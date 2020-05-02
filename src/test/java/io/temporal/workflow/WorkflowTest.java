@@ -2875,14 +2875,14 @@ public class WorkflowTest {
     String execute(String arg);
   }
 
-  private static String child2Id;
-
   public static class TestParentWorkflow implements TestWorkflow1 {
 
     private final ITestChild child1 = Workflow.newChildWorkflowStub(ITestChild.class);
     private final ITestNamedChild child2;
+    private final String child2Id;
 
     public TestParentWorkflow() {
+      child2Id = Workflow.randomUUID().toString();
       ChildWorkflowOptions options =
           ChildWorkflowOptions.newBuilder().setWorkflowId(child2Id).build();
       child2 = Workflow.newChildWorkflowStub(ITestNamedChild.class, options);
@@ -2939,7 +2939,6 @@ public class WorkflowTest {
 
   @Test
   public void testChildWorkflow() {
-    child2Id = UUID.randomUUID().toString();
     startWorkerFor(TestParentWorkflow.class, TestNamedChild.class, TestChild.class);
 
     WorkflowOptions options =
@@ -2954,7 +2953,6 @@ public class WorkflowTest {
 
   @Test
   public void testChildWorkflowTimeout() {
-    child2Id = UUID.randomUUID().toString();
     startWorkerFor(TestParentWorkflowWithChildTimeout.class, TestChild.class);
 
     WorkflowOptions options =
@@ -2990,7 +2988,6 @@ public class WorkflowTest {
   /** Reproduction of a bug when a child of continued as new workflow has the same UUID ID. */
   @Test
   public void testParentContinueAsNew() {
-    child2Id = UUID.randomUUID().toString();
     startWorkerFor(TestParentWorkflowContinueAsNew.class, TestChild.class);
 
     WorkflowOptions options =
