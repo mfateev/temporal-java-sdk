@@ -21,10 +21,11 @@ package io.temporal.internal.replay;
 
 import io.temporal.decision.v1.Decision;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.List;
 
 interface DecisionStateMachine {
 
-  Decision getDecision();
+  List<Decision> getDecisions();
 
   /** @return true if produced a decision */
   boolean cancel(Runnable immediateCancellationCallback);

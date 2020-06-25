@@ -19,11 +19,15 @@
 
 package io.temporal.internal.replay;
 
+import static java.util.Collections.EMPTY_LIST;
+
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.RequestCancelActivityTaskDecisionAttributes;
 import io.temporal.decision.v1.ScheduleActivityTaskDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.Arrays;
+import java.util.List;
 
 final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
 
@@ -51,14 +55,14 @@ final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
   }
 
   @Override
-  public Decision getDecision() {
+  public List<Decision> getDecisions() {
     switch (state) {
       case CREATED:
-        return createScheduleActivityTaskDecision();
+        return Arrays.asList(createScheduleActivityTaskDecision());
       case CANCELED_AFTER_INITIATED:
-        return createRequestCancelActivityTaskDecision();
+        return Arrays.asList(createRequestCancelActivityTaskDecision());
       default:
-        return null;
+        return EMPTY_LIST;
     }
   }
 

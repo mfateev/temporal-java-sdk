@@ -213,7 +213,7 @@ public class WorkflowExecutionUtils {
               .setExecution(workflowExecution)
               .setHistoryEventFilterType(
                   HistoryEventFilterType.HISTORY_EVENT_FILTER_TYPE_CLOSE_EVENT)
-              .setWaitForNewEvent(true)
+              .setWaitForNewEvent(timeout > 0)
               .setNextPageToken(pageToken)
               .build();
       long elapsed = System.currentTimeMillis() - start;

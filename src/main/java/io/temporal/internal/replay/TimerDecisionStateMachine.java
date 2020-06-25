@@ -19,11 +19,15 @@
 
 package io.temporal.internal.replay;
 
+import static java.util.Collections.EMPTY_LIST;
+
 import io.temporal.decision.v1.CancelTimerDecisionAttributes;
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.StartTimerDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Timer doesn't have separate initiation decision as it is started immediately. But from the state
@@ -51,14 +55,14 @@ class TimerDecisionStateMachine extends DecisionStateMachineBase {
   }
 
   @Override
-  public Decision getDecision() {
+  public List<Decision> getDecisions() {
     switch (state) {
       case CREATED:
-        return createStartTimerDecision();
+        return Arrays.asList(createStartTimerDecision());
       case CANCELED_AFTER_INITIATED:
-        return createCancelTimerDecision();
+        return Arrays.asList(createCancelTimerDecision());
       default:
-        return null;
+        return EMPTY_LIST;
     }
   }
 

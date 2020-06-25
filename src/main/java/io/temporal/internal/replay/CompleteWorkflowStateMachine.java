@@ -21,6 +21,8 @@ package io.temporal.internal.replay;
 
 import io.temporal.decision.v1.Decision;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.Arrays;
+import java.util.List;
 
 final class CompleteWorkflowStateMachine implements DecisionStateMachine {
 
@@ -38,8 +40,8 @@ final class CompleteWorkflowStateMachine implements DecisionStateMachine {
   }
 
   @Override
-  public Decision getDecision() {
-    return decision;
+  public List<Decision> getDecisions() {
+    return Arrays.asList(decision);
   }
 
   @Override

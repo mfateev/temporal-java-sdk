@@ -19,7 +19,11 @@
 
 package io.temporal.internal.replay;
 
+import static java.util.Collections.EMPTY_LIST;
+
 import io.temporal.decision.v1.Decision;
+import java.util.Arrays;
+import java.util.List;
 
 final class MarkerDecisionStateMachine extends DecisionStateMachineBase {
 
@@ -31,10 +35,10 @@ final class MarkerDecisionStateMachine extends DecisionStateMachineBase {
   }
 
   @Override
-  public Decision getDecision() {
+  public List<Decision> getDecisions() {
     if (state == DecisionState.CREATED) {
-      return decision;
+      return Arrays.asList(decision);
     }
-    return null;
+    return EMPTY_LIST;
   }
 }

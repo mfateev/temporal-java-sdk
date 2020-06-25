@@ -42,8 +42,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class ActivityDecisionContext {
+
+  private static final Logger log = LoggerFactory.getLogger(ActivityDecisionContext.class);
 
   private final class ActivityCancellationHandler implements Consumer<Exception> {
 
@@ -68,6 +72,11 @@ final class ActivityDecisionContext {
 
     @Override
     public void accept(Exception cause) {
+      log.info(
+          "scheduledEventId="
+              + scheduledEventId
+              + ", scheduledActivities="
+              + scheduledActivities.keySet());
       if (!scheduledActivities.containsKey(scheduledEventId)) {
         // Cancellation handlers are not deregistered. So they fire after an activity completion.
         return;
@@ -176,6 +185,11 @@ final class ActivityDecisionContext {
     }
 
     long scheduledEventId = decisions.scheduleActivityTask(attributes.build());
+    log.info(
+        "scheduleActivityTask scheduledEventId="
+            + scheduledEventId
+            + ", input="
+            + parameters.getInput());
     final OpenRequestInfo<Optional<Payloads>, OpenActivityInfo> context =
         new OpenRequestInfo<>(
             new OpenActivityInfo(
@@ -210,6 +224,7 @@ final class ActivityDecisionContext {
   }
 
   void handleActivityTaskCompleted(HistoryEvent event) {
+    log.info("handleActivityTaskCompleted event=" + event);
     ActivityTaskCompletedEventAttributes attributes =
         event.getActivityTaskCompletedEventAttributes();
     if (decisions.handleActivityTaskClosed(attributes.getScheduledEventId())) {

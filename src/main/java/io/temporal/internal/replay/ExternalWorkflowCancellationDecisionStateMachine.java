@@ -19,10 +19,14 @@
 
 package io.temporal.internal.replay;
 
+import static java.util.Collections.EMPTY_LIST;
+
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.RequestCancelExternalWorkflowExecutionDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.Arrays;
+import java.util.List;
 
 final class ExternalWorkflowCancellationDecisionStateMachine extends DecisionStateMachineBase {
 
@@ -35,12 +39,12 @@ final class ExternalWorkflowCancellationDecisionStateMachine extends DecisionSta
   }
 
   @Override
-  public Decision getDecision() {
+  public List<Decision> getDecisions() {
     switch (state) {
       case CREATED:
-        return createRequestCancelExternalWorkflowExecutionDecision();
+        return Arrays.asList(createRequestCancelExternalWorkflowExecutionDecision());
       default:
-        return null;
+        return EMPTY_LIST;
     }
   }
 

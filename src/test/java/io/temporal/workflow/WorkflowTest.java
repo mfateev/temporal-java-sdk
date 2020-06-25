@@ -1270,6 +1270,38 @@ public class WorkflowTest {
     activitiesImpl.assertInvocations("activityWithDelay");
   }
 
+  public static class TestImmediateCancellation implements TestWorkflow1 {
+
+    @Override
+    public String execute(String taskList) {
+      TestActivities testActivities =
+          Workflow.newActivityStub(
+              TestActivities.class,
+              ActivityOptions.newBuilder(newActivityOptions1(taskList))
+                  .setHeartbeatTimeout(Duration.ofSeconds(10))
+                  .setCancellationType(ActivityCancellationType.WAIT_CANCELLATION_COMPLETED)
+                  .build());
+      CancellationScope cs =
+          Workflow.newCancellationScope(
+              () -> Async.function(testActivities::activityWithDelay, 100000L, true));
+      cs.run();
+      Promise<String> p = Async.function(testActivities::activityWithDelay, 0L, true);
+      cs.cancel();
+      p.get();
+      return "foo";
+    }
+  }
+
+  @Test
+  public void testImmediateCancellation() {
+    startWorkerFor(TestImmediateCancellation.class);
+    TestWorkflow1 client =
+        workflowClient.newWorkflowStub(
+            TestWorkflow1.class, newWorkflowOptionsBuilder(taskList).build());
+    String result = client.execute(taskList);
+    assertEquals("foo1", result);
+  }
+
   @Test
   public void testAbandonOnCancelActivity() {
     startWorkerFor(TestAbandonOnCancelActivity.class);

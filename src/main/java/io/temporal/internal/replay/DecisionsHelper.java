@@ -553,10 +553,8 @@ class DecisionsHelper {
   List<Decision> getDecisions() {
     List<Decision> result = new ArrayList<>(MAXIMUM_DECISIONS_PER_COMPLETION + 1);
     for (DecisionStateMachine decisionStateMachine : decisions.values()) {
-      Decision decision = decisionStateMachine.getDecision();
-      if (decision != null) {
-        result.add(decision);
-      }
+      List<Decision> decisions = decisionStateMachine.getDecisions();
+      result.addAll(decisions);
     }
     // Include FORCE_IMMEDIATE_DECISION timer only if there are more then 100 events
     int size = result.size();
@@ -605,10 +603,14 @@ class DecisionsHelper {
     DecisionStateMachine decisionStateMachine = getNextDecision(iterator);
     while (decisionStateMachine != null) {
       next = getNextDecision(iterator);
-      if (++count == MAXIMUM_DECISIONS_PER_COMPLETION
-          && next != null
-          && !isCompletionEvent(next.getDecision())) {
-        break;
+      if (next != null) {
+        for (Decision decision : next.getDecisions()) {
+          if (++count == MAXIMUM_DECISIONS_PER_COMPLETION
+              && next != null
+              && !isCompletionEvent(decision)) {
+            break;
+          }
+        }
       }
       decisionStateMachine.handleDecisionTaskStartedEvent();
       decisionStateMachine = next;
@@ -622,7 +624,7 @@ class DecisionsHelper {
     DecisionStateMachine result = null;
     while (result == null && iterator.hasNext()) {
       result = iterator.next();
-      if (result.getDecision() == null) {
+      if (result.getDecisions().isEmpty()) {
         result = null;
       }
     }
