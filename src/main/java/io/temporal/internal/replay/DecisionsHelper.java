@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 class DecisionsHelper {
 
@@ -93,7 +94,7 @@ class DecisionsHelper {
    * task completion event. The nextDecisionEventId is the id of an event that corresponds to the
    * next decision to be added.
    */
-  private long nextDecisionEventId;
+  private AtomicLong nextDecisionEventId = new AtomicLong();
 
   private long lastStartedEventId;
 
@@ -113,7 +114,7 @@ class DecisionsHelper {
   }
 
   long getNextDecisionEventId() {
-    return nextDecisionEventId;
+    return nextDecisionEventId.get();
   }
 
   public long getLastStartedEventId() {
@@ -139,7 +140,7 @@ class DecisionsHelper {
     DecisionStateMachine decision =
         getDecision(new DecisionId(DecisionTarget.ACTIVITY, scheduledEventId));
     if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId++;
+      nextDecisionEventId.incrementAndGet();
     }
     return decision.isDone();
   }
@@ -272,7 +273,7 @@ class DecisionsHelper {
     DecisionStateMachine decision =
         getDecision(new DecisionId(DecisionTarget.SIGNAL_EXTERNAL_WORKFLOW, initiatedEventId));
     if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId++;
+      nextDecisionEventId.incrementAndGet();
     }
   }
 
@@ -306,7 +307,7 @@ class DecisionsHelper {
       return true;
     }
     if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId++;
+      nextDecisionEventId.incrementAndGet();
     }
     return decision.isDone();
   }
@@ -590,7 +591,7 @@ class DecisionsHelper {
 
   public void handleDecisionTaskStartedEvent(DecisionEvents decision) {
     this.decisionEvents = decision;
-    this.nextDecisionEventId = decision.getNextDecisionEventId();
+    this.nextDecisionEventId.set(decision.getNextDecisionEventId());
     // Account for DecisionCompleted
     this.lastStartedEventId = decision.getNextDecisionEventId() - 2;
   }
@@ -649,7 +650,7 @@ class DecisionsHelper {
   private void addDecision(DecisionId decisionId, DecisionStateMachine decision) {
     Objects.requireNonNull(decisionId);
     decisions.put(decisionId, decision);
-    nextDecisionEventId++;
+    nextDecisionEventId.incrementAndGet();
   }
 
   void addAllMissingVersionMarker() {
@@ -684,7 +685,7 @@ class DecisionsHelper {
    * @param converter must be present if changeId is present
    */
   void addAllMissingVersionMarker(Optional<String> changeId, Optional<DataConverter> converter) {
-    Optional<HistoryEvent> markerEvent = getVersionMakerEvent(nextDecisionEventId);
+    Optional<HistoryEvent> markerEvent = getVersionMakerEvent(nextDecisionEventId.get());
 
     if (!markerEvent.isPresent()) {
       return;
@@ -696,7 +697,7 @@ class DecisionsHelper {
     long changeIdMarkerEventId = -1;
     if (changeId.isPresent()) {
       String id = changeId.get();
-      long eventId = nextDecisionEventId;
+      long eventId = nextDecisionEventId.get();
       while (true) {
         MarkerRecordedEventAttributes eventAttributes =
             markerEvent.get().getMarkerRecordedEventAttributes();
@@ -714,7 +715,7 @@ class DecisionsHelper {
         }
       }
       // There are no version markers preceding a marker with the changeId
-      if (changeIdMarkerEventId < 0 || changeIdMarkerEventId == nextDecisionEventId) {
+      if (changeIdMarkerEventId < 0 || changeIdMarkerEventId == nextDecisionEventId.get()) {
         return;
       }
     }
@@ -737,13 +738,14 @@ class DecisionsHelper {
               .setDecisionType(DecisionType.DECISION_TYPE_RECORD_MARKER)
               .setRecordMarkerDecisionAttributes(attributes)
               .build();
-      DecisionId markerDecisionId = new DecisionId(DecisionTarget.MARKER, nextDecisionEventId);
+      DecisionId markerDecisionId =
+          new DecisionId(DecisionTarget.MARKER, nextDecisionEventId.get());
       decisions.put(
           markerDecisionId, new MarkerDecisionStateMachine(markerDecisionId, markerDecision));
-      nextDecisionEventId++;
-      markerEvent = getVersionMakerEvent(nextDecisionEventId);
+      nextDecisionEventId.incrementAndGet();
+      markerEvent = getVersionMakerEvent(nextDecisionEventId.get());
     } while (markerEvent.isPresent()
-        && (changeIdMarkerEventId < 0 || nextDecisionEventId < changeIdMarkerEventId));
+        && (changeIdMarkerEventId < 0 || nextDecisionEventId.get() < changeIdMarkerEventId));
   }
 
   private DecisionStateMachine getDecision(DecisionId decisionId) {
