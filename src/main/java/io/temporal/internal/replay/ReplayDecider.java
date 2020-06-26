@@ -439,6 +439,7 @@ class ReplayDecider implements Decider {
       while (iterator.hasNext()) {
         DecisionEvents decision = iterator.next();
         context.setReplaying(decision.isReplay());
+        decisionsHelper.setReplaying(decision.isReplay());
         context.setReplayCurrentTimeMilliseconds(decision.getReplayCurrentTimeMilliseconds());
 
         decisionsHelper.handleDecisionTaskStartedEvent(decision);

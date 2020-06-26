@@ -56,7 +56,7 @@ public class ReplayAwareScope implements Scope {
 
     @Override
     public void inc(long delta) {
-      if (context.isReplaying()) {
+      if (context.isReplay()) {
         return;
       }
 
@@ -73,7 +73,7 @@ public class ReplayAwareScope implements Scope {
 
     @Override
     public void update(double value) {
-      if (context.isReplaying()) {
+      if (context.isReplay()) {
         return;
       }
 
@@ -90,7 +90,7 @@ public class ReplayAwareScope implements Scope {
 
     @Override
     public void record(Duration interval) {
-      if (context.isReplaying()) {
+      if (context.isReplay()) {
         return;
       }
 
@@ -136,7 +136,7 @@ public class ReplayAwareScope implements Scope {
 
     @Override
     public void recordValue(double value) {
-      if (context.isReplaying()) {
+      if (context.isReplay()) {
         return;
       }
 
@@ -145,7 +145,7 @@ public class ReplayAwareScope implements Scope {
 
     @Override
     public void recordDuration(Duration value) {
-      if (context.isReplaying()) {
+      if (context.isReplay()) {
         return;
       }
 

@@ -124,7 +124,7 @@ public final class ClockDecisionContext {
     }
   }
 
-  boolean isReplaying() {
+  boolean isReplay() {
     return replaying;
   }
 

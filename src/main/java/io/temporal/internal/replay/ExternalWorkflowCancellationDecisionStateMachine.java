@@ -27,14 +27,17 @@ import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class ExternalWorkflowCancellationDecisionStateMachine extends DecisionStateMachineBase {
 
   private RequestCancelExternalWorkflowExecutionDecisionAttributes attributes;
 
   ExternalWorkflowCancellationDecisionStateMachine(
-      DecisionId decisionId, RequestCancelExternalWorkflowExecutionDecisionAttributes attributes) {
-    super(decisionId);
+      DecisionId decisionId,
+      AtomicBoolean isReplay,
+      RequestCancelExternalWorkflowExecutionDecisionAttributes attributes) {
+    super(decisionId, isReplay);
     this.attributes = attributes;
   }
 

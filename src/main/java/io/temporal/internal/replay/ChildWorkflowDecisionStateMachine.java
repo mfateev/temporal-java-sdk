@@ -28,6 +28,7 @@ import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class ChildWorkflowDecisionStateMachine extends DecisionStateMachineBase {
 
@@ -36,8 +37,10 @@ final class ChildWorkflowDecisionStateMachine extends DecisionStateMachineBase {
   private String runId;
 
   public ChildWorkflowDecisionStateMachine(
-      DecisionId id, StartChildWorkflowExecutionDecisionAttributes startAttributes) {
-    super(id);
+      DecisionId id,
+      AtomicBoolean isReplay,
+      StartChildWorkflowExecutionDecisionAttributes startAttributes) {
+    super(id, isReplay);
     this.startAttributes = startAttributes;
   }
 

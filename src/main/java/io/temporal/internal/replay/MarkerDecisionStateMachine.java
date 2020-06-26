@@ -24,13 +24,14 @@ import static java.util.Collections.EMPTY_LIST;
 import io.temporal.decision.v1.Decision;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class MarkerDecisionStateMachine extends DecisionStateMachineBase {
 
   private final Decision decision;
 
-  MarkerDecisionStateMachine(DecisionId id, Decision decision) {
-    super(id);
+  MarkerDecisionStateMachine(DecisionId id, AtomicBoolean isReplay, Decision decision) {
+    super(id, isReplay);
     this.decision = decision;
   }
 

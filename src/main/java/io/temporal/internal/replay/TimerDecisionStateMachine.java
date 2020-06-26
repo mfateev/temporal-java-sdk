@@ -28,6 +28,7 @@ import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Timer doesn't have separate initiation decision as it is started immediately. But from the state
@@ -42,8 +43,9 @@ class TimerDecisionStateMachine extends DecisionStateMachineBase {
 
   private boolean canceled;
 
-  public TimerDecisionStateMachine(DecisionId id, StartTimerDecisionAttributes attributes) {
-    super(id);
+  public TimerDecisionStateMachine(
+      DecisionId id, AtomicBoolean isReplay, StartTimerDecisionAttributes attributes) {
+    super(id, isReplay);
     this.attributes = attributes;
   }
 

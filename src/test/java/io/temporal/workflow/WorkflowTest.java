@@ -706,7 +706,7 @@ public class WorkflowTest {
               .setStartToCloseTimeout(Duration.ofSeconds(1))
               .setRetryOptions(RetryOptions.newBuilder().setMaximumAttempts(1).build());
       RetryOptions retryOptions;
-      if (Workflow.isReplaying()) {
+      if (Workflow.isReplay()) {
         retryOptions =
             RetryOptions.newBuilder()
                 .setMaximumInterval(Duration.ofSeconds(1))
@@ -952,7 +952,7 @@ public class WorkflowTest {
               .setScheduleToCloseTimeout(Duration.ofSeconds(5))
               .setScheduleToStartTimeout(Duration.ofSeconds(5))
               .setStartToCloseTimeout(Duration.ofSeconds(10));
-      if (Workflow.isReplaying()) {
+      if (Workflow.isReplay()) {
         options.setRetryOptions(
             RetryOptions.newBuilder()
                 .setMaximumInterval(Duration.ofSeconds(1))
@@ -2486,7 +2486,7 @@ public class WorkflowTest {
     @Override
     public String execute(boolean useExternalService) {
       RetryOptions retryOptions;
-      if (Workflow.isReplaying()) {
+      if (Workflow.isReplay()) {
         retryOptions =
             RetryOptions.newBuilder()
                 .setMaximumInterval(Duration.ofSeconds(1))
@@ -4674,7 +4674,7 @@ public class WorkflowTest {
 
       boolean replaying = false;
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         result += "activity" + testActivities.activity1(1); // This is executed in non-replay mode.
       } else {
         replaying = true;
@@ -4719,7 +4719,7 @@ public class WorkflowTest {
     @Override
     public String execute(String taskList) {
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         Workflow.sleep(Duration.ofMinutes(1));
       } else {
         int version2 = Workflow.getVersion("test_change_2", Workflow.DEFAULT_VERSION, 11);
@@ -4750,7 +4750,7 @@ public class WorkflowTest {
     @Override
     public String execute(String taskList) {
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         int version2 = Workflow.getVersion("test_change", Workflow.DEFAULT_VERSION, 11);
         Workflow.sleep(Duration.ofMinutes(1));
       } else {
@@ -4783,7 +4783,7 @@ public class WorkflowTest {
     public String execute(String taskList) {
       log.info("TestGetVersionWorkflow3Impl this=" + this.hashCode());
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         // The first version of the code
         int changeFoo = Workflow.getVersion("changeFoo", Workflow.DEFAULT_VERSION, 1);
         if (changeFoo != 1) {
@@ -4822,7 +4822,7 @@ public class WorkflowTest {
     public String execute(String taskList) {
       log.info("TestGetVersionWorkflow3Impl this=" + this.hashCode());
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         // The first version of the code
         int changeFoo1 = Workflow.getVersion("changeFoo0", Workflow.DEFAULT_VERSION, 2);
         if (changeFoo1 != 2) {
@@ -4865,7 +4865,7 @@ public class WorkflowTest {
     public String execute(String taskList) {
       log.info("TestGetVersionWorkflow3Impl this=" + this.hashCode());
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         // The first version of the code
         Workflow.getVersion("changeFoo0", Workflow.DEFAULT_VERSION, 2);
         Workflow.getVersion("changeFoo1", Workflow.DEFAULT_VERSION, 111);
@@ -4905,7 +4905,7 @@ public class WorkflowTest {
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskList));
       String result;
       // Test adding a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         // The first version of the code
         int changeFoo = Workflow.getVersion("changeFoo", Workflow.DEFAULT_VERSION, 1);
         if (changeFoo != 1) {
@@ -4942,7 +4942,7 @@ public class WorkflowTest {
     @Override
     public String execute() {
       try {
-        if (!Workflow.isReplaying()) {
+        if (!Workflow.isReplay()) {
           executionStarted.complete(true);
           signalReceived.get();
         } else {
@@ -4994,7 +4994,7 @@ public class WorkflowTest {
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskList));
       String result;
       // Test removing a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         int version = Workflow.getVersion("test_change", Workflow.DEFAULT_VERSION, 13);
         assertEquals(13, version);
         result = testActivities.activity2("activity2", 2);
@@ -5031,7 +5031,7 @@ public class WorkflowTest {
       TestActivities testActivities =
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskList));
       // Test removing a version check in replay code.
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         Workflow.getVersion("test_change1", Workflow.DEFAULT_VERSION, 11);
         Workflow.getVersion("test_change2", Workflow.DEFAULT_VERSION, 12);
         Workflow.getVersion("test_change3", Workflow.DEFAULT_VERSION, 13);
@@ -5118,7 +5118,7 @@ public class WorkflowTest {
     public void execute(String taskList) {
       TestActivities activities =
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskList));
-      if (!Workflow.isReplaying()) {
+      if (!Workflow.isReplay()) {
         activities.activity1(1);
       }
     }
@@ -5880,8 +5880,8 @@ public class WorkflowTest {
     private final List<String> impl = Collections.synchronizedList(new ArrayList<>());
 
     public boolean add(String s) {
-      log.trace("FilteredTrace isReplaying=" + Workflow.isReplaying());
-      if (!Workflow.isReplaying()) {
+      log.trace("FilteredTrace isReplay=" + Workflow.isReplay());
+      if (!Workflow.isReplay()) {
         return impl.add(s);
       }
       return true;

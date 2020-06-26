@@ -27,6 +27,7 @@ import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 class SignalDecisionStateMachine extends DecisionStateMachineBase {
 
@@ -35,8 +36,10 @@ class SignalDecisionStateMachine extends DecisionStateMachineBase {
   private boolean canceled;
 
   public SignalDecisionStateMachine(
-      DecisionId id, SignalExternalWorkflowExecutionDecisionAttributes attributes) {
-    super(id);
+      DecisionId id,
+      AtomicBoolean isReplay,
+      SignalExternalWorkflowExecutionDecisionAttributes attributes) {
+    super(id, isReplay);
     this.attributes = attributes;
   }
 

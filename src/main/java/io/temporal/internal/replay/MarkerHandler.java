@@ -158,7 +158,7 @@ class MarkerHandler {
     long eventId = decisions.getNextDecisionEventId();
     int accessCount = result == null ? 0 : result.getAccessCount();
 
-    if (replayContext.isReplaying()) {
+    if (replayContext.isReplay()) {
       Optional<Payloads> data = getMarkerDataFromHistory(eventId, id, accessCount, converter);
       if (data.isPresent()) {
         // Need to insert marker to ensure that eventId is incremented

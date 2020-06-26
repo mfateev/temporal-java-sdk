@@ -865,8 +865,8 @@ public final class Workflow {
    * this flag as it is going to break determinism. The only reasonable uses for this flag are
    * deduping external never failing side effects like logging or metric reporting.
    */
-  public static boolean isReplaying() {
-    return WorkflowInternal.isReplaying();
+  public static boolean isReplay() {
+    return WorkflowInternal.isReplay();
   }
 
   /**

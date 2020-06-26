@@ -42,15 +42,15 @@ import org.junit.Test;
 public class ReplayAwareScopeTest {
 
   private static class TestContext implements ReplayAware {
-    boolean isReplaying;
+    boolean isReplay;
 
-    public TestContext(boolean isReplaying) {
-      this.isReplaying = isReplaying;
+    public TestContext(boolean isReplay) {
+      this.isReplay = isReplay;
     }
 
     @Override
-    public boolean isReplaying() {
-      return isReplaying;
+    public boolean isReplay() {
+      return isReplay;
     }
   }
 

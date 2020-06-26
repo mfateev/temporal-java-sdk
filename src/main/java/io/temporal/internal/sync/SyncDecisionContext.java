@@ -671,8 +671,8 @@ final class SyncDecisionContext implements WorkflowOutboundCallsInterceptor {
     return converter;
   }
 
-  boolean isReplaying() {
-    return context.isReplaying();
+  boolean isReplay() {
+    return context.isReplay();
   }
 
   public DecisionContext getContext() {

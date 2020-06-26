@@ -22,6 +22,7 @@ package io.temporal.internal.replay;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 abstract class DecisionStateMachineBase implements DecisionStateMachine {
 
@@ -31,8 +32,11 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
 
   private final DecisionId id;
 
-  public DecisionStateMachineBase(DecisionId id) {
+  private final AtomicBoolean isReplay;
+
+  public DecisionStateMachineBase(DecisionId id, AtomicBoolean isReplay) {
     this.id = id;
+    this.isReplay = isReplay;
     stateHistory.add(state.toString());
   }
 
@@ -40,6 +44,7 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
   protected DecisionStateMachineBase(DecisionId id, DecisionState state) {
     this.id = id;
     this.state = state;
+    this.isReplay = new AtomicBoolean();
     stateHistory.add(state.toString());
   }
 

@@ -332,8 +332,8 @@ public final class WorkflowInternal {
   /** Prohibit instantiation */
   private WorkflowInternal() {}
 
-  public static boolean isReplaying() {
-    return getRootDecisionContext().isReplaying();
+  public static boolean isReplay() {
+    return getRootDecisionContext().isReplay();
   }
 
   public static WorkflowInfo getWorkflowInfo() {
@@ -385,13 +385,13 @@ public final class WorkflowInternal {
   public static Logger getLogger(Class<?> clazz) {
     Logger logger = LoggerFactory.getLogger(clazz);
     return new ReplayAwareLogger(
-        logger, WorkflowInternal::isReplaying, WorkflowInternal::isLoggingEnabledInReplay);
+        logger, WorkflowInternal::isReplay, WorkflowInternal::isLoggingEnabledInReplay);
   }
 
   public static Logger getLogger(String name) {
     Logger logger = LoggerFactory.getLogger(name);
     return new ReplayAwareLogger(
-        logger, WorkflowInternal::isReplaying, WorkflowInternal::isLoggingEnabledInReplay);
+        logger, WorkflowInternal::isReplay, WorkflowInternal::isLoggingEnabledInReplay);
   }
 
   public static <R> R getLastCompletionResult(Class<R> resultClass, Type resultType) {

@@ -482,6 +482,6 @@ public class ReplayAwareLogger implements Logger {
   }
 
   private boolean shouldSkipLogging() {
-    return context.isReplaying() && !enableLoggingInReplay.get();
+    return context.isReplay() && !enableLoggingInReplay.get();
   }
 }

@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 class DecisionsHelper {
@@ -88,6 +89,8 @@ class DecisionsHelper {
           + "change in the workflow definition.";
 
   private final PollForDecisionTaskResponse.Builder task;
+
+  private final AtomicBoolean isReplay = new AtomicBoolean();
 
   /**
    * When workflow task completes the decisions are converted to events that follow the decision
@@ -121,6 +124,10 @@ class DecisionsHelper {
     return lastStartedEventId;
   }
 
+  public void setReplaying(boolean isReplay) {
+    this.isReplay.set(isReplay);
+  }
+
   long scheduleActivityTask(ScheduleActivityTaskDecisionAttributes schedule) {
     addAllMissingVersionMarker();
 
@@ -128,7 +135,8 @@ class DecisionsHelper {
     DecisionId decisionId = new DecisionId(DecisionTarget.ACTIVITY, nextDecisionEventId);
     activityIdToScheduledEventId.put(schedule.getActivityId(), nextDecisionEventId);
     addDecision(
-        decisionId, new ActivityDecisionStateMachine(decisionId, schedule, nextDecisionEventId));
+        decisionId,
+        new ActivityDecisionStateMachine(decisionId, this.nextDecisionEventId, isReplay, schedule));
     return nextDecisionEventId;
   }
 
@@ -196,7 +204,8 @@ class DecisionsHelper {
 
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.CHILD_WORKFLOW, nextDecisionEventId);
-    addDecision(decisionId, new ChildWorkflowDecisionStateMachine(decisionId, childWorkflow));
+    addDecision(
+        decisionId, new ChildWorkflowDecisionStateMachine(decisionId, isReplay, childWorkflow));
     return nextDecisionEventId;
   }
 
@@ -228,7 +237,8 @@ class DecisionsHelper {
     DecisionId decisionId =
         new DecisionId(DecisionTarget.CANCEL_EXTERNAL_WORKFLOW, nextDecisionEventId);
     addDecision(
-        decisionId, new ExternalWorkflowCancellationDecisionStateMachine(decisionId, schedule));
+        decisionId,
+        new ExternalWorkflowCancellationDecisionStateMachine(decisionId, isReplay, schedule));
     return nextDecisionEventId;
   }
 
@@ -264,7 +274,7 @@ class DecisionsHelper {
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId =
         new DecisionId(DecisionTarget.SIGNAL_EXTERNAL_WORKFLOW, nextDecisionEventId);
-    addDecision(decisionId, new SignalDecisionStateMachine(decisionId, signal));
+    addDecision(decisionId, new SignalDecisionStateMachine(decisionId, isReplay, signal));
     return nextDecisionEventId;
   }
 
@@ -296,7 +306,7 @@ class DecisionsHelper {
 
     long startEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.TIMER, startEventId);
-    addDecision(decisionId, new TimerDecisionStateMachine(decisionId, request));
+    addDecision(decisionId, new TimerDecisionStateMachine(decisionId, isReplay, request));
     return startEventId;
   }
 
@@ -534,7 +544,7 @@ class DecisionsHelper {
             .build();
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.MARKER, nextDecisionEventId);
-    addDecision(decisionId, new MarkerDecisionStateMachine(decisionId, decision));
+    addDecision(decisionId, new MarkerDecisionStateMachine(decisionId, isReplay, decision));
   }
 
   void upsertSearchAttributes(SearchAttributes searchAttributes) {
@@ -548,7 +558,8 @@ class DecisionsHelper {
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId =
         new DecisionId(DecisionTarget.UPSERT_SEARCH_ATTRIBUTES, nextDecisionEventId);
-    addDecision(decisionId, new UpsertSearchAttributesDecisionStateMachine(decisionId, decision));
+    addDecision(
+        decisionId, new UpsertSearchAttributesDecisionStateMachine(decisionId, isReplay, decision));
   }
 
   List<Decision> getDecisions() {
@@ -741,7 +752,8 @@ class DecisionsHelper {
       DecisionId markerDecisionId =
           new DecisionId(DecisionTarget.MARKER, nextDecisionEventId.get());
       decisions.put(
-          markerDecisionId, new MarkerDecisionStateMachine(markerDecisionId, markerDecision));
+          markerDecisionId,
+          new MarkerDecisionStateMachine(markerDecisionId, isReplay, markerDecision));
       nextDecisionEventId.incrementAndGet();
       markerEvent = getVersionMakerEvent(nextDecisionEventId.get());
     } while (markerEvent.isPresent()

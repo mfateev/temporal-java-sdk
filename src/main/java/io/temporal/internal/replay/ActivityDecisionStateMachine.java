@@ -26,32 +26,29 @@ import io.temporal.decision.v1.RequestCancelActivityTaskDecisionAttributes;
 import io.temporal.decision.v1.ScheduleActivityTaskDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
 
   private ScheduleActivityTaskDecisionAttributes scheduleAttributes;
   private long scheduledEventId;
+  private final AtomicLong nextEventId;
+  private List<Decision> decisions = new ArrayList<>();
 
   public ActivityDecisionStateMachine(
       DecisionId id,
-      ScheduleActivityTaskDecisionAttributes scheduleAttributes,
-      long scheduledEventId) {
-    super(id);
+      AtomicLong nextEventId,
+      AtomicBoolean isReplay,
+      ScheduleActivityTaskDecisionAttributes scheduleAttributes) {
+    super(id, isReplay);
+    this.scheduledEventId = id.getDecisionEventId();
+    this.nextEventId = nextEventId;
     this.scheduleAttributes = scheduleAttributes;
-    this.scheduledEventId = scheduledEventId;
-  }
-
-  /** Used for unit testing */
-  ActivityDecisionStateMachine(
-      DecisionId id,
-      ScheduleActivityTaskDecisionAttributes scheduleAttributes,
-      DecisionState state,
-      long scheduledEventId) {
-    super(id, state);
-    this.scheduleAttributes = scheduleAttributes;
-    this.scheduledEventId = scheduledEventId;
+    decisions.add(createScheduleActivityTaskDecision());
   }
 
   @Override

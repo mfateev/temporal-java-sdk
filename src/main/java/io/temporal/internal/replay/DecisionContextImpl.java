@@ -272,8 +272,8 @@ final class DecisionContextImpl implements DecisionContext, HistoryEventHandler 
   }
 
   @Override
-  public boolean isReplaying() {
-    return workflowClock.isReplaying();
+  public boolean isReplay() {
+    return workflowClock.isReplay();
   }
 
   @Override
