@@ -19,15 +19,11 @@
 
 package io.temporal.internal.replay;
 
-import static java.util.Collections.EMPTY_LIST;
-
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.RequestCancelExternalWorkflowExecutionDecisionAttributes;
 import io.temporal.decision.v1.StartChildWorkflowExecutionDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class ChildWorkflowDecisionStateMachine extends DecisionStateMachineBase {
@@ -51,18 +47,6 @@ final class ChildWorkflowDecisionStateMachine extends DecisionStateMachineBase {
       DecisionState state) {
     super(id, state);
     this.startAttributes = startAttributes;
-  }
-
-  @Override
-  public List<Decision> getDecisions() {
-    switch (state) {
-      case CREATED:
-        return Arrays.asList(createStartChildWorkflowExecutionDecision());
-      case CANCELED_AFTER_STARTED:
-        return Arrays.asList(createRequestCancelExternalWorkflowExecutionDecision());
-      default:
-        return EMPTY_LIST;
-    }
   }
 
   @Override
@@ -144,20 +128,22 @@ final class ChildWorkflowDecisionStateMachine extends DecisionStateMachineBase {
     }
   }
 
-  private Decision createRequestCancelExternalWorkflowExecutionDecision() {
+  @Override
+  protected Decision newInitiateDecision() {
+    return Decision.newBuilder()
+        .setStartChildWorkflowExecutionDecisionAttributes(startAttributes)
+        .setDecisionType(DecisionType.DECISION_TYPE_START_CHILD_WORKFLOW_EXECUTION)
+        .build();
+  }
+
+  @Override
+  protected Decision newRequestCancelDecision() {
     return Decision.newBuilder()
         .setRequestCancelExternalWorkflowExecutionDecisionAttributes(
             RequestCancelExternalWorkflowExecutionDecisionAttributes.newBuilder()
                 .setWorkflowId(startAttributes.getWorkflowId())
                 .setRunId(runId))
         .setDecisionType(DecisionType.DECISION_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION)
-        .build();
-  }
-
-  private Decision createStartChildWorkflowExecutionDecision() {
-    return Decision.newBuilder()
-        .setStartChildWorkflowExecutionDecisionAttributes(startAttributes)
-        .setDecisionType(DecisionType.DECISION_TYPE_START_CHILD_WORKFLOW_EXECUTION)
         .build();
   }
 }

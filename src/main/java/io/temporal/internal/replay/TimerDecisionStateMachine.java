@@ -19,15 +19,11 @@
 
 package io.temporal.internal.replay;
 
-import static java.util.Collections.EMPTY_LIST;
-
 import io.temporal.decision.v1.CancelTimerDecisionAttributes;
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.StartTimerDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -57,24 +53,13 @@ class TimerDecisionStateMachine extends DecisionStateMachineBase {
   }
 
   @Override
-  public List<Decision> getDecisions() {
-    switch (state) {
-      case CREATED:
-        return Arrays.asList(createStartTimerDecision());
-      case CANCELED_AFTER_INITIATED:
-        return Arrays.asList(createCancelTimerDecision());
-      default:
-        return EMPTY_LIST;
-    }
-  }
-
-  @Override
   public void handleDecisionTaskStartedEvent() {
     switch (state) {
       case CANCELED_AFTER_INITIATED:
         stateHistory.add("handleDecisionTaskStartedEvent");
         state = DecisionState.CANCELLATION_DECISION_SENT;
         stateHistory.add(state.toString());
+        addDecision(newRequestCancelDecision());
         break;
       default:
         super.handleDecisionTaskStartedEvent();
@@ -110,18 +95,20 @@ class TimerDecisionStateMachine extends DecisionStateMachineBase {
     return state == DecisionState.COMPLETED || canceled;
   }
 
-  private Decision createCancelTimerDecision() {
+  @Override
+  protected Decision newInitiateDecision() {
+    return Decision.newBuilder()
+        .setStartTimerDecisionAttributes(attributes)
+        .setDecisionType(DecisionType.DECISION_TYPE_START_TIMER)
+        .build();
+  }
+
+  @Override
+  protected Decision newRequestCancelDecision() {
     return Decision.newBuilder()
         .setCancelTimerDecisionAttributes(
             CancelTimerDecisionAttributes.newBuilder().setTimerId(attributes.getTimerId()))
         .setDecisionType(DecisionType.DECISION_TYPE_CANCEL_TIMER)
-        .build();
-  }
-
-  private Decision createStartTimerDecision() {
-    return Decision.newBuilder()
-        .setStartTimerDecisionAttributes(attributes)
-        .setDecisionType(DecisionType.DECISION_TYPE_START_TIMER)
         .build();
   }
 }

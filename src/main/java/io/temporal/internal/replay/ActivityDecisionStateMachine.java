@@ -19,15 +19,12 @@
 
 package io.temporal.internal.replay;
 
-import static java.util.Collections.EMPTY_LIST;
-
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.RequestCancelActivityTaskDecisionAttributes;
 import io.temporal.decision.v1.ScheduleActivityTaskDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,19 +45,6 @@ final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
     this.scheduledEventId = id.getDecisionEventId();
     this.nextEventId = nextEventId;
     this.scheduleAttributes = scheduleAttributes;
-    decisions.add(createScheduleActivityTaskDecision());
-  }
-
-  @Override
-  public List<Decision> getDecisions() {
-    switch (state) {
-      case CREATED:
-        return Arrays.asList(createScheduleActivityTaskDecision());
-      case CANCELED_AFTER_INITIATED:
-        return Arrays.asList(createRequestCancelActivityTaskDecision());
-      default:
-        return EMPTY_LIST;
-    }
   }
 
   @Override
@@ -87,9 +71,11 @@ final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
       default:
         super.handleCancellationFailureEvent(event);
     }
+    nextEventId.incrementAndGet();
   }
 
-  private Decision createRequestCancelActivityTaskDecision() {
+  @Override
+  protected Decision newRequestCancelDecision() {
     return Decision.newBuilder()
         .setRequestCancelActivityTaskDecisionAttributes(
             RequestCancelActivityTaskDecisionAttributes.newBuilder()
@@ -98,7 +84,8 @@ final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
         .build();
   }
 
-  private Decision createScheduleActivityTaskDecision() {
+  @Override
+  protected Decision newInitiateDecision() {
     scheduledEventId = getId().getDecisionEventId();
     return Decision.newBuilder()
         .setScheduleActivityTaskDecisionAttributes(scheduleAttributes)

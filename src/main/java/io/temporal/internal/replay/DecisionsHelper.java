@@ -61,10 +61,10 @@ import io.temporal.internal.replay.HistoryHelper.DecisionEvents;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.tasklist.v1.TaskList;
 import io.temporal.workflowservice.v1.PollForDecisionTaskResponse;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,14 +75,6 @@ import java.util.concurrent.atomic.AtomicLong;
 class DecisionsHelper {
 
   //  private static final Logger log = LoggerFactory.getLogger(DecisionsHelper.class);
-
-  /**
-   * TODO: Update constant once Temporal introduces the limit of decision per completion. Or remove
-   * code path if Temporal deals with this problem differently like paginating through decisions.
-   */
-  private static final int MAXIMUM_DECISIONS_PER_COMPLETION = 10000;
-
-  static final String FORCE_IMMEDIATE_DECISION_TIMER = "FORCE_IMMEDIATE_DECISION";
 
   private static final String NON_DETERMINISTIC_MESSAGE =
       "The possible causes are a nondeterministic workflow definition code or an incompatible "
@@ -105,9 +97,9 @@ class DecisionsHelper {
 
   private DecisionEvents decisionEvents;
 
-  /** Use access-order to ensure that decisions are emitted in order of their creation */
-  private final Map<DecisionId, DecisionStateMachine> decisions =
-      new LinkedHashMap<>(100, 0.75f, true);
+  private List<DecisionStateMachine> newDecisions = new ArrayList<>();
+
+  private Map<DecisionId, DecisionStateMachine> decisionMap = new HashMap<>();
 
   // TODO: removal of completed activities
   private final Map<String, Long> activityIdToScheduledEventId = new HashMap<>();
@@ -420,7 +412,7 @@ class DecisionsHelper {
     if (!(decision instanceof CompleteWorkflowStateMachine)) {
       throw new IllegalStateException("Unexpected decision: " + decision);
     }
-    decisions.clear();
+    newDecisions.clear();
   }
 
   void completeWorkflowExecution(Optional<Payloads> output) {
@@ -562,28 +554,12 @@ class DecisionsHelper {
         decisionId, new UpsertSearchAttributesDecisionStateMachine(decisionId, isReplay, decision));
   }
 
-  List<Decision> getDecisions() {
-    List<Decision> result = new ArrayList<>(MAXIMUM_DECISIONS_PER_COMPLETION + 1);
-    for (DecisionStateMachine decisionStateMachine : decisions.values()) {
-      List<Decision> decisions = decisionStateMachine.getDecisions();
+  List<Decision> getNewDecisions() {
+    List<Decision> result = new ArrayList<>();
+    for (DecisionStateMachine decisionStateMachine : newDecisions) {
+      List<Decision> decisions = decisionStateMachine.takeDecisions();
       result.addAll(decisions);
     }
-    // Include FORCE_IMMEDIATE_DECISION timer only if there are more then 100 events
-    int size = result.size();
-    if (size > MAXIMUM_DECISIONS_PER_COMPLETION
-        && !isCompletionEvent(result.get(MAXIMUM_DECISIONS_PER_COMPLETION - 2))) {
-      result = result.subList(0, MAXIMUM_DECISIONS_PER_COMPLETION - 1);
-      Decision d =
-          Decision.newBuilder()
-              .setStartTimerDecisionAttributes(
-                  StartTimerDecisionAttributes.newBuilder()
-                      .setStartToFireTimeoutSeconds(0)
-                      .setTimerId(FORCE_IMMEDIATE_DECISION_TIMER))
-              .setDecisionType(DecisionType.DECISION_TYPE_START_TIMER)
-              .build();
-      result.add(d);
-    }
-
     return result;
   }
 
@@ -608,44 +584,18 @@ class DecisionsHelper {
   }
 
   void notifyDecisionSent() {
-    int count = 0;
-    Iterator<DecisionStateMachine> iterator = decisions.values().iterator();
+    Iterator<DecisionStateMachine> iterator = newDecisions.iterator();
     DecisionStateMachine next = null;
 
-    DecisionStateMachine decisionStateMachine = getNextDecision(iterator);
-    while (decisionStateMachine != null) {
-      next = getNextDecision(iterator);
-      if (next != null) {
-        for (Decision decision : next.getDecisions()) {
-          if (++count == MAXIMUM_DECISIONS_PER_COMPLETION
-              && next != null
-              && !isCompletionEvent(decision)) {
-            break;
-          }
-        }
-      }
+    for (DecisionStateMachine decisionStateMachine : newDecisions) {
       decisionStateMachine.handleDecisionTaskStartedEvent();
-      decisionStateMachine = next;
     }
-    if (next != null && count < MAXIMUM_DECISIONS_PER_COMPLETION) {
-      next.handleDecisionTaskStartedEvent();
-    }
-  }
-
-  private DecisionStateMachine getNextDecision(Iterator<DecisionStateMachine> iterator) {
-    DecisionStateMachine result = null;
-    while (result == null && iterator.hasNext()) {
-      result = iterator.next();
-      if (result.getDecisions().isEmpty()) {
-        result = null;
-      }
-    }
-    return result;
+    newDecisions = new ArrayList<>();
   }
 
   @Override
   public String toString() {
-    return WorkflowExecutionUtils.prettyPrintDecisions(getDecisions());
+    return WorkflowExecutionUtils.prettyPrintDecisions(getNewDecisions());
   }
 
   PollForDecisionTaskResponse.Builder getTask() {
@@ -660,7 +610,8 @@ class DecisionsHelper {
   // after that.
   private void addDecision(DecisionId decisionId, DecisionStateMachine decision) {
     Objects.requireNonNull(decisionId);
-    decisions.put(decisionId, decision);
+    decision.init();
+    newDecisions.add(decision);
     nextDecisionEventId.incrementAndGet();
   }
 
@@ -751,9 +702,7 @@ class DecisionsHelper {
               .build();
       DecisionId markerDecisionId =
           new DecisionId(DecisionTarget.MARKER, nextDecisionEventId.get());
-      decisions.put(
-          markerDecisionId,
-          new MarkerDecisionStateMachine(markerDecisionId, isReplay, markerDecision));
+      newDecisions.add(new MarkerDecisionStateMachine(markerDecisionId, isReplay, markerDecision));
       nextDecisionEventId.incrementAndGet();
       markerEvent = getVersionMakerEvent(nextDecisionEventId.get());
     } while (markerEvent.isPresent()
@@ -761,7 +710,7 @@ class DecisionsHelper {
   }
 
   private DecisionStateMachine getDecision(DecisionId decisionId) {
-    DecisionStateMachine result = decisions.get(decisionId);
+    DecisionStateMachine result = newDecisions.get(decisionId);
     if (result == null) {
       throw new NonDeterminisicWorkflowError(
           "Unknown " + decisionId + ". " + NON_DETERMINISTIC_MESSAGE);

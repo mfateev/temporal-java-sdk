@@ -19,11 +19,7 @@
 
 package io.temporal.internal.replay;
 
-import static java.util.Collections.EMPTY_LIST;
-
 import io.temporal.decision.v1.Decision;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class UpsertSearchAttributesDecisionStateMachine extends DecisionStateMachineBase {
@@ -37,10 +33,7 @@ public class UpsertSearchAttributesDecisionStateMachine extends DecisionStateMac
   }
 
   @Override
-  public List<Decision> getDecisions() {
-    if (state == DecisionState.CREATED) {
-      return Arrays.asList(decision);
-    }
-    return EMPTY_LIST;
+  protected Decision newInitiateDecision() {
+    return decision;
   }
 }

@@ -25,7 +25,9 @@ import java.util.List;
 
 interface DecisionStateMachine {
 
-  List<Decision> getDecisions();
+  void init();
+
+  List<Decision> takeDecisions();
 
   /** @return true if produced a decision */
   boolean cancel(Runnable immediateCancellationCallback);

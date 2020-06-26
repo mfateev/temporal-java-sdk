@@ -19,14 +19,10 @@
 
 package io.temporal.internal.replay;
 
-import static java.util.Collections.EMPTY_LIST;
-
 import io.temporal.decision.v1.Decision;
 import io.temporal.decision.v1.SignalExternalWorkflowExecutionDecisionAttributes;
 import io.temporal.enums.v1.DecisionType;
 import io.temporal.history.v1.HistoryEvent;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 class SignalDecisionStateMachine extends DecisionStateMachineBase {
@@ -50,16 +46,6 @@ class SignalDecisionStateMachine extends DecisionStateMachineBase {
       DecisionState state) {
     super(id, state);
     this.attributes = attributes;
-  }
-
-  @Override
-  public List<Decision> getDecisions() {
-    switch (state) {
-      case CREATED:
-        return Arrays.asList(createSignalExternalWorkflowExecutionDecision());
-      default:
-        return EMPTY_LIST;
-    }
   }
 
   @Override
@@ -154,7 +140,8 @@ class SignalDecisionStateMachine extends DecisionStateMachineBase {
     throw new UnsupportedOperationException();
   }
 
-  private Decision createSignalExternalWorkflowExecutionDecision() {
+  @Override
+  protected Decision newInitiateDecision() {
     Decision decision =
         Decision.newBuilder()
             .setSignalExternalWorkflowExecutionDecisionAttributes(attributes)

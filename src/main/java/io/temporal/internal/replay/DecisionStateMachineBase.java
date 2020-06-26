@@ -19,6 +19,7 @@
 
 package io.temporal.internal.replay;
 
+import io.temporal.decision.v1.Decision;
 import io.temporal.history.v1.HistoryEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +35,16 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
 
   private final AtomicBoolean isReplay;
 
+  private List<Decision> decisions = new ArrayList<>();
+
   public DecisionStateMachineBase(DecisionId id, AtomicBoolean isReplay) {
     this.id = id;
     this.isReplay = isReplay;
     stateHistory.add(state.toString());
+  }
+
+  public final void init() {
+    addDecision(newInitiateDecision());
   }
 
   /** Used for unit testing. */
@@ -46,6 +53,12 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
     this.state = state;
     this.isReplay = new AtomicBoolean();
     stateHistory.add(state.toString());
+  }
+
+  protected abstract Decision newInitiateDecision();
+
+  protected Decision newRequestCancelDecision() {
+    throw new IllegalStateException();
   }
 
   @Override
@@ -65,6 +78,19 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
   }
 
   @Override
+  public List<Decision> takeDecisions() {
+    List<Decision> result = decisions;
+    decisions = new ArrayList<>();
+    return result;
+  }
+
+  protected void addDecision(Decision decision) {
+    if (!isReplay.get()) {
+      decisions.add(decision);
+    }
+  }
+
+  @Override
   public void handleDecisionTaskStartedEvent() {
     switch (state) {
       case CREATED:
@@ -74,6 +100,7 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
         break;
       default:
     }
+    decisions.clear();
   }
 
   @Override
@@ -86,14 +113,17 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
         if (immediateCancellationCallback != null) {
           immediateCancellationCallback.run();
         }
+        addDecision(newRequestCancelDecision());
         break;
       case DECISION_SENT:
-        state = DecisionState.CANCELED_BEFORE_INITIATED;
-        result = true;
+        failStateTransition();
+        //        state = DecisionState.CANCELED_BEFORE_INITIATED;
+        //        result = true;
         break;
       case INITIATED:
         state = DecisionState.CANCELED_AFTER_INITIATED;
         result = true;
+        addDecision(newRequestCancelDecision());
         break;
       default:
         failStateTransition();

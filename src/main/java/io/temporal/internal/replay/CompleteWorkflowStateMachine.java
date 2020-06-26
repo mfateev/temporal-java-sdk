@@ -40,7 +40,10 @@ final class CompleteWorkflowStateMachine implements DecisionStateMachine {
   }
 
   @Override
-  public List<Decision> getDecisions() {
+  public void init() {}
+
+  @Override
+  public List<Decision> takeDecisions() {
     return Arrays.asList(decision);
   }
 

@@ -33,7 +33,6 @@ import io.temporal.enums.v1.QueryResultType;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.history.v1.History;
 import io.temporal.history.v1.HistoryEvent;
-import io.temporal.history.v1.TimerFiredEventAttributes;
 import io.temporal.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.internal.common.GrpcRetryer;
@@ -378,12 +377,7 @@ class ReplayDecider implements Decider {
   }
 
   private void handleTimerFired(HistoryEvent event) {
-    TimerFiredEventAttributes attributes = event.getTimerFiredEventAttributes();
-    String timerId = attributes.getTimerId();
-    if (timerId.equals(DecisionsHelper.FORCE_IMMEDIATE_DECISION_TIMER)) {
-      return;
-    }
-    context.handleTimerFired(attributes);
+    context.handleTimerFired(event.getTimerFiredEventAttributes());
   }
 
   private void handleWorkflowExecutionSignaled(HistoryEvent event) {
@@ -405,7 +399,7 @@ class ReplayDecider implements Decider {
       queryResults.clear();
       boolean forceCreateNewDecisionTask = decideImpl(decisionTask, null);
       return new DecisionResult(
-          decisionsHelper.getDecisions(), queryResults, forceCreateNewDecisionTask, completed);
+          decisionsHelper.getNewDecisions(), queryResults, forceCreateNewDecisionTask, completed);
     } finally {
       lock.unlock();
     }
