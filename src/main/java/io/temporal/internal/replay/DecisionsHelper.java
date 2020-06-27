@@ -61,13 +61,11 @@ import io.temporal.internal.replay.HistoryHelper.DecisionEvents;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.tasklist.v1.TaskList;
 import io.temporal.workflowservice.v1.PollForDecisionTaskResponse;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -127,7 +125,6 @@ class DecisionsHelper {
     DecisionId decisionId = new DecisionId(DecisionTarget.ACTIVITY, nextDecisionEventId);
     activityIdToScheduledEventId.put(schedule.getActivityId(), nextDecisionEventId);
     addDecision(
-        decisionId,
         new ActivityDecisionStateMachine(decisionId, this.nextDecisionEventId, isReplay, schedule));
     return nextDecisionEventId;
   }
@@ -140,8 +137,9 @@ class DecisionsHelper {
     DecisionStateMachine decision =
         getDecision(new DecisionId(DecisionTarget.ACTIVITY, scheduledEventId));
     if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId.incrementAndGet();
+      //      nextDecisionEventId.incrementAndGet();
     }
+    addDecision(decision);
     return decision.isDone();
   }
 
@@ -196,8 +194,7 @@ class DecisionsHelper {
 
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.CHILD_WORKFLOW, nextDecisionEventId);
-    addDecision(
-        decisionId, new ChildWorkflowDecisionStateMachine(decisionId, isReplay, childWorkflow));
+    addDecision(new ChildWorkflowDecisionStateMachine(decisionId, isReplay, childWorkflow));
     return nextDecisionEventId;
   }
 
@@ -229,7 +226,6 @@ class DecisionsHelper {
     DecisionId decisionId =
         new DecisionId(DecisionTarget.CANCEL_EXTERNAL_WORKFLOW, nextDecisionEventId);
     addDecision(
-        decisionId,
         new ExternalWorkflowCancellationDecisionStateMachine(decisionId, isReplay, schedule));
     return nextDecisionEventId;
   }
@@ -266,7 +262,7 @@ class DecisionsHelper {
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId =
         new DecisionId(DecisionTarget.SIGNAL_EXTERNAL_WORKFLOW, nextDecisionEventId);
-    addDecision(decisionId, new SignalDecisionStateMachine(decisionId, isReplay, signal));
+    addDecision(new SignalDecisionStateMachine(decisionId, isReplay, signal));
     return nextDecisionEventId;
   }
 
@@ -274,9 +270,8 @@ class DecisionsHelper {
       long initiatedEventId, Runnable immediateCancellationCallback) {
     DecisionStateMachine decision =
         getDecision(new DecisionId(DecisionTarget.SIGNAL_EXTERNAL_WORKFLOW, initiatedEventId));
-    if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId.incrementAndGet();
-    }
+    if (decision.cancel(immediateCancellationCallback)) {}
+    addDecision(decision);
   }
 
   boolean handleSignalExternalWorkflowExecutionFailed(long initiatedEventId) {
@@ -298,7 +293,7 @@ class DecisionsHelper {
 
     long startEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.TIMER, startEventId);
-    addDecision(decisionId, new TimerDecisionStateMachine(decisionId, isReplay, request));
+    addDecision(new TimerDecisionStateMachine(decisionId, isReplay, request));
     return startEventId;
   }
 
@@ -308,9 +303,8 @@ class DecisionsHelper {
       // Cancellation callbacks are not deregistered and might be invoked after timer firing
       return true;
     }
-    if (decision.cancel(immediateCancellationCallback)) {
-      nextDecisionEventId.incrementAndGet();
-    }
+    if (decision.cancel(immediateCancellationCallback)) {}
+    addDecision(decision);
     return decision.isDone();
   }
 
@@ -429,7 +423,7 @@ class DecisionsHelper {
             .setDecisionType(DecisionType.DECISION_TYPE_COMPLETE_WORKFLOW_EXECUTION)
             .build();
     DecisionId decisionId = new DecisionId(DecisionTarget.SELF, 0);
-    addDecision(decisionId, new CompleteWorkflowStateMachine(decisionId, decision));
+    addDecision(new CompleteWorkflowStateMachine(decisionId, decision));
   }
 
   void continueAsNewWorkflowExecution(ContinueAsNewWorkflowExecutionParameters continueParameters) {
@@ -479,7 +473,7 @@ class DecisionsHelper {
             .build();
 
     DecisionId decisionId = new DecisionId(DecisionTarget.SELF, 0);
-    addDecision(decisionId, new CompleteWorkflowStateMachine(decisionId, decision));
+    addDecision(new CompleteWorkflowStateMachine(decisionId, decision));
   }
 
   void failWorkflowExecution(WorkflowExecutionException exception) {
@@ -493,7 +487,7 @@ class DecisionsHelper {
             .setDecisionType(DecisionType.DECISION_TYPE_FAIL_WORKFLOW_EXECUTION)
             .build();
     DecisionId decisionId = new DecisionId(DecisionTarget.SELF, 0);
-    addDecision(decisionId, new CompleteWorkflowStateMachine(decisionId, decision));
+    addDecision(new CompleteWorkflowStateMachine(decisionId, decision));
   }
 
   /**
@@ -510,7 +504,7 @@ class DecisionsHelper {
             .setDecisionType(DecisionType.DECISION_TYPE_CANCEL_WORKFLOW_EXECUTION)
             .build();
     DecisionId decisionId = new DecisionId(DecisionTarget.SELF, 0);
-    addDecision(decisionId, new CompleteWorkflowStateMachine(decisionId, decision));
+    addDecision(new CompleteWorkflowStateMachine(decisionId, decision));
   }
 
   void recordMarker(
@@ -536,7 +530,7 @@ class DecisionsHelper {
             .build();
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId = new DecisionId(DecisionTarget.MARKER, nextDecisionEventId);
-    addDecision(decisionId, new MarkerDecisionStateMachine(decisionId, isReplay, decision));
+    addDecision(new MarkerDecisionStateMachine(decisionId, isReplay, decision));
   }
 
   void upsertSearchAttributes(SearchAttributes searchAttributes) {
@@ -550,8 +544,7 @@ class DecisionsHelper {
     long nextDecisionEventId = getNextDecisionEventId();
     DecisionId decisionId =
         new DecisionId(DecisionTarget.UPSERT_SEARCH_ATTRIBUTES, nextDecisionEventId);
-    addDecision(
-        decisionId, new UpsertSearchAttributesDecisionStateMachine(decisionId, isReplay, decision));
+    addDecision(new UpsertSearchAttributesDecisionStateMachine(decisionId, isReplay, decision));
   }
 
   List<Decision> getNewDecisions() {
@@ -608,10 +601,11 @@ class DecisionsHelper {
   // Be careful that addAllMissingVersionMarker can add decision and hence change
   // nextDecisionEventId, so any call to determine the event ID for the next decision should happen
   // after that.
-  private void addDecision(DecisionId decisionId, DecisionStateMachine decision) {
-    Objects.requireNonNull(decisionId);
-    decision.init();
+  // TODO(maxim): decisionMap cleanup
+  private void addDecision(DecisionStateMachine decision) {
+    decision.initIdempotently();
     newDecisions.add(decision);
+    decisionMap.put(decision.getId(), decision);
     nextDecisionEventId.incrementAndGet();
   }
 
@@ -702,7 +696,10 @@ class DecisionsHelper {
               .build();
       DecisionId markerDecisionId =
           new DecisionId(DecisionTarget.MARKER, nextDecisionEventId.get());
-      newDecisions.add(new MarkerDecisionStateMachine(markerDecisionId, isReplay, markerDecision));
+      MarkerDecisionStateMachine stateMachine =
+          new MarkerDecisionStateMachine(markerDecisionId, isReplay, markerDecision);
+      newDecisions.add(stateMachine);
+      decisionMap.put(markerDecisionId, stateMachine);
       nextDecisionEventId.incrementAndGet();
       markerEvent = getVersionMakerEvent(nextDecisionEventId.get());
     } while (markerEvent.isPresent()
@@ -710,7 +707,7 @@ class DecisionsHelper {
   }
 
   private DecisionStateMachine getDecision(DecisionId decisionId) {
-    DecisionStateMachine result = newDecisions.get(decisionId);
+    DecisionStateMachine result = decisionMap.get(decisionId);
     if (result == null) {
       throw new NonDeterminisicWorkflowError(
           "Unknown " + decisionId + ". " + NON_DETERMINISTIC_MESSAGE);

@@ -89,7 +89,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   }
 
   private static final Logger log = LoggerFactory.getLogger(DeterministicRunnerImpl.class);
-  static final String WORKFLOW_ROOT_THREAD_NAME = "workflow-root";
+  static final String ROOT_THREAD_NAME = "root";
   private static final ThreadLocal<WorkflowThread> currentThreadThreadLocal = new ThreadLocal<>();
 
   private final Lock lock = new ReentrantLock();
@@ -222,8 +222,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     if (rootWorkflowThread == null) {
       // TODO: workflow instance specific thread name
       rootWorkflowThread =
-          (WorkflowThread)
-              interceptorHead.newThread(rootRunnable, false, WORKFLOW_ROOT_THREAD_NAME);
+          (WorkflowThread) interceptorHead.newThread(rootRunnable, false, ROOT_THREAD_NAME);
       threads.add(rootWorkflowThread);
       rootWorkflowThread.start();
     }
@@ -386,8 +385,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
           throw new Error("unreachable");
         } catch (RuntimeException e) {
           log.warn(
-              "Promise that was completedExceptionally was never accessed. "
-                  + "The ignored exception:",
+              "Promise completed with exception and was never accessed. The ignored exception:",
               CheckedExceptionWrapper.unwrap(e));
         }
       }

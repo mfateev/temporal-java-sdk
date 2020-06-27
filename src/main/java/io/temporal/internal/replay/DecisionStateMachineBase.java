@@ -43,8 +43,10 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
     stateHistory.add(state.toString());
   }
 
-  public final void init() {
-    addDecision(newInitiateDecision());
+  public final void initIdempotently() {
+    if (state == DecisionState.CREATED) {
+      addDecision(newInitiateDecision());
+    }
   }
 
   /** Used for unit testing. */
@@ -109,7 +111,7 @@ abstract class DecisionStateMachineBase implements DecisionStateMachine {
     boolean result = false;
     switch (state) {
       case CREATED:
-        state = DecisionState.COMPLETED;
+        state = DecisionState.CANCELED_BEFORE_INITIATED;
         if (immediateCancellationCallback != null) {
           immediateCancellationCallback.run();
         }

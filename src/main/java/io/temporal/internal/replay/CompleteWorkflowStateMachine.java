@@ -40,7 +40,7 @@ final class CompleteWorkflowStateMachine implements DecisionStateMachine {
   }
 
   @Override
-  public void init() {}
+  public void initIdempotently() {}
 
   @Override
   public List<Decision> takeDecisions() {

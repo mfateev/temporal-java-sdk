@@ -71,7 +71,7 @@ final class ActivityDecisionStateMachine extends DecisionStateMachineBase {
       default:
         super.handleCancellationFailureEvent(event);
     }
-    nextEventId.incrementAndGet();
+    //    nextEventId.incrementAndGet();
   }
 
   @Override

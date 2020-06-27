@@ -25,7 +25,7 @@ import java.util.List;
 
 interface DecisionStateMachine {
 
-  void init();
+  void initIdempotently();
 
   List<Decision> takeDecisions();
 

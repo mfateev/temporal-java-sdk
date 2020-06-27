@@ -464,7 +464,11 @@ class ReplayDecider implements Decider {
         }
         // Updates state machines with results of the previous decisions
         for (HistoryEvent event : decision.getDecisionEvents()) {
-          processEvent(event);
+          try {
+            processEvent(event);
+          } catch (RuntimeException e) {
+            throw new RuntimeException("Failure processing eventId=" + event.getEventId(), e);
+          }
         }
         // Reset state to before running the event loop
         decisionsHelper.handleDecisionTaskStartedEvent(decision);

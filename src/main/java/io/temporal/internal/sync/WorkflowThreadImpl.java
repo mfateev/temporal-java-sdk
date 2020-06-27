@@ -108,15 +108,6 @@ class WorkflowThreadImpl implements WorkflowThread {
           threadContext.setUnhandledException(e);
         }
       } catch (Error e) {
-        // Error aborts decision, not fails the workflow.
-        if (log.isErrorEnabled() && !root) {
-          StringWriter sw = new StringWriter();
-          PrintWriter pw = new PrintWriter(sw, true);
-          e.printStackTrace(pw);
-          String stackTrace = sw.getBuffer().toString();
-          log.error(
-              String.format("Workflow thread \"%s\" run failed with Error:\n%s", name, stackTrace));
-        }
         threadContext.setUnhandledException(e);
       } catch (CanceledFailure e) {
         if (!isCancelRequested()) {
@@ -126,16 +117,6 @@ class WorkflowThreadImpl implements WorkflowThread {
           log.debug(String.format("Workflow thread \"%s\" run cancelled", name));
         }
       } catch (Throwable e) {
-        if (log.isWarnEnabled() && !root) {
-          StringWriter sw = new StringWriter();
-          PrintWriter pw = new PrintWriter(sw, true);
-          e.printStackTrace(pw);
-          String stackTrace = sw.getBuffer().toString();
-          log.warn(
-              String.format(
-                  "Workflow thread \"%s\" run failed with unhandled exception:\n%s",
-                  name, stackTrace));
-        }
         threadContext.setUnhandledException(e);
       } finally {
         DeterministicRunnerImpl.setCurrentThreadInternal(null);
@@ -420,9 +401,10 @@ class WorkflowThreadImpl implements WorkflowThread {
     // These numbers might change if implementation changes.
     int omitTop = 5;
     int omitBottom = 7;
-    if (DeterministicRunnerImpl.WORKFLOW_ROOT_THREAD_NAME.equals(getName())) {
-      omitBottom = 11;
-    }
+    // TODO(maxim): Fix the stack trace
+    //    if (DeterministicRunnerImpl.ROOT_THREAD_NAME.equals(getName())) {
+    //      omitBottom = 11;
+    //    }
     StackTraceElement[] stackTrace = thread.getStackTrace();
     for (int i = omitTop; i < stackTrace.length - omitBottom; i++) {
       StackTraceElement e = stackTrace[i];
