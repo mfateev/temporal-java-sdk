@@ -5644,6 +5644,27 @@ public class WorkflowTest {
     assertEquals(activitiesImpl.toString(), 3, activitiesImpl.invocations.size());
   }
 
+  public static class TestLocalActivityLongerThanWorkflowTaskTimeout implements TestWorkflow1 {
+    @Override
+    public String execute(String taskQueue) {
+      TestActivities localActivities = Workflow.newLocalActivityStub(TestActivities.class);
+      return localActivities.sleepActivity(2000, 123);
+    }
+  }
+
+  @Test
+  public void testLocalActivityLongerThanWorkflowTaskTimeout() {
+    startWorkerFor(TestLocalActivityLongerThanWorkflowTaskTimeout.class);
+    TestWorkflow1 workflowStub =
+        workflowClient.newWorkflowStub(
+            TestWorkflow1.class,
+            newWorkflowOptionsBuilder(taskQueue)
+                .setWorkflowTaskTimeout(Duration.ofSeconds(1))
+                .build());
+    String result = workflowStub.execute(taskQueue);
+    assertEquals("sleepActivity123", result);
+  }
+
   public static class TestLocalActivityMultiBatchWorkflowImpl implements TestWorkflow1 {
     @Override
     public String execute(String taskQueue) {

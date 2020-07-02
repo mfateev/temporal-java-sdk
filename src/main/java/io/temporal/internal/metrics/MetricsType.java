@@ -63,6 +63,9 @@ public class MetricsType {
       TEMPORAL_METRICS_PREFIX + "decision-execution-failed";
   public static final String DECISION_EXECUTION_LATENCY =
       TEMPORAL_METRICS_PREFIX + "decision-execution-latency";
+  // Total latency of a decision which can include multiple synchronous decision tasks
+  public static final String DECISION_EXECUTION_TOTAL_LATENCY =
+      TEMPORAL_METRICS_PREFIX + "decision-execution-total-latency";
   public static final String DECISION_RESPONSE_FAILED_COUNTER =
       TEMPORAL_METRICS_PREFIX + "decision-response-failed";
   public static final String DECISION_RESPONSE_LATENCY =
@@ -71,6 +74,8 @@ public class MetricsType {
       TEMPORAL_METRICS_PREFIX + "decision-task-error";
   public static final String DECISION_TASK_COMPLETED_COUNTER =
       TEMPORAL_METRICS_PREFIX + "decision-task-completed";
+  public static final String DECISION_TASK_HEARTBEAT_COUNTER =
+      TEMPORAL_METRICS_PREFIX + "decision-task-heartbeat";
 
   public static final String ACTIVITY_POLL_COUNTER =
       TEMPORAL_METRICS_PREFIX + "activity-poll-total";

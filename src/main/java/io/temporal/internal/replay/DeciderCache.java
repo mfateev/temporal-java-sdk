@@ -26,7 +26,9 @@ import com.google.common.cache.LoadingCache;
 import com.uber.m3.tally.Scope;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.workflowservice.v1.PollForDecisionTaskResponseOrBuilder;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -75,6 +77,17 @@ public final class DeciderCache {
     return deciderFunc.call();
   }
 
+  public Decider get(String runId) throws Exception {
+    cacheLock.lock();
+    try {
+      return cache.get(runId);
+    } catch (CacheLoader.InvalidCacheLoadException e) {
+      throw new Error("Unexpected cache miss for runId=" + runId, e);
+    } finally {
+      cacheLock.unlock();
+    }
+  }
+
   private Decider getForProcessing(String runId) throws Exception {
     cacheLock.lock();
     try {
@@ -91,9 +104,7 @@ public final class DeciderCache {
     }
   }
 
-  void markProcessingDone(PollForDecisionTaskResponseOrBuilder decisionTask) {
-    String runId = decisionTask.getWorkflowExecution().getRunId();
-
+  void markProcessingDone(String runId) {
     cacheLock.lock();
     try {
       inProcessing.remove(runId);
@@ -102,8 +113,7 @@ public final class DeciderCache {
     }
   }
 
-  public void addToCache(PollForDecisionTaskResponseOrBuilder decisionTask, Decider decider) {
-    String runId = decisionTask.getWorkflowExecution().getRunId();
+  public void addToCache(String runId, Decider decider) {
     cache.put(runId, decider);
   }
 

@@ -142,6 +142,8 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
       throws Throwable {
     Decider decider = null;
     AtomicBoolean createdNew = new AtomicBoolean();
+    WorkflowExecution execution = decisionTask.getWorkflowExecution();
+    String runId = execution.getRunId();
     try {
       if (stickyTaskQueueName == null) {
         decider = createDecider(decisionTask);
@@ -156,35 +158,32 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
       }
 
       Decider.DecisionResult result = decider.decide(decisionTask);
-
       if (result.isFinalDecision()) {
-        cache.invalidate(decisionTask.getWorkflowExecution().getRunId());
+        cache.invalidate(runId);
       } else if (stickyTaskQueueName != null && createdNew.get()) {
-        cache.addToCache(decisionTask, decider);
+        cache.addToCache(runId, decider);
       }
 
       if (log.isTraceEnabled()) {
-        WorkflowExecution execution = decisionTask.getWorkflowExecution();
         log.trace(
             "WorkflowTask startedEventId="
                 + decisionTask.getStartedEventId()
                 + ", WorkflowId="
                 + execution.getWorkflowId()
                 + ", RunId="
-                + execution.getRunId()
+                + runId
                 + " completed with \n"
                 + WorkflowExecutionUtils.prettyPrintDecisions(result.getDecisions())
                 + "\nforceCreateNewDecisionTask "
                 + result.getForceCreateNewDecisionTask());
       } else if (log.isDebugEnabled()) {
-        WorkflowExecution execution = decisionTask.getWorkflowExecution();
         log.debug(
             "WorkflowTask startedEventId="
                 + decisionTask.getStartedEventId()
                 + ", WorkflowId="
                 + execution.getWorkflowId()
                 + ", RunId="
-                + execution.getRunId()
+                + runId
                 + " completed with "
                 + result.getDecisions().size()
                 + " new decisions"
@@ -201,14 +200,14 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
       }
 
       if (stickyTaskQueueName != null) {
-        cache.invalidate(decisionTask.getWorkflowExecution().getRunId());
+        cache.invalidate(runId);
       }
       throw e;
     } finally {
       if (stickyTaskQueueName == null && decider != null) {
         decider.close();
       } else {
-        cache.markProcessingDone(decisionTask);
+        cache.markProcessingDone(runId);
       }
     }
   }
@@ -218,6 +217,7 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
         RespondQueryTaskCompletedRequest.newBuilder().setTaskToken(decisionTask.getTaskToken());
     Decider decider = null;
     AtomicBoolean createdNew = new AtomicBoolean();
+    String runId = decisionTask.getWorkflowExecution().getRunId();
     try {
       if (stickyTaskQueueName == null) {
         decider = createDecider(decisionTask);
@@ -233,7 +233,7 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
 
       Optional<Payloads> queryResult = decider.query(decisionTask, decisionTask.getQuery());
       if (stickyTaskQueueName != null && createdNew.get()) {
-        cache.addToCache(decisionTask, decider);
+        cache.addToCache(runId, decider);
       }
       if (queryResult.isPresent()) {
         queryCompletedRequest.setQueryResult(queryResult.get());
@@ -250,7 +250,7 @@ public final class ReplayDecisionTaskHandler implements DecisionTaskHandler {
       if (stickyTaskQueueName == null && decider != null) {
         decider.close();
       } else {
-        cache.markProcessingDone(decisionTask);
+        cache.markProcessingDone(runId);
       }
     }
     return new Result(null, null, queryCompletedRequest.build(), null, false);

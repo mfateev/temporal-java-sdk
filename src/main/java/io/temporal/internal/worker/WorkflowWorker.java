@@ -44,12 +44,14 @@ import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.workflowservice.v1.GetWorkflowExecutionHistoryResponse;
 import io.temporal.workflowservice.v1.PollForDecisionTaskResponse;
 import io.temporal.workflowservice.v1.RespondDecisionTaskCompletedRequest;
+import io.temporal.workflowservice.v1.RespondDecisionTaskCompletedResponse;
 import io.temporal.workflowservice.v1.RespondDecisionTaskFailedRequest;
 import io.temporal.workflowservice.v1.RespondQueryTaskCompletedRequest;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import org.slf4j.MDC;
@@ -293,17 +295,31 @@ public final class WorkflowWorker
         runLock.lock();
       }
 
+      Stopwatch swTotal = metricsScope.timer(MetricsType.DECISION_EXECUTION_TOTAL_LATENCY).start();
       try {
-        Stopwatch sw = metricsScope.timer(MetricsType.DECISION_EXECUTION_LATENCY).start();
-        DecisionTaskHandler.Result response = handler.handleDecisionTask(task);
-        sw.stop();
+        Optional<PollForDecisionTaskResponse> nextTask = Optional.of(task);
+        do {
+          DecisionTaskHandler.Result response;
+          Stopwatch sw = metricsScope.timer(MetricsType.DECISION_EXECUTION_LATENCY).start();
+          try {
+            response = handler.handleDecisionTask(nextTask.get());
+          } finally {
+            sw.stop();
+          }
 
-        sw = metricsScope.timer(MetricsType.DECISION_RESPONSE_LATENCY).start();
-        sendReply(service, task.getTaskToken(), response);
-        sw.stop();
-
+          sw = metricsScope.timer(MetricsType.DECISION_RESPONSE_LATENCY).start();
+          try {
+            nextTask = sendReply(service, metricsScope, task.getTaskToken(), response);
+          } finally {
+            sw.stop();
+          }
+          if (nextTask.isPresent()) {
+            metricsScope.counter(MetricsType.DECISION_TASK_HEARTBEAT_COUNTER).inc(1);
+          }
+        } while (nextTask.isPresent());
         metricsScope.counter(MetricsType.DECISION_TASK_COMPLETED_COUNTER).inc(1);
       } finally {
+        swTotal.stop();
         MDC.remove(LoggerTag.WORKFLOW_ID);
         MDC.remove(LoggerTag.WORKFLOW_TYPE);
         MDC.remove(LoggerTag.RUN_ID);
@@ -325,8 +341,11 @@ public final class WorkflowWorker
           failure);
     }
 
-    private void sendReply(
-        WorkflowServiceStubs service, ByteString taskToken, DecisionTaskHandler.Result response) {
+    private Optional<PollForDecisionTaskResponse> sendReply(
+        WorkflowServiceStubs service,
+        Scope metricsScope,
+        ByteString taskToken,
+        DecisionTaskHandler.Result response) {
       RpcRetryOptions ro = response.getRequestRetryOptions();
       RespondDecisionTaskCompletedRequest taskCompleted = response.getTaskCompleted();
       if (taskCompleted != null) {
@@ -338,7 +357,20 @@ public final class WorkflowWorker
                 .setIdentity(options.getIdentity())
                 .setTaskToken(taskToken)
                 .build();
-        GrpcRetryer.retry(ro, () -> service.blockingStub().respondDecisionTaskCompleted(request));
+        AtomicReference<RespondDecisionTaskCompletedResponse> nextTask = new AtomicReference<>();
+        GrpcRetryer.retry(
+            ro,
+            () -> {
+              try {
+                nextTask.set(service.blockingStub().respondDecisionTaskCompleted(request));
+              } catch (RuntimeException e) {
+                metricsScope.counter(MetricsType.DECISION_RESPONSE_FAILED_COUNTER).inc(1);
+                throw e;
+              }
+            });
+        if (nextTask.get().hasDecisionTask()) {
+          return Optional.of(nextTask.get().getDecisionTask());
+        }
       } else {
         RespondDecisionTaskFailedRequest taskFailed = response.getTaskFailed();
         if (taskFailed != null) {
@@ -353,7 +385,16 @@ public final class WorkflowWorker
                   .setIdentity(options.getIdentity())
                   .setTaskToken(taskToken)
                   .build();
-          GrpcRetryer.retry(ro, () -> service.blockingStub().respondDecisionTaskFailed(request));
+          GrpcRetryer.retry(
+              ro,
+              () -> {
+                try {
+                  service.blockingStub().respondDecisionTaskFailed(request);
+                } catch (RuntimeException e) {
+                  metricsScope.counter(MetricsType.DECISION_RESPONSE_FAILED_COUNTER).inc(1);
+                  throw e;
+                }
+              });
         } else {
           RespondQueryTaskCompletedRequest queryCompleted = response.getQueryCompleted();
           if (queryCompleted != null) {
@@ -363,6 +404,7 @@ public final class WorkflowWorker
           }
         }
       }
+      return Optional.empty();
     }
   }
 }
