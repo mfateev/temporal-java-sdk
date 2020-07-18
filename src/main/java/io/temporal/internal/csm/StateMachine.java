@@ -24,187 +24,33 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * State machine of a single server side entity like activity, workflow task or the whole workflow.
  *
  * <p>Based on the idea that each entity goes through state transitions and the same operation like
  * timeout is applicable to some states only and can lead to different actions in each state. Each
- * valid state transition should be registered through {@link #add(Object, Object, Object,
- * Functions.Proc)}. The associated callback is invoked when the state transition is requested.
+ * valid state transition should be registered through add methods. The associated callback is
+ * invoked when the state transition is requested.
  */
 final class StateMachine<State, Action, Data> {
 
-  /**
-   * Function invoked when an action happens in a given state. Returns the next state. Used when the
-   * next state depends not only on the current state and action, but also on the data.
-   */
-  @FunctionalInterface
-  interface DynamicCallback<State> {
-
-    /** @return state after the action */
-    State apply();
-  }
-
-  private static class ActionOrEventType<Action> {
-    final Action action;
-    final EventType eventType;
-
-    private ActionOrEventType(Action action) {
-      this.action = action;
-      this.eventType = null;
-    }
-
-    public ActionOrEventType(EventType eventType) {
-      this.eventType = eventType;
-      this.action = null;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-      ActionOrEventType<?> that = (ActionOrEventType<?>) o;
-      return com.google.common.base.Objects.equal(action, that.action)
-          && eventType == that.eventType;
-    }
-
-    @Override
-    public int hashCode() {
-      return com.google.common.base.Objects.hashCode(action, eventType);
-    }
-
-    @Override
-    public String toString() {
-      if (action == null) {
-        return eventType.toString();
-      }
-      return action.toString();
-    }
-  }
-
-  private static class Transition<State, ActionOrEventType> {
-
-    final State from;
-    final ActionOrEventType action;
-
-    public Transition(State from, ActionOrEventType action) {
-      this.from = Objects.requireNonNull(from);
-      this.action = Objects.requireNonNull(action);
-    }
-
-    public State getFrom() {
-      return from;
-    }
-
-    public ActionOrEventType getAction() {
-      return action;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-      Transition<?, ?> that = (Transition<?, ?>) o;
-      return com.google.common.base.Objects.equal(from, that.from)
-          && com.google.common.base.Objects.equal(action, that.action);
-    }
-
-    @Override
-    public int hashCode() {
-      return com.google.common.base.Objects.hashCode(from, action);
-    }
-
-    @Override
-    public String toString() {
-      return "Transition{" + "from='" + from + '\'' + ", action=" + action + '}';
-    }
-  }
-
-  private interface TransitionTarget<State> {
-    State apply();
-
-    List<State> getAllowedStates();
-  }
-
-  private static class FixedTransitionTarget<State> implements TransitionTarget<State> {
-
-    final State state;
-
-    final Functions.Proc callback;
-
-    private FixedTransitionTarget(State state, Functions.Proc callback) {
-      this.state = state;
-      this.callback = callback;
-    }
-
-    @Override
-    public String toString() {
-      return "TransitionDestination{" + "state=" + state + ", callback=" + callback + '}';
-    }
-
-    @Override
-    public State apply() {
-      callback.apply();
-      return state;
-    }
-
-    @Override
-    public List<State> getAllowedStates() {
-      return Collections.singletonList(state);
-    }
-  }
-
-  private static class DynamicTransitionTarget<State> implements TransitionTarget<State> {
-
-    final DynamicCallback<State> callback;
-    State[] expectedStates;
-    State state;
-
-    private DynamicTransitionTarget(State[] expectedStates, DynamicCallback<State> callback) {
-      this.expectedStates = expectedStates;
-      this.callback = callback;
-    }
-
-    @Override
-    public String toString() {
-      return "DynamicTransitionDestination{" + "state=" + state + ", callback=" + callback + '}';
-    }
-
-    @Override
-    public State apply() {
-      state = callback.apply();
-      for (State s : expectedStates) {
-        if (s.equals(state)) {
-          return state;
-        }
-      }
-      throw new IllegalStateException(
-          state + " is not expected. Expected states are: " + Arrays.toString(expectedStates));
-    }
-
-    @Override
-    public List<State> getAllowedStates() {
-      return Arrays.asList(expectedStates);
-    }
-  }
-
-  private final List<Transition<State, ActionOrEventType>> transitionHistory = new ArrayList<>();
-  private final Map<Transition<State, ActionOrEventType>, TransitionTarget<State>> transitions =
-      new HashMap<>();
+  private final List<Transition<State, ActionOrEventType<Action>>> transitionHistory =
+      new ArrayList<>();
+  private final Map<Transition<State, ActionOrEventType<Action>>, TransitionTarget<State, Data>>
+      transitions = new HashMap<>();
 
   private final State initialState;
   private final List<State> finalStates;
 
   private State state;
 
-  public static <State> StateMachine newInstance(State initialState, State... finalStates) {
-    return new StateMachine(initialState, finalStates);
+  public static <State, Action, Data> StateMachine<State, Action, Data> newInstance(
+      State initialState, State... finalStates) {
+    return new StateMachine<>(initialState, finalStates);
   }
 
   public StateMachine(State initialState, State[] finalStates) {
@@ -232,31 +78,33 @@ final class StateMachine<State, Action, Data> {
    * @param callback callback to invoke upon transition
    * @return the current StateMachine instance for the fluid pattern.
    */
-  StateMachine add(State from, Action action, State to, Functions.Proc callback) {
+  StateMachine<State, Action, Data> add(
+      State from, Action action, State to, Functions.Proc1<Data> callback) {
     transitions.put(
-        new Transition<>(from, new ActionOrEventType(action)),
+        new Transition<>(from, new ActionOrEventType<>(action)),
         new FixedTransitionTarget<>(to, callback));
     return this;
   }
 
-  StateMachine add(State from, Action action, State to) {
+  StateMachine<State, Action, Data> add(State from, Action action, State to) {
     transitions.put(
-        new Transition<>(from, new ActionOrEventType(action)),
-        new FixedTransitionTarget<>(to, () -> {}));
+        new Transition<>(from, new ActionOrEventType<>(action)),
+        new FixedTransitionTarget<>(to, (data) -> {}));
     return this;
   }
 
-  StateMachine add(State from, EventType eventType, State to, Functions.Proc callback) {
+  StateMachine<State, Action, Data> add(
+      State from, EventType eventType, State to, Functions.Proc1<Data> callback) {
     transitions.put(
-        new Transition<>(from, new ActionOrEventType(eventType)),
+        new Transition<>(from, new ActionOrEventType<>(eventType)),
         new FixedTransitionTarget<>(to, callback));
     return this;
   }
 
-  StateMachine add(State from, EventType eventType, State to) {
+  StateMachine<State, Action, Data> add(State from, EventType eventType, State to) {
     transitions.put(
-        new Transition<>(from, new ActionOrEventType(eventType)),
-        new FixedTransitionTarget<>(to, () -> {}));
+        new Transition<>(from, new ActionOrEventType<>(eventType)),
+        new FixedTransitionTarget<>(to, (data) -> {}));
     return this;
   }
 
@@ -269,30 +117,32 @@ final class StateMachine<State, Action, Data> {
    * @param callback callback to invoke upon transition
    * @return the current StateMachine instance for the fluid pattern.
    */
-  StateMachine add(State from, Action action, State[] toStates, DynamicCallback<State> callback) {
+  StateMachine<State, Action, Data> add(
+      State from, Action action, State[] toStates, DynamicCallback<State, Data> callback) {
     transitions.put(
-        new Transition<>(from, new ActionOrEventType(action)),
+        new Transition<>(from, new ActionOrEventType<>(action)),
         new DynamicTransitionTarget<>(toStates, callback));
     return this;
   }
 
-  void action(Action action) {
-    action(new ActionOrEventType(action));
+  void action(Action action, Data data) {
+    action(new ActionOrEventType<>(action), data);
   }
 
-  void handleEvent(EventType eventType) {
-    action(new ActionOrEventType(eventType));
+  void handleEvent(EventType eventType, Data data) {
+    action(new ActionOrEventType<>(eventType), data);
   }
 
-  private void action(ActionOrEventType actionOrEventType) {
-    Transition<State, ActionOrEventType> transition = new Transition<>(state, actionOrEventType);
-    TransitionTarget<State> destination = transitions.get(transition);
+  private void action(ActionOrEventType<Action> actionOrEventType, Data data) {
+    Transition<State, ActionOrEventType<Action>> transition =
+        new Transition<>(state, actionOrEventType);
+    TransitionTarget<State, Data> destination = transitions.get(transition);
     if (destination == null) {
       throw Status.INTERNAL
           .withDescription("Invalid " + transition + ", history: " + transitionHistory)
           .asRuntimeException();
     }
-    state = destination.apply();
+    state = destination.apply(data);
     transitionHistory.add(transition);
   }
 
@@ -302,8 +152,8 @@ final class StateMachine<State, Action, Data> {
     result.append("[*] --> ");
     result.append(initialState);
     result.append('\n');
-    for (Map.Entry<Transition<State, ActionOrEventType>, TransitionTarget<State>> entry :
-        transitions.entrySet()) {
+    for (Map.Entry<Transition<State, ActionOrEventType<Action>>, TransitionTarget<State, Data>>
+        entry : transitions.entrySet()) {
       List<State> targets = entry.getValue().getAllowedStates();
       for (State target : targets) {
         result.append(entry.getKey().getFrom());

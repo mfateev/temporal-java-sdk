@@ -19,17 +19,13 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
-import org.junit.Test;
+/**
+ * Function invoked when an action happens in a given state. Returns the next state. Used when the
+ * next state depends not only on the current state and action, but also on the data.
+ */
+@FunctionalInterface
+interface DynamicCallback<State, Data> {
 
-public class ActivityCommandsTest {
-
-  ActivityCommands commands =
-      new ActivityCommands(
-          ScheduleActivityTaskCommandAttributes.newBuilder().build(), (a, b, c) -> {}, (c) -> {});
-
-  @Test
-  public void plantUML() {
-    System.out.println(commands.toPlantUML());
-  }
+  /** @return state after the action */
+  State apply(Data data);
 }

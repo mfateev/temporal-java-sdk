@@ -19,17 +19,10 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
-import org.junit.Test;
+import java.util.List;
 
-public class ActivityCommandsTest {
+interface TransitionTarget<State, Data> {
+  State apply(Data data);
 
-  ActivityCommands commands =
-      new ActivityCommands(
-          ScheduleActivityTaskCommandAttributes.newBuilder().build(), (a, b, c) -> {}, (c) -> {});
-
-  @Test
-  public void plantUML() {
-    System.out.println(commands.toPlantUML());
-  }
+  List<State> getAllowedStates();
 }

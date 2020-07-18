@@ -19,17 +19,34 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
-import org.junit.Test;
+import io.temporal.workflow.Functions;
+import java.util.Collections;
+import java.util.List;
 
-public class ActivityCommandsTest {
+class FixedTransitionTarget<State, Data> implements TransitionTarget<State, Data> {
 
-  ActivityCommands commands =
-      new ActivityCommands(
-          ScheduleActivityTaskCommandAttributes.newBuilder().build(), (a, b, c) -> {}, (c) -> {});
+  final State state;
 
-  @Test
-  public void plantUML() {
-    System.out.println(commands.toPlantUML());
+  final Functions.Proc1<Data> callback;
+
+  FixedTransitionTarget(State state, Functions.Proc1<Data> callback) {
+    this.state = state;
+    this.callback = callback;
+  }
+
+  @Override
+  public String toString() {
+    return "TransitionDestination{" + "state=" + state + ", callback=" + callback + '}';
+  }
+
+  @Override
+  public State apply(Data data) {
+    callback.apply(data);
+    return state;
+  }
+
+  @Override
+  public List<State> getAllowedStates() {
+    return Collections.singletonList(state);
   }
 }
