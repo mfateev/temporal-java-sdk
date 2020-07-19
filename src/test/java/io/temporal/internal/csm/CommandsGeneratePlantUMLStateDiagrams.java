@@ -20,13 +20,11 @@
 package io.temporal.internal.csm;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
 import com.google.common.io.CharSink;
 import com.google.common.io.Files;
-import io.temporal.workflow.Functions;
 import io.temporal.workflow.WorkflowTest;
 import java.io.File;
-import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -38,13 +36,19 @@ public class CommandsGeneratePlantUMLStateDiagrams {
 
   @Test
   public void plantUML() {
-    generate(ActivityCommands.class, ActivityCommands::asPlantUMLStateDiagram);
-    generate(TimerCommands.class, TimerCommands::asPlantUMLStateDiagram);
-    generate(SignalExternalCommands.class, SignalExternalCommands::asPlantUMLStateDiagram);
+    generate(ActivityCommands.class);
+    generate(TimerCommands.class);
+    generate(SignalExternalCommands.class);
+    generate(CancelExternalCommands.class);
   }
 
-  private void generate(
-      Class<? extends CommandsBase> commandClass, Functions.Func<String> generator) {
+  private void generate(Class<? extends CommandsBase> commandClass) {
+    Method generator;
+    try {
+      generator = commandClass.getDeclaredMethod("asPlantUMLStateDiagram");
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
     String projectPath = System.getProperty("user.dir");
     String relativePath = commandClass.getName().replace(".", File.separator);
     String fullRelativePath = ("src/main/java/" + relativePath).replace("/", File.separator);
@@ -62,10 +66,10 @@ public class CommandsGeneratePlantUMLStateDiagrams {
       content.append(
           "` Generated from " + fullRelativePath + ".java\n` by " + this.getClass().getName());
       content.append("\n\n");
-      content.append(generator.apply());
+      content.append(generator.invoke(null));
       sink.write(content);
-    } catch (IOException e) {
-      Throwables.propagateIfPossible(e, RuntimeException.class);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
     log.info("Regenerated state diagram file: " + diagramFile);
   }

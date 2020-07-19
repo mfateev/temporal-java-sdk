@@ -115,14 +115,5 @@ public final class SignalExternalCommands
 
   public static String asPlantUMLStateDiagram() {
     return newStateMachine().asPlantUMLStateDiagram();
-    //    StringBuilder result = new StringBuilder();
-    //    SignalExternalCommands.newInstance(
-    //        SignalExternalWorkflowExecutionCommandAttributes.getDefaultInstance(),
-    //        (f, c) -> {},
-    //        (c) -> {
-    //          c.setInitialCommandEventId(0);
-    //          result.append(c.getCommands().toPlantUML());
-    //        });
-    //    return result.toString();
   }
 }
