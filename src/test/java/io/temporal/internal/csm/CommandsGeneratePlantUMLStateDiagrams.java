@@ -63,12 +63,6 @@ public class CommandsGeneratePlantUMLStateDiagrams {
           "` Generated from " + fullRelativePath + ".java\n` by " + this.getClass().getName());
       content.append("\n\n");
       content.append(generator.apply());
-      if (file.exists()) {
-        String existingContent = Files.asCharSource(file, Charsets.UTF_8).read();
-        if (existingContent.equals(content.toString())) {
-          return;
-        }
-      }
       sink.write(content);
     } catch (IOException e) {
       Throwables.propagateIfPossible(e, RuntimeException.class);
