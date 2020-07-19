@@ -40,8 +40,9 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(TimerCommands.class);
     generate(SignalExternalCommands.class);
     generate(CancelExternalCommands.class);
-    generate(UpseartSearchAttributesCommands.class);
+    generate(UpsertSearchAttributesCommands.class);
     generate(ChildWorkflowCommands.class);
+    generate(MarkerCommands.class);
   }
 
   private void generate(Class<? extends CommandsBase> commandClass) {

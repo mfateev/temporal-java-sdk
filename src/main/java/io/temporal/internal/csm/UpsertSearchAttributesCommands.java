@@ -24,25 +24,25 @@ import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttribute
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
-public final class UpseartSearchAttributesCommands
+public final class UpsertSearchAttributesCommands
     extends CommandsBase<
-        UpseartSearchAttributesCommands.State,
-        UpseartSearchAttributesCommands.Action,
-        UpseartSearchAttributesCommands> {
+        UpsertSearchAttributesCommands.State,
+        UpsertSearchAttributesCommands.Action,
+        UpsertSearchAttributesCommands> {
 
-  private final UpsertWorkflowSearchAttributesCommandAttributes upseartAttributes;
+  private final UpsertWorkflowSearchAttributesCommandAttributes upsertAttributes;
 
   public static void newInstance(
-      UpsertWorkflowSearchAttributesCommandAttributes upseartAttributes,
+      UpsertWorkflowSearchAttributesCommandAttributes upsertAttributes,
       Functions.Proc1<NewCommand> commandSink) {
-    new UpseartSearchAttributesCommands(upseartAttributes, commandSink);
+    new UpsertSearchAttributesCommands(upsertAttributes, commandSink);
   }
 
-  private UpseartSearchAttributesCommands(
-      UpsertWorkflowSearchAttributesCommandAttributes upseartAttributes,
+  private UpsertSearchAttributesCommands(
+      UpsertWorkflowSearchAttributesCommandAttributes upsertAttributes,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
-    this.upseartAttributes = upseartAttributes;
+    this.upsertAttributes = upsertAttributes;
     action(Action.SCHEDULE);
   }
 
@@ -56,14 +56,14 @@ public final class UpseartSearchAttributesCommands
     UPSERT_COMMAND_RECORDED,
   }
 
-  private static StateMachine<State, Action, UpseartSearchAttributesCommands> newStateMachine() {
-    return StateMachine.<State, Action, UpseartSearchAttributesCommands>newInstance(
+  private static StateMachine<State, Action, UpsertSearchAttributesCommands> newStateMachine() {
+    return StateMachine.<State, Action, UpsertSearchAttributesCommands>newInstance(
             State.CREATED, State.UPSERT_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
             State.UPSERT_COMMAND_CREATED,
-            UpseartSearchAttributesCommands::createUpsertCommand)
+            UpsertSearchAttributesCommands::createUpsertCommand)
         .add(
             State.UPSERT_COMMAND_CREATED,
             EventType.EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES,
@@ -73,7 +73,7 @@ public final class UpseartSearchAttributesCommands
   private void createUpsertCommand() {
     addCommand(
         Command.newBuilder()
-            .setUpsertWorkflowSearchAttributesCommandAttributes(upseartAttributes)
+            .setUpsertWorkflowSearchAttributesCommandAttributes(upsertAttributes)
             .build());
   }
 
