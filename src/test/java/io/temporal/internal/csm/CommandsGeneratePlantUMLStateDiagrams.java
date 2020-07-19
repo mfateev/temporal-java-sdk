@@ -40,6 +40,7 @@ public class CommandsGeneratePlantUMLStateDiagrams {
   public void plantUML() {
     generate(ActivityCommands.class, ActivityCommands::asPlantUMLStateDiagram);
     generate(TimerCommands.class, TimerCommands::asPlantUMLStateDiagram);
+    generate(SignalExternalCommands.class, SignalExternalCommands::asPlantUMLStateDiagram);
   }
 
   private void generate(
@@ -62,6 +63,12 @@ public class CommandsGeneratePlantUMLStateDiagrams {
           "` Generated from " + fullRelativePath + ".java\n` by " + this.getClass().getName());
       content.append("\n\n");
       content.append(generator.apply());
+      if (file.exists()) {
+        String existingContent = Files.toString(file, Charsets.UTF_8);
+        if (existingContent.equals(content.toString())) {
+          return;
+        }
+      }
       sink.write(content);
     } catch (IOException e) {
       Throwables.propagateIfPossible(e, RuntimeException.class);

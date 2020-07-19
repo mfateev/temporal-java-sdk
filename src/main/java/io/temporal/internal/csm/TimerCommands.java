@@ -54,7 +54,6 @@ public final class TimerCommands
 
   enum Action {
     SCHEDULE,
-    START,
     CANCEL
   }
 
