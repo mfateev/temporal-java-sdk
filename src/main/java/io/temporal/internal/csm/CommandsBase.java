@@ -50,7 +50,7 @@ public class CommandsBase<State, Action, Data> {
   }
 
   public final String toPlantUML() {
-    return stateMachine.toPlantUML();
+    return stateMachine.asPlantUMLStateDiagram();
   }
 
   protected final void action(Action action) {

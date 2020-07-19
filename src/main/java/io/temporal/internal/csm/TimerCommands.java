@@ -145,14 +145,6 @@ public final class TimerCommands
   }
 
   public static String asPlantUMLStateDiagram() {
-    StringBuilder result = new StringBuilder();
-    TimerCommands.newInstance(
-        StartTimerCommandAttributes.getDefaultInstance(),
-        (f, c) -> {},
-        (c) -> {
-          c.setInitialCommandEventId(0);
-          result.append(c.getCommands().toPlantUML());
-        });
-    return result.toString();
+    return newStateMachine().asPlantUMLStateDiagram();
   }
 }

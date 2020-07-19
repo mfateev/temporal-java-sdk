@@ -24,7 +24,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,7 +41,8 @@ final class StateMachine<State, Action, Data> {
   private final List<Transition<State, ActionOrEventType<Action>>> transitionHistory =
       new ArrayList<>();
   private final Map<Transition<State, ActionOrEventType<Action>>, TransitionTarget<State, Data>>
-      transitions = new HashMap<>();
+      transitions =
+          new LinkedHashMap<>(); // linked to maintain the same order for diagram generation
 
   private final State initialState;
   private final List<State> finalStates;
@@ -146,7 +147,7 @@ final class StateMachine<State, Action, Data> {
     transitionHistory.add(transition);
   }
 
-  public String toPlantUML() {
+  public String asPlantUMLStateDiagram() {
     StringBuilder result = new StringBuilder();
     result.append("@startuml\n" + "scale 350 width\n");
     result.append("[*] --> ");

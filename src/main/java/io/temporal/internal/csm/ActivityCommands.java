@@ -221,14 +221,6 @@ public final class ActivityCommands
   }
 
   public static String asPlantUMLStateDiagram() {
-    StringBuilder result = new StringBuilder();
-    ActivityCommands.newInstance(
-        ScheduleActivityTaskCommandAttributes.getDefaultInstance(),
-        (a, b, c) -> {},
-        (c) -> {
-          c.setInitialCommandEventId(0);
-          result.append(c.getCommands().toPlantUML());
-        });
-    return result.toString();
+    return newStateMachine().asPlantUMLStateDiagram();
   }
 }

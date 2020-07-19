@@ -64,7 +64,7 @@ public class CommandsGeneratePlantUMLStateDiagrams {
       content.append("\n\n");
       content.append(generator.apply());
       if (file.exists()) {
-        String existingContent = Files.toString(file, Charsets.UTF_8);
+        String existingContent = Files.asCharSource(file, Charsets.UTF_8).read();
         if (existingContent.equals(content.toString())) {
           return;
         }
