@@ -37,14 +37,14 @@ public final class CancelExternalCommands
           RequestCancelExternalWorkflowExecutionFailedEventAttributes>
       completionCallback;
 
-  public static void newInstance(
+  public static CancelExternalCommands newInstance(
       RequestCancelExternalWorkflowExecutionCommandAttributes signalAttributes,
       Functions.Proc2<
               ExternalWorkflowExecutionCancelRequestedEventAttributes,
               RequestCancelExternalWorkflowExecutionFailedEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new CancelExternalCommands(signalAttributes, completionCallback, commandSink);
+    return new CancelExternalCommands(signalAttributes, completionCallback, commandSink);
   }
 
   private CancelExternalCommands(

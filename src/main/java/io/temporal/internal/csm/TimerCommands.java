@@ -35,11 +35,11 @@ public final class TimerCommands
   private final Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes>
       completionCallback;
 
-  public static void newInstance(
+  public static TimerCommands newInstance(
       StartTimerCommandAttributes startAttributes,
       Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new TimerCommands(startAttributes, completionCallback, commandSink);
+    return new TimerCommands(startAttributes, completionCallback, commandSink);
   }
 
   private TimerCommands(

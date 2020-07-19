@@ -158,7 +158,7 @@ public final class ActivityCommands
           ActivityTaskCanceledEventAttributes>
       completionCallback;
 
-  public static void newInstance(
+  public static ActivityCommands newInstance(
       ScheduleActivityTaskCommandAttributes scheduleAttr,
       Functions.Proc4<
               ActivityTaskCompletedEventAttributes,
@@ -167,7 +167,7 @@ public final class ActivityCommands
               ActivityTaskCanceledEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new ActivityCommands(scheduleAttr, completionCallback, commandSink);
+    return new ActivityCommands(scheduleAttr, completionCallback, commandSink);
   }
 
   private ActivityCommands(

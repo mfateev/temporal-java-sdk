@@ -37,14 +37,14 @@ public final class SignalExternalCommands
           SignalExternalWorkflowExecutionFailedEventAttributes>
       completionCallback;
 
-  public static void newInstance(
+  public static SignalExternalCommands newInstance(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
       Functions.Proc2<
               ExternalWorkflowExecutionSignaledEventAttributes,
               SignalExternalWorkflowExecutionFailedEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new SignalExternalCommands(signalAttributes, completionCallback, commandSink);
+    return new SignalExternalCommands(signalAttributes, completionCallback, commandSink);
   }
 
   private SignalExternalCommands(

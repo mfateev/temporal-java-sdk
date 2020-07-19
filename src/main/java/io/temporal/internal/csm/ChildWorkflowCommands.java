@@ -123,7 +123,7 @@ public final class ChildWorkflowCommands
           ChildWorkflowExecutionTerminatedEventAttributes>
       completionCallback;
 
-  public static void newInstance(
+  public static ChildWorkflowCommands newInstance(
       StartChildWorkflowExecutionCommandAttributes startAttributes,
       Functions.Proc6<
               StartChildWorkflowExecutionFailedEventAttributes,
@@ -134,7 +134,7 @@ public final class ChildWorkflowCommands
               ChildWorkflowExecutionTerminatedEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new ChildWorkflowCommands(startAttributes, completionCallback, commandSink);
+    return new ChildWorkflowCommands(startAttributes, completionCallback, commandSink);
   }
 
   private ChildWorkflowCommands(

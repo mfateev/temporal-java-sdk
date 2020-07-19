@@ -23,12 +23,13 @@ import com.google.common.base.Charsets;
 import com.google.common.io.CharSink;
 import com.google.common.io.Files;
 import io.temporal.workflow.WorkflowTest;
-import java.io.File;
-import java.lang.reflect.Method;
-import java.util.List;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.lang.reflect.Method;
+import java.util.List;
 
 public class CommandsGeneratePlantUMLStateDiagrams {
 
@@ -43,6 +44,9 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(UpsertSearchAttributesCommands.class);
     generate(ChildWorkflowCommands.class);
     generate(MarkerCommands.class);
+    generate(CompleteWorkflowCommands.class);
+    generate(FailWorkflowCommands.class);
+    generate(CancelWorkflowCommands.class);
   }
 
   private void generate(Class<? extends CommandsBase> commandClass) {
