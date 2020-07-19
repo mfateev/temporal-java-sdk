@@ -22,6 +22,9 @@ package io.temporal.internal.csm;
 import io.temporal.api.enums.v1.EventType;
 
 class ActionOrEventType<Action> {
+
+  public static final int EVENT_TYPE_PREFIX_LENGTH = "EVENT_TYPE_".length();
+
   final Action action;
   final EventType eventType;
 
@@ -51,7 +54,7 @@ class ActionOrEventType<Action> {
   @Override
   public String toString() {
     if (action == null) {
-      return eventType.toString();
+      return eventType.toString().substring(EVENT_TYPE_PREFIX_LENGTH);
     }
     return action.toString();
   }

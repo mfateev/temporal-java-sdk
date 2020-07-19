@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
+import java.util.Optional;
 
 public class CommandsBase<State, Action, Data> {
 
@@ -57,7 +58,7 @@ public class CommandsBase<State, Action, Data> {
   }
 
   protected final void addCommand(Command command) {
-    initialCommand = new NewCommand(command);
+    initialCommand = new NewCommand(command, this);
     commandSink.apply(initialCommand);
   }
 
@@ -66,6 +67,10 @@ public class CommandsBase<State, Action, Data> {
   }
 
   protected final long getInitialCommandEventId() {
-    return initialCommand.getInitialCommandEventId();
+    Optional<Long> eventId = initialCommand.getInitialCommandEventId();
+    if (!eventId.isPresent()) {
+      throw new IllegalArgumentException("Initial eventId is not set yet");
+    }
+    return eventId.get();
   }
 }

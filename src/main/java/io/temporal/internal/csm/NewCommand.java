@@ -26,11 +26,14 @@ import java.util.Optional;
 public class NewCommand {
 
   private final Command command;
+  private final CommandsBase commands;
   private boolean canceled;
-  private long initialCommandEventId;
+  private Optional<Long> initialCommandEventId;
 
-  public NewCommand(Command command) {
+  public NewCommand(Command command, CommandsBase commands) {
     this.command = Objects.requireNonNull(command);
+    this.commands = Objects.requireNonNull(commands);
+    this.initialCommandEventId = Optional.empty();
   }
 
   public Optional<Command> getCommand() {
@@ -44,11 +47,15 @@ public class NewCommand {
     canceled = true;
   }
 
-  public long getInitialCommandEventId() {
+  public Optional<Long> getInitialCommandEventId() {
     return initialCommandEventId;
   }
 
   public void setInitialCommandEventId(long initialCommandEventId) {
-    this.initialCommandEventId = initialCommandEventId;
+    this.initialCommandEventId = Optional.of(initialCommandEventId);
+  }
+
+  public CommandsBase getCommands() {
+    return commands;
   }
 }

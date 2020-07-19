@@ -39,16 +39,14 @@ public final class ActivityCommands
   enum State {
     CREATED,
     SCHEDULE_COMMAND_CREATED,
-    // Cancelled without sending schedule command to the server
-    CANCELED_CREATED_ACTIVITY,
     SCHEDULED_EVENT_RECORDED,
     STARTED,
     COMPLETED,
     FAILED,
     CANCELED,
-    CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
+    SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
     SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
-    CANCEL_REQUESTED_STARTED_ACTIVITY,
+    STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
     STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
     COMPLETED_CANCEL_REQUESTED,
     FAILED_CANCEL_REQUESTED,
@@ -57,25 +55,21 @@ public final class ActivityCommands
 
   private static StateMachine<State, Action, ActivityCommands> newStateMachine() {
     return StateMachine.<State, Action, ActivityCommands>newInstance(
-            State.CREATED,
-            State.COMPLETED,
-            State.FAILED,
-            State.CANCELED,
-            State.CANCELED_CREATED_ACTIVITY)
+            State.CREATED, State.COMPLETED, State.FAILED, State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
             State.SCHEDULE_COMMAND_CREATED,
-            ActivityCommands::scheduleActivityTask)
+            ActivityCommands::createScheduleActivityTaskCommand)
         .add(
             State.SCHEDULE_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
             State.SCHEDULED_EVENT_RECORDED)
         .add(
-            State.CREATED,
+            State.SCHEDULE_COMMAND_CREATED,
             Action.CANCEL,
-            State.CANCELED_CREATED_ACTIVITY,
-            ActivityCommands::cancelCreated)
+            State.CANCELED,
+            ActivityCommands::cancelScheduleCommand)
         .add(
             State.SCHEDULED_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
@@ -93,12 +87,16 @@ public final class ActivityCommands
         .add(
             State.SCHEDULED_EVENT_RECORDED,
             Action.CANCEL,
-            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-            ActivityCommands::addRequestCancelCommand)
+            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            ActivityCommands::createRequestCancelActivityTaskCommand)
         .add(
-            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
+            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
             State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED)
+        .add(
+            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED)
         .add(
             State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
@@ -109,33 +107,39 @@ public final class ActivityCommands
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED)
         .add(
+            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
+            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED)
+        .add(
+            State.STARTED,
+            Action.CANCEL,
+            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            ActivityCommands::createRequestCancelActivityTaskCommand)
+        .add(
+            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
+            State.COMPLETED,
+            ActivityCommands::cancelScheduleCommandCompleteActivity)
+        .add(
+            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            State.FAILED,
+            ActivityCommands::cancelScheduleCommandFailActivity)
+        .add(
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
             State.FAILED,
             ActivityCommands::activityTaskFailed)
         .add(
-            State.STARTED,
-            Action.CANCEL,
-            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-            ActivityCommands::addRequestCancelCommand)
-        .add(
-            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
+            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-            State.COMPLETED_CANCEL_REQUESTED,
+            State.COMPLETED,
             ActivityCommands::activityTaskCompleted)
         .add(
-            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-            State.FAILED_CANCEL_REQUESTED,
-            ActivityCommands::activityTaskFailed)
-        .add(
-            State.COMPLETED_CANCEL_REQUESTED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.COMPLETED)
-        .add(
-            State.FAILED_CANCEL_REQUESTED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.FAILED);
+            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
+            State.CANCELED,
+            ActivityCommands::activityTaskCanceled);
   }
 
   private final ScheduleActivityTaskCommandAttributes scheduleAttr;
@@ -171,7 +175,7 @@ public final class ActivityCommands
     action(Action.SCHEDULE);
   }
 
-  public void scheduleActivityTask() {
+  public void createScheduleActivityTaskCommand() {
     addCommand(Command.newBuilder().setScheduleActivityTaskCommandAttributes(scheduleAttr).build());
   }
 
@@ -179,7 +183,7 @@ public final class ActivityCommands
     action(Action.CANCEL);
   }
 
-  private void cancelCreated() {
+  private void cancelScheduleCommand() {
     cancelInitialCommand();
     completionCallback.apply(
         null,
@@ -199,12 +203,32 @@ public final class ActivityCommands
     completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null, null);
   }
 
-  private void addRequestCancelCommand() {
+  private State cancelScheduleCommandFailActivity() {
+    throw new UnsupportedOperationException("unimplemented");
+  }
+
+  private State cancelScheduleCommandCompleteActivity() {
+    throw new UnsupportedOperationException("unimplemented");
+  }
+
+  private void createRequestCancelActivityTaskCommand() {
     addCommand(
         Command.newBuilder()
             .setRequestCancelActivityTaskCommandAttributes(
                 RequestCancelActivityTaskCommandAttributes.newBuilder()
                     .setScheduledEventId(getInitialCommandEventId()))
             .build());
+  }
+
+  public static String asPlantUMLStateDiagram() {
+    StringBuilder result = new StringBuilder();
+    ActivityCommands.newInstance(
+        ScheduleActivityTaskCommandAttributes.getDefaultInstance(),
+        (a, b, c) -> {},
+        (c) -> {
+          c.setInitialCommandEventId(0);
+          result.append(c.getCommands().toPlantUML());
+        });
+    return result.toString();
   }
 }
