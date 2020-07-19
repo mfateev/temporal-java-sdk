@@ -19,178 +19,141 @@
 
 package io.temporal.internal.csm;
 
+import io.temporal.api.command.v1.CancelTimerCommandAttributes;
+import io.temporal.api.command.v1.Command;
+import io.temporal.api.command.v1.StartTimerCommandAttributes;
+import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.history.v1.TimerCanceledEventAttributes;
+import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.workflow.Functions;
 
 public final class TimerCommands
     extends CommandsBase<TimerCommands.State, TimerCommands.Action, TimerCommands> {
-  public TimerCommands(
-      StateMachine<TimerCommands.State, TimerCommands.Action, TimerCommands> stateMachine,
+
+  private final StartTimerCommandAttributes startAttributes;
+
+  private final Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes>
+      completionCallback;
+
+  public static void newInstance(
+      StartTimerCommandAttributes startAttributes,
+      Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    super(stateMachine, commandSink);
+    new TimerCommands(startAttributes, completionCallback, commandSink);
+  }
+
+  private TimerCommands(
+      StartTimerCommandAttributes startAttributes,
+      Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes> completionCallback,
+      Functions.Proc1<NewCommand> commandSink) {
+    super(newStateMachine(), commandSink);
+    this.startAttributes = startAttributes;
+    this.completionCallback = completionCallback;
+    action(Action.SCHEDULE);
   }
 
   enum Action {
+    SCHEDULE,
     START,
     CANCEL
   }
 
   enum State {
     CREATED,
-    START_CREATED,
-    // Cancelled without sending start command to the server
-    CANCELED_CREATED_TIMER,
-    STARTED,
+    START_COMMAND_CREATED,
+    START_COMMAND_RECORDED,
+    CANCEL_TIMER_COMMAND_CREATED,
+    FIRED,
     CANCELED,
   }
-  //
-  //  private static StateMachine<State, Action, TimerCommands> newStateMachine() {
-  //    return StateMachine.<State, Action, TimerCommands>newInstance(
-  //            State.CREATED,
-  //            State.COMPLETED,
-  //            State.FAILED,
-  //            State.CANCELED,
-  //            State.CANCELED_CREATED_TIMER)
-  //        .add(State.CREATED, Action.START, State.START_CREATED,
-  // TimerCommands::scheduleActivityTask)
-  //        .add(
-  //            State.START_CREATED,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
-  //            State.SCHEDULED_EVENT_RECORDED)
-  //        .add(
-  //            State.CREATED,
-  //            Action.CANCEL,
-  //            State.CANCELED_CREATED_TIMER,
-  //            TimerCommands::cancelCreated)
-  //        .add(
-  //            State.SCHEDULED_EVENT_RECORDED,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
-  //            State.STARTED)
-  //        .add(
-  //            State.STARTED,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-  //            State.COMPLETED,
-  //            TimerCommands::activityTaskCompleted)
-  //        .add(
-  //            State.STARTED,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-  //            State.FAILED,
-  //            TimerCommands::activityTaskFailed)
-  //        .add(
-  //            State.SCHEDULED_EVENT_RECORDED,
-  //            Action.CANCEL,
-  //            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-  //            TimerCommands::addRequestCancelCommand)
-  //        .add(
-  //            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
-  //            State.CANCELED,
-  //            TimerCommands::activityTaskCanceled)
-  //        .add(
-  //            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-  //            State.COMPLETED,
-  //            TimerCommands::activityTaskCompleted)
-  //        .add(
-  //            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-  //            State.FAILED,
-  //            TimerCommands::activityTaskFailed)
-  //        .add(
-  //            State.CANCEL_REQUESTED_SCHEDULED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
-  //            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-  //            TimerCommands::activityTaskFailed)
-  //        .add(
-  //            State.STARTED,
-  //            Action.CANCEL,
-  //            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-  //            TimerCommands::addRequestCancelCommand)
-  //        .add(
-  //            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
-  //            State.CANCELED,
-  //            TimerCommands::activityTaskCanceled)
-  //        .add(
-  //            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-  //            State.COMPLETED,
-  //            TimerCommands::activityTaskCompleted)
-  //        .add(
-  //            State.CANCEL_REQUESTED_STARTED_ACTIVITY,
-  //            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-  //            State.FAILED,
-  //            TimerCommands::activityTaskFailed);
-  //  }
-  //
-  //  private final ScheduleActivityTaskCommandAttributes scheduleAttr;
-  //
-  //  private final Functions.Proc3<
-  //          ActivityTaskCompletedEventAttributes,
-  //          ActivityTaskFailedEventAttributes,
-  //          ActivityTaskCanceledEventAttributes>
-  //      completionCallback;
-  //
-  //  public static void newInstance(
-  //      ScheduleActivityTaskCommandAttributes scheduleAttr,
-  //      Functions.Proc3<
-  //              ActivityTaskCompletedEventAttributes,
-  //              ActivityTaskFailedEventAttributes,
-  //              ActivityTaskCanceledEventAttributes>
-  //          completionCallback,
-  //      Functions.Proc1<NewCommand> commandSink) {
-  //    new TimerCommands(scheduleAttr, completionCallback, commandSink);
-  //  }
-  //
-  //  private TimerCommands(
-  //      ScheduleActivityTaskCommandAttributes scheduleAttr,
-  //      Functions.Proc3<
-  //              ActivityTaskCompletedEventAttributes,
-  //              ActivityTaskFailedEventAttributes,
-  //              ActivityTaskCanceledEventAttributes>
-  //          completionCallback,
-  //      Functions.Proc1<NewCommand> commandSink) {
-  //    super(newStateMachine(), commandSink);
-  //    this.scheduleAttr = scheduleAttr;
-  //    this.completionCallback = completionCallback;
-  //    action(Action.START);
-  //  }
-  //
-  //  public void scheduleActivityTask() {
-  //
-  // addCommand(Command.newBuilder().setScheduleActivityTaskCommandAttributes(scheduleAttr).build());
-  //  }
-  //
-  //  public void cancel() {
-  //    action(Action.CANCEL);
-  //  }
-  //
-  //  private void cancelCreated() {
-  //    cancelInitialCommand();
-  //    completionCallback.apply(
-  //        null,
-  //        null,
-  //        ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow").build());
-  //  }
-  //
-  //  private void activityTaskCanceled() {
-  //    completionCallback.apply(null, null, currentEvent.getActivityTaskCanceledEventAttributes());
-  //  }
-  //
-  //  private void activityTaskFailed() {
-  //    completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null);
-  //  }
-  //
-  //  private void activityTaskCompleted() {
-  //    completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null,
-  // null);
-  //  }
-  //
-  //  private void addRequestCancelCommand() {
-  //    addCommand(
-  //        Command.newBuilder()
-  //            .setRequestCancelActivityTaskCommandAttributes(
-  //                RequestCancelActivityTaskCommandAttributes.newBuilder()
-  //                    .setScheduledEventId(getInitialCommandEventId()))
-  //            .build());
-  //  }
+
+  private static StateMachine<State, Action, TimerCommands> newStateMachine() {
+    return StateMachine.<State, Action, TimerCommands>newInstance(
+            State.CREATED, State.FIRED, State.CANCELED)
+        .add(
+            State.CREATED,
+            Action.SCHEDULE,
+            State.START_COMMAND_CREATED,
+            TimerCommands::createStartTimerCommand)
+        .add(
+            State.START_COMMAND_CREATED,
+            EventType.EVENT_TYPE_TIMER_STARTED,
+            State.START_COMMAND_RECORDED)
+        .add(
+            State.START_COMMAND_CREATED,
+            Action.CANCEL,
+            State.CANCELED,
+            TimerCommands::cancelStartTimerCommand)
+        .add(
+            State.START_COMMAND_RECORDED,
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            State.FIRED,
+            TimerCommands::fireTimer)
+        .add(
+            State.START_COMMAND_RECORDED,
+            Action.CANCEL,
+            State.CANCEL_TIMER_COMMAND_CREATED,
+            TimerCommands::createCancelTimerCommand)
+        .add(
+            State.CANCEL_TIMER_COMMAND_CREATED,
+            EventType.EVENT_TYPE_TIMER_CANCELED,
+            State.CANCELED,
+            TimerCommands::timerCanceled)
+        .add(
+            State.CANCEL_TIMER_COMMAND_CREATED,
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            State.FIRED,
+            TimerCommands::cancelTimerCommandFireTimer);
+  }
+
+  private void createStartTimerCommand() {
+    addCommand(Command.newBuilder().setStartTimerCommandAttributes(startAttributes).build());
+  }
+
+  public void cancel() {
+    action(Action.CANCEL);
+  }
+
+  private void cancelStartTimerCommand() {
+    cancelInitialCommand();
+    completionCallback.apply(
+        null,
+        TimerCanceledEventAttributes.newBuilder()
+            .setIdentity("workflow")
+            .setTimerId(startAttributes.getTimerId())
+            .build());
+  }
+
+  private void fireTimer() {
+    completionCallback.apply(currentEvent.getTimerFiredEventAttributes(), null);
+  }
+
+  private void createCancelTimerCommand() {
+    addCommand(
+        Command.newBuilder()
+            .setCancelTimerCommandAttributes(
+                CancelTimerCommandAttributes.newBuilder().setTimerId(startAttributes.getTimerId()))
+            .build());
+  }
+
+  private void timerCanceled() {
+    completionCallback.apply(null, currentEvent.getTimerCanceledEventAttributes());
+  }
+
+  private void cancelTimerCommandFireTimer() {
+    cancelInitialCommand();
+    fireTimer();
+  }
+
+  public static String asPlantUMLStateDiagram() {
+    StringBuilder result = new StringBuilder();
+    TimerCommands.newInstance(
+        StartTimerCommandAttributes.getDefaultInstance(),
+        (f, c) -> {},
+        (c) -> {
+          c.setInitialCommandEventId(0);
+          result.append(c.getCommands().toPlantUML());
+        });
+    return result.toString();
+  }
 }

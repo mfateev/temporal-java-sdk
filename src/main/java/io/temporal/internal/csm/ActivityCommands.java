@@ -191,23 +191,23 @@ public final class ActivityCommands
         ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow").build());
   }
 
-  private void activityTaskCanceled() {
-    completionCallback.apply(null, null, currentEvent.getActivityTaskCanceledEventAttributes());
+  private void activityTaskCompleted() {
+    completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null, null);
   }
 
   private void activityTaskFailed() {
     completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null);
   }
 
-  private void activityTaskCompleted() {
-    completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null, null);
+  private void activityTaskCanceled() {
+    completionCallback.apply(null, null, currentEvent.getActivityTaskCanceledEventAttributes());
   }
 
-  private State cancelScheduleCommandFailActivity() {
+  private void cancelScheduleCommandFailActivity() {
     throw new UnsupportedOperationException("unimplemented");
   }
 
-  private State cancelScheduleCommandCompleteActivity() {
+  private void cancelScheduleCommandCompleteActivity() {
     throw new UnsupportedOperationException("unimplemented");
   }
 
