@@ -25,12 +25,12 @@ import com.google.common.io.CharSink;
 import com.google.common.io.Files;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.WorkflowTest;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
 
 public class CommandsGeneratePlantUMLStateDiagrams {
 
@@ -38,19 +38,31 @@ public class CommandsGeneratePlantUMLStateDiagrams {
 
   @Test
   public void plantUML() {
-
-    //    System.out.println(ActivityCommands.asPlantUMLStateDiagram());
+    generate(ActivityCommands.class, ActivityCommands::asPlantUMLStateDiagram);
     generate(TimerCommands.class, TimerCommands::asPlantUMLStateDiagram);
   }
 
-  private void generate(Class<? extends CommandsBase> commandClass, Functions.Func<String> generator) {
+  private void generate(
+      Class<? extends CommandsBase> commandClass, Functions.Func<String> generator) {
     String projectPath = System.getProperty("user.dir");
-    String classPath = commandClass.getName().replace(".", "/") + ".puml";
-    String diagramFile = projectPath + "/src/main/java/" + classPath + ".";
-    File file = new File(diagramFile);
+    String relativePath = commandClass.getName().replace(".", File.separator);
+    String fullRelativePath = ("src/main/java/" + relativePath).replace("/", File.separator);
+    String diagramFile = (projectPath + "/" + fullRelativePath).replace("/", File.separator);
+    File file = new File(diagramFile + ".puml");
     CharSink sink = Files.asCharSink(file, Charsets.UTF_8);
+    File licenseFile = new File(projectPath + File.separator + "license-header.txt");
+    StringBuilder content = new StringBuilder();
     try {
-      sink.write(generator.apply());
+      List<String> license = Files.readLines(licenseFile, Charsets.UTF_8);
+      for (String licenseLine : license) {
+        content.append("`" + licenseLine + "\n");
+      }
+      content.append("\n");
+      content.append(
+          "` Generated from " + fullRelativePath + ".java\n` by " + this.getClass().getName());
+      content.append("\n\n");
+      content.append(generator.apply());
+      sink.write(content);
     } catch (IOException e) {
       Throwables.propagateIfPossible(e, RuntimeException.class);
     }
