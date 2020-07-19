@@ -20,16 +20,20 @@
 package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
-import io.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes;
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
+import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
+import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskCompletedEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes;
+import io.temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes;
 import io.temporal.workflow.Functions;
 
 public final class ChildWorkflowCommands
-    extends CommandsBase<ChildWorkflowCommands.State, ChildWorkflowCommands.Action, ChildWorkflowCommands> {
+    extends CommandsBase<
+        ChildWorkflowCommands.State, ChildWorkflowCommands.Action, ChildWorkflowCommands> {
 
   enum Action {
     SCHEDULE,
@@ -38,186 +42,205 @@ public final class ChildWorkflowCommands
 
   enum State {
     CREATED,
-    SCHEDULE_COMMAND_CREATED,
-    SCHEDULED_EVENT_RECORDED,
+    START_COMMAND_CREATED,
+    START_EVENT_RECORDED,
     STARTED,
+    START_FAILED,
     COMPLETED,
     FAILED,
     CANCELED,
-    SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
-    SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
-    STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
-    STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
-    COMPLETED_CANCEL_REQUESTED,
-    FAILED_CANCEL_REQUESTED,
-    CANCELED_CANCEL_REQUESTED,
+    TIMED_OUT,
+    TERMINATED,
   }
 
   private static StateMachine<State, Action, ChildWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, ChildWorkflowCommands>newInstance(
-            State.CREATED, State.COMPLETED, State.FAILED, State.CANCELED)
+            State.CREATED,
+            State.START_FAILED,
+            State.COMPLETED,
+            State.FAILED,
+            State.CANCELED,
+            State.TIMED_OUT,
+            State.TERMINATED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
-            State.SCHEDULE_COMMAND_CREATED,
-            ChildWorkflowCommands::createScheduleActivityTaskCommand)
+            State.START_COMMAND_CREATED,
+            ChildWorkflowCommands::createStartChildCommand)
         .add(
-            State.SCHEDULE_COMMAND_CREATED,
+            State.START_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
-            State.SCHEDULED_EVENT_RECORDED)
+            State.START_EVENT_RECORDED)
         .add(
-            State.SCHEDULE_COMMAND_CREATED,
+            State.START_COMMAND_CREATED,
             Action.CANCEL,
             State.CANCELED,
-            ChildWorkflowCommands::cancelScheduleCommand)
+            ChildWorkflowCommands::cancelStartChildCommand)
         .add(
-            State.SCHEDULED_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
+            State.START_EVENT_RECORDED,
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_STARTED,
             State.STARTED)
         .add(
+            State.START_EVENT_RECORDED,
+            EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED,
+            State.START_FAILED,
+            ChildWorkflowCommands::startChildWorklfowFailed)
+        .add(
             State.STARTED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED,
             State.COMPLETED,
-            ChildWorkflowCommands::activityTaskCompleted)
+            ChildWorkflowCommands::childWorklfowCompleted)
         .add(
             State.STARTED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED,
             State.FAILED,
-            ChildWorkflowCommands::activityTaskFailed)
+            ChildWorkflowCommands::childWorkflowFailed)
         .add(
-            State.SCHEDULED_EVENT_RECORDED,
-            Action.CANCEL,
-            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            ChildWorkflowCommands::createRequestCancelActivityTaskCommand)
+            State.STARTED,
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT,
+            State.TIMED_OUT,
+            ChildWorkflowCommands::childWorkflowTimedOut)
         .add(
-            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED)
-        .add(
-            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
-            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED)
-        .add(
-            State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
+            State.STARTED,
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED,
             State.CANCELED,
-            ChildWorkflowCommands::activityTaskCanceled)
-        .add(
-            State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED)
+            ChildWorkflowCommands::childWorkflowCanceled)
         .add(
             State.STARTED,
-            Action.CANCEL,
-            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            ChildWorkflowCommands::createRequestCancelActivityTaskCommand)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-            State.COMPLETED,
-            ChildWorkflowCommands::cancelScheduleCommandCompleteActivity)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-            State.FAILED,
-            ChildWorkflowCommands::cancelScheduleCommandFailActivity)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
-            State.FAILED,
-            ChildWorkflowCommands::activityTaskFailed)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
-            State.COMPLETED,
-            ChildWorkflowCommands::activityTaskCompleted)
-        .add(
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
-            State.CANCELED,
-            ChildWorkflowCommands::activityTaskCanceled);
+            EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED,
+            State.TERMINATED,
+            ChildWorkflowCommands::childWorkflowTerminated);
   }
 
-  private final ScheduleActivityTaskCommandAttributes scheduleAttr;
+  private final StartChildWorkflowExecutionCommandAttributes startAttributes;
 
-  private final Functions.Proc3<
-          ActivityTaskCompletedEventAttributes,
-          ActivityTaskFailedEventAttributes,
-          ActivityTaskCanceledEventAttributes>
+  private final Functions.Proc6<
+          StartChildWorkflowExecutionFailedEventAttributes,
+          ChildWorkflowExecutionCompletedEventAttributes,
+          ChildWorkflowExecutionFailedEventAttributes,
+          ChildWorkflowExecutionTimedOutEventAttributes,
+          ChildWorkflowExecutionCanceledEventAttributes,
+          ChildWorkflowExecutionTerminatedEventAttributes>
       completionCallback;
 
   public static void newInstance(
-      ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc3<
-              ActivityTaskCompletedEventAttributes,
-              ActivityTaskFailedEventAttributes,
-              ActivityTaskCanceledEventAttributes>
+      StartChildWorkflowExecutionCommandAttributes startAttributes,
+      Functions.Proc6<
+              StartChildWorkflowExecutionFailedEventAttributes,
+              ChildWorkflowExecutionCompletedEventAttributes,
+              ChildWorkflowExecutionFailedEventAttributes,
+              ChildWorkflowExecutionTimedOutEventAttributes,
+              ChildWorkflowExecutionCanceledEventAttributes,
+              ChildWorkflowExecutionTerminatedEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new ChildWorkflowCommands(scheduleAttr, completionCallback, commandSink);
+    new ChildWorkflowCommands(startAttributes, completionCallback, commandSink);
   }
 
   private ChildWorkflowCommands(
-      ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc3<
-              ActivityTaskCompletedEventAttributes,
-              ActivityTaskFailedEventAttributes,
-              ActivityTaskCanceledEventAttributes>
+      StartChildWorkflowExecutionCommandAttributes startAttributes,
+      Functions.Proc6<
+              StartChildWorkflowExecutionFailedEventAttributes,
+              ChildWorkflowExecutionCompletedEventAttributes,
+              ChildWorkflowExecutionFailedEventAttributes,
+              ChildWorkflowExecutionTimedOutEventAttributes,
+              ChildWorkflowExecutionCanceledEventAttributes,
+              ChildWorkflowExecutionTerminatedEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
-    this.scheduleAttr = scheduleAttr;
+    this.startAttributes = startAttributes;
     this.completionCallback = completionCallback;
     action(Action.SCHEDULE);
   }
 
-  public void createScheduleActivityTaskCommand() {
-    addCommand(Command.newBuilder().setScheduleActivityTaskCommandAttributes(scheduleAttr).build());
+  public void createStartChildCommand() {
+    addCommand(
+        Command.newBuilder()
+            .setStartChildWorkflowExecutionCommandAttributes(startAttributes)
+            .build());
   }
 
   public void cancel() {
     action(Action.CANCEL);
   }
 
-  private void cancelScheduleCommand() {
+  private void cancelStartChildCommand() {
     cancelInitialCommand();
     completionCallback.apply(
         null,
         null,
-        ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow").build());
+        null,
+        null,
+        ChildWorkflowExecutionCanceledEventAttributes.newBuilder()
+            .setWorkflowType(startAttributes.getWorkflowType())
+            .setNamespace(startAttributes.getNamespace())
+            .setWorkflowExecution(
+                WorkflowExecution.newBuilder()
+                    .setWorkflowId(startAttributes.getWorkflowId())
+                    .build())
+            .build(),
+        null);
   }
 
-  private void activityTaskCompleted() {
-    completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null, null);
+  private void startChildWorklfowFailed() {
+    completionCallback.apply(
+        currentEvent.getStartChildWorkflowExecutionFailedEventAttributes(),
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
-  private void activityTaskFailed() {
-    completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null);
+  private void childWorklfowCompleted() {
+    completionCallback.apply(
+        null,
+        currentEvent.getChildWorkflowExecutionCompletedEventAttributes(),
+        null,
+        null,
+        null,
+        null);
   }
 
-  private void activityTaskCanceled() {
-    completionCallback.apply(null, null, currentEvent.getActivityTaskCanceledEventAttributes());
+  private void childWorkflowFailed() {
+    completionCallback.apply(
+        null,
+        null,
+        currentEvent.getChildWorkflowExecutionFailedEventAttributes(),
+        null,
+        null,
+        null);
   }
 
-  private void cancelScheduleCommandFailActivity() {
-    throw new UnsupportedOperationException("unimplemented");
+  private void childWorkflowTimedOut() {
+    completionCallback.apply(
+        null,
+        null,
+        null,
+        currentEvent.getChildWorkflowExecutionTimedOutEventAttributes(),
+        null,
+        null);
   }
 
-  private void cancelScheduleCommandCompleteActivity() {
-    throw new UnsupportedOperationException("unimplemented");
+  private void childWorkflowCanceled() {
+    completionCallback.apply(
+        null,
+        null,
+        null,
+        null,
+        currentEvent.getChildWorkflowExecutionCanceledEventAttributes(),
+        null);
   }
 
-  private void createRequestCancelActivityTaskCommand() {
-    addCommand(
-        Command.newBuilder()
-            .setRequestCancelActivityTaskCommandAttributes(
-                RequestCancelActivityTaskCommandAttributes.newBuilder()
-                    .setScheduledEventId(getInitialCommandEventId()))
-            .build());
+  private void childWorkflowTerminated() {
+    completionCallback.apply(
+        null,
+        null,
+        null,
+        null,
+        null,
+        currentEvent.getChildWorkflowExecutionTerminatedEventAttributes());
   }
 
   public static String asPlantUMLStateDiagram() {

@@ -41,6 +41,7 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(SignalExternalCommands.class);
     generate(CancelExternalCommands.class);
     generate(UpseartSearchAttributesCommands.class);
+    generate(ChildWorkflowCommands.class);
   }
 
   private void generate(Class<? extends CommandsBase> commandClass) {

@@ -26,6 +26,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
 import io.temporal.api.history.v1.ActivityTaskCompletedEventAttributes;
 import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
+import io.temporal.api.history.v1.ActivityTaskTimedOutEventAttributes;
 import io.temporal.workflow.Functions;
 
 public final class ActivityCommands
@@ -43,6 +44,7 @@ public final class ActivityCommands
     STARTED,
     COMPLETED,
     FAILED,
+    TIMED_OUT,
     CANCELED,
     SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
     SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
@@ -55,7 +57,7 @@ public final class ActivityCommands
 
   private static StateMachine<State, Action, ActivityCommands> newStateMachine() {
     return StateMachine.<State, Action, ActivityCommands>newInstance(
-            State.CREATED, State.COMPLETED, State.FAILED, State.CANCELED)
+            State.CREATED, State.COMPLETED, State.FAILED, State.TIMED_OUT, State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -84,6 +86,11 @@ public final class ActivityCommands
             EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
             State.FAILED,
             ActivityCommands::activityTaskFailed)
+        .add(
+            State.STARTED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+            State.TIMED_OUT,
+            ActivityCommands::activityTaskTimedOut)
         .add(
             State.SCHEDULED_EVENT_RECORDED,
             Action.CANCEL,
@@ -144,17 +151,19 @@ public final class ActivityCommands
 
   private final ScheduleActivityTaskCommandAttributes scheduleAttr;
 
-  private final Functions.Proc3<
+  private final Functions.Proc4<
           ActivityTaskCompletedEventAttributes,
           ActivityTaskFailedEventAttributes,
+          ActivityTaskTimedOutEventAttributes,
           ActivityTaskCanceledEventAttributes>
       completionCallback;
 
   public static void newInstance(
       ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc3<
+      Functions.Proc4<
               ActivityTaskCompletedEventAttributes,
               ActivityTaskFailedEventAttributes,
+              ActivityTaskTimedOutEventAttributes,
               ActivityTaskCanceledEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
@@ -163,9 +172,10 @@ public final class ActivityCommands
 
   private ActivityCommands(
       ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc3<
+      Functions.Proc4<
               ActivityTaskCompletedEventAttributes,
               ActivityTaskFailedEventAttributes,
+              ActivityTaskTimedOutEventAttributes,
               ActivityTaskCanceledEventAttributes>
           completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
@@ -188,19 +198,27 @@ public final class ActivityCommands
     completionCallback.apply(
         null,
         null,
+        null,
         ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow").build());
   }
 
   private void activityTaskCompleted() {
-    completionCallback.apply(currentEvent.getActivityTaskCompletedEventAttributes(), null, null);
+    completionCallback.apply(
+        currentEvent.getActivityTaskCompletedEventAttributes(), null, null, null);
   }
 
   private void activityTaskFailed() {
-    completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null);
+    completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null, null);
+  }
+
+  private void activityTaskTimedOut() {
+    completionCallback.apply(
+        null, null, currentEvent.getActivityTaskTimedOutEventAttributes(), null);
   }
 
   private void activityTaskCanceled() {
-    completionCallback.apply(null, null, currentEvent.getActivityTaskCanceledEventAttributes());
+    completionCallback.apply(
+        null, null, null, currentEvent.getActivityTaskCanceledEventAttributes());
   }
 
   private void cancelScheduleCommandFailActivity() {
