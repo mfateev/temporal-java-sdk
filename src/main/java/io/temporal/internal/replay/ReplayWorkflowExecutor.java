@@ -94,6 +94,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private final Map<String, WorkflowQueryResult> queryResults = new HashMap<>();
   private final DataConverter converter;
   private final CommandsManager commandsManager;
+  private final HistoryEvent firstEvent;
 
   ReplayWorkflowExecutor(
       WorkflowServiceStubs service,
@@ -112,7 +113,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
-    HistoryEvent firstEvent = workflowTask.getHistory().getEvents(0);
+    firstEvent = workflowTask.getHistory().getEvents(0);
     if (!firstEvent.hasWorkflowExecutionStartedEventAttributes()) {
       throw new IllegalArgumentException(
           "First event in the history is not WorkflowExecutionStarted");
@@ -291,22 +292,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     boolean timerStopped = false;
     try {
       long startTime = System.currentTimeMillis();
-      WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
-          new WorkflowTaskWithHistoryIteratorImpl(
-              workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
-      HistoryHelper historyHelper =
-          new HistoryHelper(
-              workflowTaskWithHistoryIterator, context.getReplayCurrentTimeMilliseconds());
-      Iterator<WorkflowTaskEvents> iterator = historyHelper.getIterator();
-      if (commandsManager.getLastStartedEventId() > 0
-          && commandsManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
-          && workflowTask.getHistory().getEventsCount() > 0) {
-        throw new IllegalStateException(
-            String.format(
-                "ReplayWorkflowExecutor processed up to event id %d. History's previous started event id is %d",
-                commandsManager.getLastStartedEventId(),
-                historyHelper.getPreviousStartedEventId()));
-      }
+      Iterator<WorkflowTaskEvents> iterator = getWorkflowTaskEventsIterator(workflowTask);
+      handleWorkflowExecutionStarted(firstEvent);
       while (iterator.hasNext()) {
         WorkflowTaskEvents taskEvents = iterator.next();
         if (!timerStopped && !taskEvents.isReplay()) {
@@ -392,6 +379,29 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         close();
       }
     }
+  }
+
+  private Iterator<WorkflowTaskEvents> getWorkflowTaskEventsIterator(
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
+    HistoryHelper historyHelper = newHistoryHelper(workflowTask);
+    Iterator<WorkflowTaskEvents> iterator = historyHelper.getIterator();
+    if (commandsManager.getLastStartedEventId() > 0
+        && commandsManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
+        && workflowTask.getHistory().getEventsCount() > 0) {
+      throw new IllegalStateException(
+          String.format(
+              "ReplayWorkflowExecutor processed up to event id %d. History's previous started event id is %d",
+              commandsManager.getLastStartedEventId(), historyHelper.getPreviousStartedEventId()));
+    }
+    return iterator;
+  }
+
+  private HistoryHelper newHistoryHelper(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
+    WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
+        new WorkflowTaskWithHistoryIteratorImpl(
+            workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
+    return new HistoryHelper(
+        workflowTaskWithHistoryIterator, context.getReplayCurrentTimeMilliseconds());
   }
 
   private boolean processEventLoop(

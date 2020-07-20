@@ -28,6 +28,7 @@ import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributesOrBuilder;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
@@ -80,6 +81,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -312,7 +314,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                 .build();
         callback.accept(Optional.empty(), new FailureWrapperException(canceledFailure));
       default:
-        throw new IllegalArgumentException("Unexpected event type");
+        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
   }
 
@@ -431,7 +433,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
           return;
         }
       default:
-        throw new IllegalArgumentException("Unexpected event type");
+        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
   }
 
@@ -471,7 +473,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
           return;
         }
       default:
-        throw new IllegalArgumentException("Unexpected event type");
+        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
   }
 
@@ -502,7 +504,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
           return;
         }
       default:
-        throw new IllegalArgumentException("Unexpected event type");
+        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
   }
 
@@ -538,8 +540,44 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public Consumer<Exception> createTimer(long delaySeconds, Consumer<Exception> callback) {
-    //    return workflowClock.createTimer(delaySeconds, callback);
-    throw new UnsupportedOperationException("TODO");
+    if (delaySeconds == 0) {
+      callback.accept(null);
+      return null;
+    }
+    long firingTime = currentTimeMillis() + TimeUnit.SECONDS.toMillis(delaySeconds);
+    StartTimerCommandAttributes timer =
+        StartTimerCommandAttributes.newBuilder()
+            .setStartToFireTimeoutSeconds(delaySeconds)
+            .setTimerId(commandsManager.randomUUID().toString())
+            .build();
+    Functions.Proc cancellationHandler =
+        commandsManager.newTimer(
+            timer, (event) -> handleTimerCallback(callback, firingTime, event));
+    return (e) -> cancellationHandler.apply();
+  }
+
+  private void handleTimerCallback(
+      Consumer<Exception> callback, long firingTime, HistoryEvent event) {
+    switch (event.getEventType()) {
+      case EVENT_TYPE_TIMER_FIRED:
+        {
+          // Server doesn't guarantee that the timer fire timestamp is larger or equal of the
+          // expected fire time. So fix the time or timer firing will be ignored.
+          if (replayCurrentTimeMilliseconds < firingTime) {
+            setReplayCurrentTimeMilliseconds(firingTime);
+          }
+          callback.accept(null);
+          return;
+        }
+      case EVENT_TYPE_TIMER_CANCELED:
+        {
+          CanceledFailure exception = new CanceledFailure("Cancelled by request");
+          callback.accept(exception);
+          return;
+        }
+      default:
+        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
+    }
   }
 
   @Override
@@ -586,7 +624,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   int numPendingLaTasks() {
     //    return workflowClock.numPendingLaTasks();
-    throw new UnsupportedOperationException("TODO");
+    // TODO(maxim): implement
+    return 0;
   }
 
   void awaitTaskCompletion(Duration duration) throws InterruptedException {

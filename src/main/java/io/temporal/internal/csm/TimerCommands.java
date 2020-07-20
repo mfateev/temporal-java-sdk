@@ -23,8 +23,8 @@ import io.temporal.api.command.v1.CancelTimerCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.TimerCanceledEventAttributes;
-import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.workflow.Functions;
 
 public final class TimerCommands
@@ -32,22 +32,29 @@ public final class TimerCommands
 
   private final StartTimerCommandAttributes startAttributes;
 
-  private final Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes>
-      completionCallback;
+  private final Functions.Proc1<HistoryEvent> completionCallback;
 
+  /**
+   * Creates a new timer state machine
+   *
+   * @param attributes timer command attributes
+   * @param completionCallback invoked when timer fires or reports cancellation. One of
+   *     TimerFiredEvent, TimerCanceledEvent.
+   * @return cancellation callback that should be invoked to initiate timer cancellation
+   */
   public static TimerCommands newInstance(
-      StartTimerCommandAttributes startAttributes,
-      Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes> completionCallback,
+      StartTimerCommandAttributes attributes,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new TimerCommands(startAttributes, completionCallback, commandSink);
+    return new TimerCommands(attributes, completionCallback, commandSink);
   }
 
   private TimerCommands(
-      StartTimerCommandAttributes startAttributes,
-      Functions.Proc2<TimerFiredEventAttributes, TimerCanceledEventAttributes> completionCallback,
+      StartTimerCommandAttributes attributes,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
-    this.startAttributes = startAttributes;
+    this.startAttributes = attributes;
     this.completionCallback = completionCallback;
     action(Action.SCHEDULE);
   }
@@ -87,7 +94,7 @@ public final class TimerCommands
             State.START_COMMAND_RECORDED,
             EventType.EVENT_TYPE_TIMER_FIRED,
             State.FIRED,
-            TimerCommands::fireTimer)
+            TimerCommands::notifyCompletion)
         .add(
             State.START_COMMAND_RECORDED,
             Action.CANCEL,
@@ -97,7 +104,7 @@ public final class TimerCommands
             State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_CANCELED,
             State.CANCELED,
-            TimerCommands::timerCanceled)
+            TimerCommands::notifyCompletion)
         .add(
             State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_FIRED,
@@ -116,15 +123,17 @@ public final class TimerCommands
   private void cancelStartTimerCommand() {
     cancelInitialCommand();
     completionCallback.apply(
-        null,
-        TimerCanceledEventAttributes.newBuilder()
-            .setIdentity("workflow")
-            .setTimerId(startAttributes.getTimerId())
+        HistoryEvent.newBuilder()
+            .setEventType(EventType.EVENT_TYPE_TIMER_CANCELED)
+            .setTimerCanceledEventAttributes(
+                TimerCanceledEventAttributes.newBuilder()
+                    .setIdentity("workflow")
+                    .setTimerId(startAttributes.getTimerId()))
             .build());
   }
 
-  private void fireTimer() {
-    completionCallback.apply(currentEvent.getTimerFiredEventAttributes(), null);
+  private void notifyCompletion() {
+    completionCallback.apply(currentEvent);
   }
 
   private void createCancelTimerCommand() {
@@ -135,13 +144,9 @@ public final class TimerCommands
             .build());
   }
 
-  private void timerCanceled() {
-    completionCallback.apply(null, currentEvent.getTimerCanceledEventAttributes());
-  }
-
   private void cancelTimerCommandFireTimer() {
     cancelInitialCommand();
-    fireTimer();
+    notifyCompletion();
   }
 
   public static String asPlantUMLStateDiagram() {
