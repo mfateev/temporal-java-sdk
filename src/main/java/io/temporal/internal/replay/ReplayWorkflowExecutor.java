@@ -29,11 +29,10 @@ import com.uber.m3.tally.Stopwatch;
 import io.grpc.Status;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
-import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.enums.v1.QueryResultType;
 import io.temporal.api.history.v1.History;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.history.v1.TimerFiredEventAttributes;
+import io.temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.query.v1.WorkflowQuery;
@@ -47,6 +46,7 @@ import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
 import io.temporal.internal.common.OptionsUtils;
 import io.temporal.internal.common.RpcRetryOptions;
+import io.temporal.internal.csm.CommandsManager;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.HistoryHelper.WorkflowTaskEvents;
 import io.temporal.internal.worker.LocalActivityWorker;
@@ -78,7 +78,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private static final int MAXIMUM_PAGE_SIZE = 10000;
 
-  private final CommandHelper commandHelper;
   private final ReplayWorkflowContextImpl context;
   private final WorkflowServiceStubs service;
   private final ReplayWorkflow workflow;
@@ -94,6 +93,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private final Consumer<HistoryEvent> localActivityCompletionSink;
   private final Map<String, WorkflowQueryResult> queryResults = new HashMap<>();
   private final DataConverter converter;
+  private final CommandsManager commandsManager;
 
   ReplayWorkflowExecutor(
       WorkflowServiceStubs service,
@@ -105,7 +105,10 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       BiFunction<LocalActivityWorker.Task, Duration, Boolean> laTaskPoller) {
     this.service = service;
     this.workflow = workflow;
-    this.commandHelper = new CommandHelper(workflowTask);
+    this.commandsManager =
+        new CommandsManager(
+            (s) -> handleWorkflowExecutionSignaled(s),
+            (c) -> handleWorkflowExecutionCancelRequested(c));
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
@@ -119,9 +122,10 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
     context =
         new ReplayWorkflowContextImpl(
-            commandHelper,
+            commandsManager,
             namespace,
             startedEvent,
+            workflowTask.getWorkflowExecution(),
             Duration.ofNanos(firstEvent.getTimestamp()).toMillis(),
             options,
             metricsScope,
@@ -132,7 +136,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         historyEvent -> {
           lock.lock();
           try {
-            processEvent(historyEvent);
+            handleEvent(historyEvent);
           } finally {
             lock.unlock();
           }
@@ -147,135 +151,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     workflow.start(event, context);
   }
 
-  private void processEvent(HistoryEvent event) {
-    EventType eventType = event.getEventType();
-    switch (eventType) {
-      case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
-        context.handleActivityTaskCanceled(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
-        context.handleActivityTaskCompleted(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_FAILED:
-        context.handleActivityTaskFailed(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_STARTED:
-        commandHelper.handleActivityTaskStarted(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
-        context.handleActivityTaskTimedOut(event);
-        break;
-      case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-        context.handleChildWorkflowExecutionCancelRequested(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED:
-        context.handleChildWorkflowExecutionCanceled(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED:
-        context.handleChildWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED:
-        context.handleChildWorkflowExecutionFailed(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_STARTED:
-        context.handleChildWorkflowExecutionStarted(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED:
-        context.handleChildWorkflowExecutionTerminated(event);
-        break;
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT:
-        context.handleChildWorkflowExecutionTimedOut(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
-        // NOOP
-        break;
-      case EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
-        // NOOP
-        break;
-      case EVENT_TYPE_WORKFLOW_TASK_STARTED:
-        throw new IllegalArgumentException("not expected");
-      case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
-        // Handled in the processEvent(event)
-        break;
-      case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED:
-        context.handleExternalWorkflowExecutionSignaled(event);
-        break;
-      case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED:
-        context.handleStartChildWorkflowExecutionFailed(event);
-        break;
-      case EVENT_TYPE_TIMER_FIRED:
-        handleTimerFired(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-        handleWorkflowExecutionCancelRequested(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
-        handleWorkflowExecutionSignaled(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
-        handleWorkflowExecutionStarted(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
-        // NOOP
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
-        commandHelper.handleWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
-        d:
-        commandHelper.handleActivityTaskScheduled(event);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
-        commandHelper.handleActivityTaskCancelRequested(event);
-        break;
-      case EVENT_TYPE_REQUEST_CANCEL_ACTIVITY_TASK_FAILED:
-        throw new Error("unexpected event");
-      case EVENT_TYPE_MARKER_RECORDED:
-        context.handleMarkerRecorded(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
-        commandHelper.handleWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
-        commandHelper.handleWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
-        commandHelper.handleWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW:
-        commandHelper.handleWorkflowExecutionCompleted(event);
-        break;
-      case EVENT_TYPE_TIMER_STARTED:
-        commandHelper.handleTimerStarted(event);
-        break;
-      case EVENT_TYPE_TIMER_CANCELED:
-        context.handleTimerCanceled(event);
-        break;
-      case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
-        commandHelper.handleSignalExternalWorkflowExecutionInitiated(event);
-        break;
-      case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
-        context.handleSignalExternalWorkflowExecutionFailed(event);
-        break;
-      case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
-        commandHelper.handleRequestCancelExternalWorkflowExecutionInitiated(event);
-        break;
-      case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
-        commandHelper.handleRequestCancelExternalWorkflowExecutionFailed(event);
-        break;
-      case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED:
-        commandHelper.handleStartChildWorkflowExecutionInitiated(event);
-        break;
-      case EVENT_TYPE_CANCEL_TIMER_FAILED:
-        commandHelper.handleCancelTimerFailed(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_TASK_FAILED:
-        context.handleWorkflowTaskFailed(event);
-        break;
-      case EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES:
-        context.handleUpsertSearchAttributes(event);
-        break;
-    }
+  private void handleEvent(HistoryEvent event) {
+    commandsManager.handleEvent(event);
   }
 
   private void eventLoop() {
@@ -311,20 +188,20 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private void completeWorkflow() {
     if (failure != null) {
-      commandHelper.failWorkflowExecution(failure);
+      commandsManager.newFailWorkflow(failure.getFailure());
       metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
     } else if (cancelRequested) {
-      commandHelper.cancelWorkflowExecution();
+      commandsManager.newCancelWorkflow();
       metricsScope.counter(MetricsType.WORKFLOW_CANCELLED_COUNTER).inc(1);
     } else {
       ContinueAsNewWorkflowExecutionCommandAttributes attributes =
           context.getContinueAsNewOnCompletion();
       if (attributes != null) {
-        commandHelper.continueAsNewWorkflowExecution(attributes);
+        commandsManager.newContinueAsNewWorkflow(attributes);
         metricsScope.counter(MetricsType.WORKFLOW_CONTINUE_AS_NEW_COUNTER).inc(1);
       } else {
         Optional<Payloads> workflowOutput = workflow.getOutput();
-        commandHelper.completeWorkflowExecution(workflowOutput);
+        commandsManager.newCompleteWorkflow(workflowOutput);
         metricsScope.counter(MetricsType.WORKFLOW_COMPLETED_COUNTER).inc(1);
       }
     }
@@ -371,25 +248,16 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
             });
   }
 
-  private void handleWorkflowExecutionCancelRequested(HistoryEvent event) {
+  private void handleWorkflowExecutionCancelRequested(
+      WorkflowExecutionCancelRequestedEventAttributes attributes) {
     context.setCancelRequested(true);
-    String cause = event.getWorkflowExecutionCancelRequestedEventAttributes().getCause();
+    String cause = attributes.getCause();
     workflow.cancel(cause);
     cancelRequested = true;
   }
 
-  private void handleTimerFired(HistoryEvent event) {
-    TimerFiredEventAttributes attributes = event.getTimerFiredEventAttributes();
-    String timerId = attributes.getTimerId();
-    if (timerId.equals(CommandHelper.FORCE_IMMEDIATE_WORKFLOW_TASK_TIMER)) {
-      return;
-    }
-    context.handleTimerFired(attributes);
-  }
-
   private void handleWorkflowExecutionSignaled(HistoryEvent event) {
-    assert (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED);
-    final WorkflowExecutionSignaledEventAttributes signalAttributes =
+    WorkflowExecutionSignaledEventAttributes signalAttributes =
         event.getWorkflowExecutionSignaledEventAttributes();
     if (completed) {
       throw new IllegalStateException("Signal received after workflow is closed.");
@@ -407,7 +275,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       queryResults.clear();
       boolean forceCreateNewWorkflowTask = handleWorkflowTaskImpl(workflowTask, null);
       return new WorkflowTaskResult(
-          commandHelper.getCommands(), queryResults, forceCreateNewWorkflowTask, completed);
+          commandsManager.takeCommands(), queryResults, forceCreateNewWorkflowTask, completed);
     } finally {
       lock.unlock();
     }
@@ -430,13 +298,14 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           new HistoryHelper(
               workflowTaskWithHistoryIterator, context.getReplayCurrentTimeMilliseconds());
       Iterator<WorkflowTaskEvents> iterator = historyHelper.getIterator();
-      if (commandHelper.getLastStartedEventId() > 0
-          && commandHelper.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
+      if (commandsManager.getLastStartedEventId() > 0
+          && commandsManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
           && workflowTask.getHistory().getEventsCount() > 0) {
         throw new IllegalStateException(
             String.format(
                 "ReplayWorkflowExecutor processed up to event id %d. History's previous started event id is %d",
-                commandHelper.getLastStartedEventId(), historyHelper.getPreviousStartedEventId()));
+                commandsManager.getLastStartedEventId(),
+                historyHelper.getPreviousStartedEventId()));
       }
       while (iterator.hasNext()) {
         WorkflowTaskEvents taskEvents = iterator.next();
@@ -446,20 +315,21 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         }
         context.setReplaying(taskEvents.isReplay());
         context.setReplayCurrentTimeMilliseconds(taskEvents.getReplayCurrentTimeMilliseconds());
+        commandsManager.setLastStartedEventId(taskEvents.getNextCommandEventId() - 2);
 
-        commandHelper.handleWorkflowTaskStartedEvent(taskEvents);
         // Markers must be cached first as their data is needed when processing events.
-        for (HistoryEvent event : taskEvents.getMarkers()) {
-          if (!event
-              .getMarkerRecordedEventAttributes()
-              .getMarkerName()
-              .equals(ReplayClockContext.LOCAL_ACTIVITY_MARKER_NAME)) {
-            processEvent(event);
-          }
-        }
+        // TODO(maxim): Markers
+        //        for (HistoryEvent event : taskEvents.getMarkers()) {
+        //          if (!event
+        //              .getMarkerRecordedEventAttributes()
+        //              .getMarkerName()
+        //              .equals(ReplayClockContext.LOCAL_ACTIVITY_MARKER_NAME)) {
+        //            handleEvent(event);
+        //          }
+        //        }
 
         for (HistoryEvent event : taskEvents.getEvents()) {
-          processEvent(event);
+          handleEvent(event);
         }
 
         forceCreateNewWorkflowTask =
@@ -471,14 +341,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
         mayBeCompleteWorkflow();
         if (taskEvents.isReplay()) {
-          commandHelper.notifyCommandSent();
+          commandsManager.takeCommands();
         }
-        // Updates state machines with results of the previous commands
-        for (HistoryEvent event : taskEvents.getCommandEvents()) {
-          processEvent(event);
-        }
-        // Reset state to before running the event loop
-        commandHelper.handleWorkflowTaskStartedEvent(taskEvents);
       }
       return forceCreateNewWorkflowTask;
     } catch (Error e) {
@@ -561,7 +425,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     while (context.numPendingLaTasks() > 0) {
       int numTasks = context.numPendingLaTasks();
       for (HistoryEvent event : localActivityMarkers) {
-        processEvent(event);
+        handleEvent(event);
       }
 
       eventLoop();

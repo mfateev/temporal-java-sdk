@@ -22,8 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.ExternalWorkflowExecutionCancelRequestedEventAttributes;
-import io.temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class CancelExternalCommands
@@ -32,27 +31,24 @@ public final class CancelExternalCommands
 
   private final RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes;
 
-  private final Functions.Proc2<
-          ExternalWorkflowExecutionCancelRequestedEventAttributes,
-          RequestCancelExternalWorkflowExecutionFailedEventAttributes>
-      completionCallback;
+  private final Functions.Proc1<HistoryEvent> completionCallback;
 
-  public static CancelExternalCommands newInstance(
-      RequestCancelExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<
-              ExternalWorkflowExecutionCancelRequestedEventAttributes,
-              RequestCancelExternalWorkflowExecutionFailedEventAttributes>
-          completionCallback,
+  /**
+   * @param attributes attributes to use to cancel external worklfow
+   * @param completionCallback one of ExternalWorkflowExecutionCancelRequestedEvent,
+   *     RequestCancelExternalWorkflowExecutionFailedEvent
+   * @param commandSink sink to send commands
+   */
+  public static void newInstance(
+      RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new CancelExternalCommands(signalAttributes, completionCallback, commandSink);
+    new CancelExternalCommands(attributes, completionCallback, commandSink);
   }
 
   private CancelExternalCommands(
       RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes,
-      Functions.Proc2<
-              ExternalWorkflowExecutionCancelRequestedEventAttributes,
-              RequestCancelExternalWorkflowExecutionFailedEventAttributes>
-          completionCallback,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.requestCancelAttributes = requestCancelAttributes;
@@ -88,12 +84,12 @@ public final class CancelExternalCommands
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED,
             State.CANCEL_REQUESTED,
-            CancelExternalCommands::reportCancelRequested)
+            CancelExternalCommands::notifyCompletion)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
             State.REQUEST_CANCEL_FAILED,
-            CancelExternalCommands::reportRequestCancelFailed);
+            CancelExternalCommands::notifyCompletion);
   }
 
   private void createCancelExternalCommand() {
@@ -103,14 +99,8 @@ public final class CancelExternalCommands
             .build());
   }
 
-  private void reportCancelRequested() {
-    completionCallback.apply(
-        currentEvent.getExternalWorkflowExecutionCancelRequestedEventAttributes(), null);
-  }
-
-  private void reportRequestCancelFailed() {
-    completionCallback.apply(
-        null, currentEvent.getRequestCancelExternalWorkflowExecutionFailedEventAttributes());
+  private void notifyCompletion() {
+    completionCallback.apply(currentEvent);
   }
 
   public static String asPlantUMLStateDiagram() {

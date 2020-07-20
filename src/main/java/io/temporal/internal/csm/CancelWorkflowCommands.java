@@ -19,8 +19,8 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 

@@ -759,7 +759,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
     }
     CompletablePromise<Void> result = Workflow.newPromise();
     Consumer<Exception> cancellationCallback =
-        context.signalWorkflowExecution(
+        context.signalExternalWorkflowExecution(
             attributes,
             (output, failure) -> {
               if (failure != null) {
@@ -841,7 +841,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   @Override
   public Promise<Void> cancelWorkflow(WorkflowExecution execution) {
-    return context.requestCancelWorkflowExecution(execution);
+    return context.requestCancelExternalWorkflowExecution(execution);
   }
 
   private RuntimeException mapSignalWorkflowException(Exception failure) {

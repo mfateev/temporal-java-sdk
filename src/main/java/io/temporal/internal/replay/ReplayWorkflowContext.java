@@ -126,11 +126,11 @@ public interface ReplayWorkflowContext extends ReplayAware {
       Consumer<WorkflowExecution> executionCallback,
       BiConsumer<Optional<Payloads>, Exception> callback);
 
-  Consumer<Exception> signalWorkflowExecution(
+  Consumer<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
       BiConsumer<Void, Exception> callback);
 
-  Promise<Void> requestCancelWorkflowExecution(WorkflowExecution execution);
+  Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution);
 
   void continueAsNewOnCompletion(ContinueAsNewWorkflowExecutionCommandAttributes attributes);
 

@@ -698,14 +698,14 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Consumer<Exception> signalWorkflowExecution(
+    public Consumer<Exception> signalExternalWorkflowExecution(
         SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
         BiConsumer<Void, Exception> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Promise<Void> requestCancelWorkflowExecution(WorkflowExecution execution) {
+    public Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution) {
       throw new UnsupportedOperationException("not implemented");
     }
 

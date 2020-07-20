@@ -21,8 +21,10 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
+import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
+import java.util.Optional;
 
 public final class CompleteWorkflowCommands
     extends CommandsBase<
@@ -31,9 +33,13 @@ public final class CompleteWorkflowCommands
   private final CompleteWorkflowExecutionCommandAttributes completeWorkflowAttributes;
 
   public static void newInstance(
-      CompleteWorkflowExecutionCommandAttributes completeWorkflowAttributes,
-      Functions.Proc1<NewCommand> commandSink) {
-    new CompleteWorkflowCommands(completeWorkflowAttributes, commandSink);
+      Optional<Payloads> workflowOutput, Functions.Proc1<NewCommand> commandSink) {
+    CompleteWorkflowExecutionCommandAttributes.Builder attributes =
+        CompleteWorkflowExecutionCommandAttributes.newBuilder();
+    if (workflowOutput.isPresent()) {
+      attributes.setResult(workflowOutput.get());
+    }
+    new CompleteWorkflowCommands(attributes.build(), commandSink);
   }
 
   private CompleteWorkflowCommands(

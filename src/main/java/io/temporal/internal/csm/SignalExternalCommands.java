@@ -22,8 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.ExternalWorkflowExecutionSignaledEventAttributes;
-import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class SignalExternalCommands
@@ -32,27 +31,30 @@ public final class SignalExternalCommands
 
   private final SignalExternalWorkflowExecutionCommandAttributes signalAttributes;
 
-  private final Functions.Proc2<
-          ExternalWorkflowExecutionSignaledEventAttributes,
-          SignalExternalWorkflowExecutionFailedEventAttributes>
-      completionCallback;
+  private final Functions.Proc2<HistoryEvent, Boolean> completionCallback;
 
-  public static SignalExternalCommands newInstance(
+  /**
+   * Register new instance of the signal commands
+   *
+   * @param signalAttributes attributes used to signal an external workflow
+   * @param completionCallback either SignalExternalWorkflowExecutionFailed,
+   *     ExternalWorkflowExecutionSignaled or true value of the second parameter to indicate
+   *     immediate cancellation.
+   * @param commandSink sink to send commands
+   * @return cancellation handler
+   */
+  public static Functions.Proc newInstance(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<
-              ExternalWorkflowExecutionSignaledEventAttributes,
-              SignalExternalWorkflowExecutionFailedEventAttributes>
-          completionCallback,
+      Functions.Proc2<HistoryEvent, Boolean> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new SignalExternalCommands(signalAttributes, completionCallback, commandSink);
+    SignalExternalCommands commands =
+        new SignalExternalCommands(signalAttributes, completionCallback, commandSink);
+    return commands::cancel;
   }
 
   private SignalExternalCommands(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<
-              ExternalWorkflowExecutionSignaledEventAttributes,
-              SignalExternalWorkflowExecutionFailedEventAttributes>
-          completionCallback,
+      Functions.Proc2<HistoryEvent, Boolean> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.signalAttributes = signalAttributes;
@@ -61,7 +63,8 @@ public final class SignalExternalCommands
   }
 
   enum Action {
-    SCHEDULE
+    SCHEDULE,
+    CANCEL
   }
 
   enum State {
@@ -70,16 +73,22 @@ public final class SignalExternalCommands
     SIGNAL_EXTERNAL_COMMAND_RECORDED,
     SIGNALED,
     FAILED,
+    CANCELED,
   }
 
   private static StateMachine<State, Action, SignalExternalCommands> newStateMachine() {
     return StateMachine.<State, Action, SignalExternalCommands>newInstance(
-            State.CREATED, State.SIGNALED, State.FAILED)
+            State.CREATED, State.SIGNALED, State.FAILED, State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
             State.SIGNAL_EXTERNAL_COMMAND_CREATED,
             SignalExternalCommands::createSignalExternalCommand)
+        .add(
+            State.SIGNAL_EXTERNAL_COMMAND_CREATED,
+            Action.CANCEL,
+            State.CANCELED,
+            SignalExternalCommands::cancelSignalExternalCommand)
         .add(
             State.SIGNAL_EXTERNAL_COMMAND_CREATED,
             EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
@@ -88,12 +97,16 @@ public final class SignalExternalCommands
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED,
             State.SIGNALED,
-            SignalExternalCommands::reportSignaled)
+            SignalExternalCommands::notifyCompletion)
+        .add(
+            State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
+            Action.CANCEL,
+            State.SIGNAL_EXTERNAL_COMMAND_RECORDED)
         .add(
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
             State.FAILED,
-            SignalExternalCommands::reportFailed);
+            SignalExternalCommands::notifyCompletion);
   }
 
   private void createSignalExternalCommand() {
@@ -103,14 +116,17 @@ public final class SignalExternalCommands
             .build());
   }
 
-  private void reportSignaled() {
-    completionCallback.apply(
-        currentEvent.getExternalWorkflowExecutionSignaledEventAttributes(), null);
+  public void cancel() {
+    action(Action.CANCEL);
   }
 
-  private void reportFailed() {
-    completionCallback.apply(
-        null, currentEvent.getSignalExternalWorkflowExecutionFailedEventAttributes());
+  private void notifyCompletion() {
+    completionCallback.apply(currentEvent, false);
+  }
+
+  private void cancelSignalExternalCommand() {
+    cancelInitialCommand();
+    completionCallback.apply(null, true);
   }
 
   public static String asPlantUMLStateDiagram() {

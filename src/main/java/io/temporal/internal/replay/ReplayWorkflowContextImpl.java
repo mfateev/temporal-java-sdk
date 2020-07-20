@@ -19,27 +19,60 @@
 
 package io.temporal.internal.replay;
 
+import static io.temporal.failure.FailureConverter.JAVA_SDK;
+
 import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
+import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributesOrBuilder;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.enums.v1.RetryState;
+import io.temporal.api.enums.v1.TimeoutType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
+import io.temporal.api.failure.v1.CanceledFailureInfo;
+import io.temporal.api.failure.v1.Failure;
+import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
+import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
+import io.temporal.api.history.v1.ActivityTaskTimedOutEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes;
+import io.temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.history.v1.TimerFiredEventAttributes;
-import io.temporal.api.history.v1.UpsertWorkflowSearchAttributesEventAttributes;
+import io.temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.WorkflowExecutionCompletedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
+import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.common.converter.EncodedValue;
+import io.temporal.failure.CanceledFailure;
+import io.temporal.failure.ChildWorkflowFailure;
+import io.temporal.failure.TerminatedFailure;
+import io.temporal.failure.TimeoutFailure;
+import io.temporal.internal.csm.ActivityCommands;
+import io.temporal.internal.csm.CommandsManager;
 import io.temporal.internal.metrics.ReplayAwareScope;
 import io.temporal.internal.worker.LocalActivityWorker;
 import io.temporal.internal.worker.SingleWorkerOptions;
+import io.temporal.workflow.CancelExternalWorkflowException;
+import io.temporal.workflow.ChildWorkflowCancellationType;
+import io.temporal.workflow.CompletablePromise;
+import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import io.temporal.workflow.Promise;
+import io.temporal.workflow.SignalExternalWorkflowException;
 import io.temporal.workflow.Workflow;
 import java.time.Duration;
 import java.util.List;
@@ -53,40 +86,43 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class ReplayWorkflowContextImpl implements ReplayWorkflowContext, HistoryEventHandler {
+/**
+ * TODO(maxim): callbacks usage is non consistent. It accepts Optional and Exception which can be
+ * null. Either switch both to Optional or both to nullable.
+ */
+final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   private static final Logger log = LoggerFactory.getLogger(ReplayWorkflowContextImpl.class);
 
-  private final ReplayActivityContext activityClient;
-  private final ReplayChildWorkflowContext workflowClient;
-  private final ReplayClockContext workflowClock;
   private final WorkflowContext workflowContext;
   private final Scope metricsScope;
   private final boolean enableLoggingInReplay;
+  private final CommandsManager commandsManager;
+  private long replayCurrentTimeMilliseconds;
+  private boolean replaying;
+  private long currentTimeMillis;
 
   ReplayWorkflowContextImpl(
-      CommandHelper commandHelper,
+      CommandsManager commandsManager,
       String namespace,
       WorkflowExecutionStartedEventAttributes startedAttributes,
+      WorkflowExecution workflowExecution,
       long runStartedTimestampMillis,
       SingleWorkerOptions options,
       Scope metricsScope,
       BiFunction<LocalActivityWorker.Task, Duration, Boolean> laTaskPoller,
       ReplayWorkflowExecutor workflowExecutor) {
-    this.activityClient = new ReplayActivityContext(commandHelper);
+    this.commandsManager = commandsManager;
     this.workflowContext =
         new WorkflowContext(
             namespace,
-            commandHelper.getTask(),
+            workflowExecution,
             startedAttributes,
             runStartedTimestampMillis,
             options.getContextPropagators());
-    this.workflowClient = new ReplayChildWorkflowContext(commandHelper, workflowContext);
-    this.workflowClock =
-        new ReplayClockContext(
-            commandHelper, laTaskPoller, workflowExecutor, options.getDataConverter());
     this.enableLoggingInReplay = options.getEnableLoggingInReplay();
-    this.metricsScope = new ReplayAwareScope(metricsScope, this, workflowClock::currentTimeMillis);
+    this.metricsScope =
+        new ReplayAwareScope(metricsScope, this, commandsManager::currentTimeMillis);
   }
 
   @Override
@@ -96,12 +132,12 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext, HistoryE
 
   @Override
   public UUID randomUUID() {
-    return workflowClient.randomUUID();
+    return commandsManager.randomUUID();
   }
 
   @Override
   public Random newRandom() {
-    return workflowClient.newRandom();
+    return commandsManager.newRandom();
   }
 
   @Override
@@ -216,14 +252,77 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext, HistoryE
   @Override
   public Consumer<Exception> scheduleActivityTask(
       ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Exception> callback) {
-    return activityClient.scheduleActivityTask(parameters, callback);
+    ScheduleActivityTaskCommandAttributes.Builder attributes = parameters.getAttributes();
+    if (attributes.getActivityId().isEmpty()) {
+      attributes.setActivityId(commandsManager.randomUUID().toString());
+    }
+    ActivityCommands activity =
+        commandsManager.newActivity(
+            attributes.build(), (event) -> handleActivityCallback(callback, attributes, event));
+
+    return (exception) -> activity.cancel();
+  }
+
+  private void handleActivityCallback(
+      BiConsumer<Optional<Payloads>, Exception> callback,
+      ScheduleActivityTaskCommandAttributesOrBuilder scheduleAttr,
+      HistoryEvent event) {
+    switch (event.getEventType()) {
+      case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
+        WorkflowExecutionCompletedEventAttributes completedAttr =
+            event.getWorkflowExecutionCompletedEventAttributes();
+        Optional<Payloads> result =
+            completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
+        callback.accept(result, null);
+        return;
+      case EVENT_TYPE_ACTIVITY_TASK_FAILED:
+        ActivityTaskFailedEventAttributes failed = event.getActivityTaskFailedEventAttributes();
+        ActivityTaskFailedException failure =
+            new ActivityTaskFailedException(
+                event.getEventId(),
+                failed.getScheduledEventId(),
+                failed.getStartedEventId(),
+                scheduleAttr.getActivityType(),
+                scheduleAttr.getActivityId(),
+                failed.getFailure());
+        callback.accept(Optional.empty(), failure);
+        return;
+      case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
+        ActivityTaskTimedOutEventAttributes timedOutAttr =
+            event.getActivityTaskTimedOutEventAttributes();
+        ActivityTaskTimeoutException timeoutException =
+            new ActivityTaskTimeoutException(
+                event.getEventId(),
+                timedOutAttr.getScheduledEventId(),
+                timedOutAttr.getStartedEventId(),
+                scheduleAttr.getActivityType(),
+                scheduleAttr.getActivityId(),
+                timedOutAttr.getRetryState(),
+                timedOutAttr.getFailure());
+        callback.accept(Optional.empty(), timeoutException);
+        return;
+      case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
+        ActivityTaskCanceledEventAttributes canceledAttr =
+            event.getActivityTaskCanceledEventAttributes();
+        Failure canceledFailure =
+            Failure.newBuilder()
+                .setSource(JAVA_SDK)
+                .setCanceledFailureInfo(
+                    CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
+                .build();
+        callback.accept(Optional.empty(), new FailureWrapperException(canceledFailure));
+      default:
+        throw new IllegalArgumentException("Unexpected event type");
+    }
   }
 
   @Override
   public Consumer<Exception> scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
       BiConsumer<Optional<Payloads>, Exception> callback) {
-    return workflowClock.scheduleLocalActivityTask(parameters, callback);
+    // TODO: scheduleLocalActivityTask
+    //    return workflowClock.scheduleLocalActivityTask(parameters, callback);
+    throw new UnsupportedOperationException("todo");
   }
 
   @Override
@@ -231,166 +330,245 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext, HistoryE
       StartChildWorkflowExecutionParameters parameters,
       Consumer<WorkflowExecution> executionCallback,
       BiConsumer<Optional<Payloads>, Exception> callback) {
-    return workflowClient.startChildWorkflow(parameters, executionCallback, callback);
+    StartChildWorkflowExecutionCommandAttributes startAttributes = parameters.getRequest().build();
+    Functions.Proc1<ChildWorkflowCancellationType> cancellationHandler =
+        commandsManager.newChildWorkflow(
+            startAttributes,
+            event -> handleChildWorkflowCallback(callback, startAttributes, event));
+    return (exception) -> cancellationHandler.apply(parameters.getCancellationType());
+  }
+
+  private void handleChildWorkflowCallback(
+      BiConsumer<Optional<Payloads>, Exception> callback,
+      StartChildWorkflowExecutionCommandAttributes startAttributes,
+      HistoryEvent event) {
+    switch (event.getEventType()) {
+      case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED:
+        {
+          StartChildWorkflowExecutionFailedEventAttributes attributes =
+              event.getStartChildWorkflowExecutionFailedEventAttributes();
+          Exception failure =
+              new ChildWorkflowTaskFailedException(
+                  event.getEventId(),
+                  WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId()).build(),
+                  attributes.getWorkflowType(),
+                  RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
+                  null);
+          failure.initCause(
+              new WorkflowExecutionAlreadyStarted(
+                  WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId()).build(),
+                  attributes.getWorkflowType().getName(),
+                  null));
+          callback.accept(Optional.empty(), failure);
+          return;
+        }
+      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED:
+        {
+          ChildWorkflowExecutionCompletedEventAttributes attributes =
+              event.getChildWorkflowExecutionCompletedEventAttributes();
+          Optional<Payloads> result =
+              attributes.hasResult() ? Optional.of(attributes.getResult()) : Optional.empty();
+          callback.accept(result, null);
+          return;
+        }
+      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED:
+        {
+          ChildWorkflowExecutionFailedEventAttributes attributes =
+              event.getChildWorkflowExecutionFailedEventAttributes();
+          RuntimeException failure =
+              new ChildWorkflowTaskFailedException(
+                  event.getEventId(),
+                  attributes.getWorkflowExecution(),
+                  attributes.getWorkflowType(),
+                  attributes.getRetryState(),
+                  attributes.getFailure());
+          callback.accept(Optional.empty(), failure);
+          return;
+        }
+      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT:
+        {
+          ChildWorkflowExecutionTimedOutEventAttributes attributes =
+              event.getChildWorkflowExecutionTimedOutEventAttributes();
+          TimeoutFailure timeoutFailure =
+              new TimeoutFailure(null, null, TimeoutType.TIMEOUT_TYPE_START_TO_CLOSE);
+          timeoutFailure.setStackTrace(new StackTraceElement[0]);
+          RuntimeException failure =
+              new ChildWorkflowFailure(
+                  attributes.getInitiatedEventId(),
+                  attributes.getStartedEventId(),
+                  attributes.getWorkflowType().getName(),
+                  attributes.getWorkflowExecution(),
+                  attributes.getNamespace(),
+                  attributes.getRetryState(),
+                  timeoutFailure);
+          callback.accept(Optional.empty(), failure);
+          return;
+        }
+      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED:
+        {
+          ChildWorkflowExecutionCanceledEventAttributes attributes =
+              event.getChildWorkflowExecutionCanceledEventAttributes();
+          CanceledFailure failure =
+              new CanceledFailure(
+                  "Child canceled", new EncodedValue(attributes.getDetails()), null);
+          callback.accept(Optional.empty(), failure);
+          return;
+        }
+      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED:
+        {
+          ChildWorkflowExecutionTerminatedEventAttributes attributes =
+              event.getChildWorkflowExecutionTerminatedEventAttributes();
+          RuntimeException failure =
+              new ChildWorkflowFailure(
+                  attributes.getInitiatedEventId(),
+                  attributes.getStartedEventId(),
+                  attributes.getWorkflowType().getName(),
+                  attributes.getWorkflowExecution(),
+                  attributes.getNamespace(),
+                  RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
+                  new TerminatedFailure(null, null));
+          callback.accept(Optional.empty(), failure);
+          return;
+        }
+      default:
+        throw new IllegalArgumentException("Unexpected event type");
+    }
   }
 
   @Override
-  public Consumer<Exception> signalWorkflowExecution(
+  public Consumer<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
       BiConsumer<Void, Exception> callback) {
-    return workflowClient.signalWorkflowExecution(attributes, callback);
+    Functions.Proc cancellationHandler =
+        commandsManager.newSignalExternal(
+            attributes.build(),
+            (event, canceled) -> handleSignalExternalCallback(callback, event, canceled));
+    return (e) -> cancellationHandler.apply();
+  }
+
+  private void handleSignalExternalCallback(
+      BiConsumer<Void, Exception> callback, HistoryEvent event, boolean canceled) {
+    if (canceled) {
+      CanceledFailure failure = new CanceledFailure("Signal external workflow execution canceled");
+      callback.accept(null, failure);
+      return;
+    }
+    switch (event.getEventType()) {
+      case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
+        callback.accept(null, null);
+        return;
+      case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
+        {
+          SignalExternalWorkflowExecutionFailedEventAttributes attributes =
+              event.getSignalExternalWorkflowExecutionFailedEventAttributes();
+          WorkflowExecution signaledExecution =
+              WorkflowExecution.newBuilder()
+                  .setWorkflowId(attributes.getWorkflowExecution().getWorkflowId())
+                  .setRunId(attributes.getWorkflowExecution().getRunId())
+                  .build();
+          RuntimeException failure = new SignalExternalWorkflowException(signaledExecution, null);
+          callback.accept(null, failure);
+          return;
+        }
+      default:
+        throw new IllegalArgumentException("Unexpected event type");
+    }
   }
 
   @Override
-  public Promise<Void> requestCancelWorkflowExecution(WorkflowExecution execution) {
-    workflowClient.requestCancelWorkflowExecution(execution);
-    // TODO: Make promise return success or failure of the cancellation request.
-    return Workflow.newPromise(null);
+  public Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution) {
+    RequestCancelExternalWorkflowExecutionCommandAttributes attributes =
+        RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
+            .setWorkflowId(execution.getWorkflowId())
+            .setRunId(execution.getRunId())
+            .build();
+    CompletablePromise<Void> result = Workflow.newPromise();
+    commandsManager.newCancelExternal(
+        attributes, event -> handleCancelExternalCallback(result, event));
+    return result;
+  }
+
+  private void handleCancelExternalCallback(CompletablePromise<Void> result, HistoryEvent event) {
+    switch (event.getEventType()) {
+      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
+        result.complete(null);
+        return;
+      case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
+        {
+          RequestCancelExternalWorkflowExecutionFailedEventAttributes attributes =
+              event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes();
+          result.completeExceptionally(
+              new CancelExternalWorkflowException(attributes.getWorkflowExecution(), "", null));
+          return;
+        }
+      default:
+        throw new IllegalArgumentException("Unexpected event type");
+    }
   }
 
   @Override
   public void continueAsNewOnCompletion(
       ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
-    workflowClient.continueAsNewOnCompletion(attributes);
+    //    workflowClient.continueAsNewOnCompletion(attributes);
   }
 
   void setReplayCurrentTimeMilliseconds(long replayCurrentTimeMilliseconds) {
-    if (replayCurrentTimeMilliseconds < workflowClock.currentTimeMillis()) {
+    if (replayCurrentTimeMilliseconds < this.replayCurrentTimeMilliseconds) {
       if (log.isWarnEnabled()) {
         log.warn(
             "Trying to set workflow clock back from "
-                + workflowClock.currentTimeMillis()
+                + this.replayCurrentTimeMilliseconds
                 + " to "
                 + replayCurrentTimeMilliseconds
                 + ". This will be a no-op.");
       }
       return;
     }
-    workflowClock.setReplayCurrentTimeMilliseconds(replayCurrentTimeMilliseconds);
+    this.replayCurrentTimeMilliseconds = replayCurrentTimeMilliseconds;
   }
 
   long getReplayCurrentTimeMilliseconds() {
-    return workflowClock.currentTimeMillis();
+    return replayCurrentTimeMilliseconds;
   }
 
   @Override
   public boolean isReplaying() {
-    return workflowClock.isReplaying();
+    return replaying;
   }
 
   @Override
   public Consumer<Exception> createTimer(long delaySeconds, Consumer<Exception> callback) {
-    return workflowClock.createTimer(delaySeconds, callback);
+    //    return workflowClock.createTimer(delaySeconds, callback);
+    throw new UnsupportedOperationException("TODO");
   }
 
   @Override
   public Optional<Payloads> sideEffect(Func<Optional<Payloads>> func) {
-    return workflowClock.sideEffect(func);
+    //    return workflowClock.sideEffect(func);
+    throw new UnsupportedOperationException("TODO");
   }
 
   @Override
   public Optional<Payloads> mutableSideEffect(
       String id, DataConverter converter, Func1<Optional<Payloads>, Optional<Payloads>> func) {
-    return workflowClock.mutableSideEffect(id, converter, func);
+    //    return workflowClock.mutableSideEffect(id, converter, func);
+    throw new UnsupportedOperationException("TODO");
   }
 
   @Override
   public int getVersion(
       String changeId, DataConverter converter, int minSupported, int maxSupported) {
-    return workflowClock.getVersion(changeId, converter, minSupported, maxSupported);
+    //    return workflowClock.getVersion(changeId, converter, minSupported, maxSupported);
+    throw new UnsupportedOperationException("TODO");
   }
 
   @Override
   public long currentTimeMillis() {
-    return workflowClock.currentTimeMillis();
+    return currentTimeMillis;
   }
 
   void setReplaying(boolean replaying) {
-    workflowClock.setReplaying(replaying);
-  }
-
-  @Override
-  public void handleActivityTaskCanceled(HistoryEvent event) {
-    activityClient.handleActivityTaskCanceled(event);
-  }
-
-  @Override
-  public void handleActivityTaskCompleted(HistoryEvent event) {
-    activityClient.handleActivityTaskCompleted(event);
-  }
-
-  @Override
-  public void handleActivityTaskFailed(HistoryEvent event) {
-    activityClient.handleActivityTaskFailed(event);
-  }
-
-  @Override
-  public void handleActivityTaskTimedOut(HistoryEvent event) {
-    activityClient.handleActivityTaskTimedOut(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionCancelRequested(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionCancelRequested(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionCanceled(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionCanceled(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionStarted(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionStarted(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionTimedOut(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionTimedOut(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionTerminated(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionTerminated(event);
-  }
-
-  @Override
-  public void handleStartChildWorkflowExecutionFailed(HistoryEvent event) {
-    workflowClient.handleStartChildWorkflowExecutionFailed(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionFailed(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionFailed(event);
-  }
-
-  @Override
-  public void handleChildWorkflowExecutionCompleted(HistoryEvent event) {
-    workflowClient.handleChildWorkflowExecutionCompleted(event);
-  }
-
-  @Override
-  public void handleTimerFired(TimerFiredEventAttributes attributes) {
-    workflowClock.handleTimerFired(attributes);
-  }
-
-  @Override
-  public void handleTimerCanceled(HistoryEvent event) {
-    workflowClock.handleTimerCanceled(event);
-  }
-
-  void handleSignalExternalWorkflowExecutionFailed(HistoryEvent event) {
-    workflowClient.handleSignalExternalWorkflowExecutionFailed(event);
-  }
-
-  @Override
-  public void handleExternalWorkflowExecutionSignaled(HistoryEvent event) {
-    workflowClient.handleExternalWorkflowExecutionSignaled(event);
-  }
-
-  @Override
-  public void handleMarkerRecorded(HistoryEvent event) {
-    workflowClock.handleMarkerRecorded(event);
+    this.replaying = replaying;
   }
 
   public void handleWorkflowTaskFailed(HistoryEvent event) {
@@ -402,30 +580,33 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext, HistoryE
   }
 
   boolean startUnstartedLaTasks(Duration maxWaitAllowed) {
-    return workflowClock.startUnstartedLaTasks(maxWaitAllowed);
+    //    return workflowClock.startUnstartedLaTasks(maxWaitAllowed);
+    throw new UnsupportedOperationException("TODO");
   }
 
   int numPendingLaTasks() {
-    return workflowClock.numPendingLaTasks();
+    //    return workflowClock.numPendingLaTasks();
+    throw new UnsupportedOperationException("TODO");
   }
 
   void awaitTaskCompletion(Duration duration) throws InterruptedException {
-    workflowClock.awaitTaskCompletion(duration);
+    //    workflowClock.awaitTaskCompletion(duration);
+    throw new UnsupportedOperationException("TODO");
   }
 
   @Override
   public void upsertSearchAttributes(SearchAttributes searchAttributes) {
-    workflowClock.upsertSearchAttributes(searchAttributes);
+    //    workflowClock.upsertSearchAttributes(searchAttributes);
     workflowContext.mergeSearchAttributes(searchAttributes);
   }
 
-  @Override
-  public void handleUpsertSearchAttributes(HistoryEvent event) {
-    UpsertWorkflowSearchAttributesEventAttributes attr =
-        event.getUpsertWorkflowSearchAttributesEventAttributes();
-    if (attr != null) {
-      SearchAttributes searchAttributes = attr.getSearchAttributes();
-      workflowContext.mergeSearchAttributes(searchAttributes);
-    }
-  }
+  //  @Override
+  //  public void handleUpsertSearchAttributes(HistoryEvent event) {
+  //    UpsertWorkflowSearchAttributesEventAttributes attr =
+  //        event.getUpsertWorkflowSearchAttributesEventAttributes();
+  //    if (attr != null) {
+  //      SearchAttributes searchAttributes = attr.getSearchAttributes();
+  //      workflowContext.mergeSearchAttributes(searchAttributes);
+  //    }
+  //  }
 }

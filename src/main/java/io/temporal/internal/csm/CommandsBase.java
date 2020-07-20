@@ -22,7 +22,6 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
-
 import java.util.Optional;
 
 public class CommandsBase<State, Action, Data> {

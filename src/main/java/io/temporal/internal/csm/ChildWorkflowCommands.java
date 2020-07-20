@@ -24,11 +24,8 @@ import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes;
-import io.temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes;
+import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 
 public final class ChildWorkflowCommands
@@ -84,69 +81,59 @@ public final class ChildWorkflowCommands
             State.START_EVENT_RECORDED,
             EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED,
             State.START_FAILED,
-            ChildWorkflowCommands::startChildWorklfowFailed)
+            ChildWorkflowCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED,
             State.COMPLETED,
-            ChildWorkflowCommands::childWorklfowCompleted)
+            ChildWorkflowCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED,
             State.FAILED,
-            ChildWorkflowCommands::childWorkflowFailed)
+            ChildWorkflowCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT,
             State.TIMED_OUT,
-            ChildWorkflowCommands::childWorkflowTimedOut)
+            ChildWorkflowCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED,
             State.CANCELED,
-            ChildWorkflowCommands::childWorkflowCanceled)
+            ChildWorkflowCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED,
             State.TERMINATED,
-            ChildWorkflowCommands::childWorkflowTerminated);
+            ChildWorkflowCommands::notifyCompletion);
   }
 
   private final StartChildWorkflowExecutionCommandAttributes startAttributes;
 
-  private final Functions.Proc6<
-          StartChildWorkflowExecutionFailedEventAttributes,
-          ChildWorkflowExecutionCompletedEventAttributes,
-          ChildWorkflowExecutionFailedEventAttributes,
-          ChildWorkflowExecutionTimedOutEventAttributes,
-          ChildWorkflowExecutionCanceledEventAttributes,
-          ChildWorkflowExecutionTerminatedEventAttributes>
-      completionCallback;
+  private final Functions.Proc1<HistoryEvent> completionCallback;
 
+  /**
+   * Creates a new child workflow state machine
+   *
+   * @param attributes child workflow start command attributes
+   * @param completionCallback invoked when child reports completion or failure. The following types
+   *     of events can be passed to the callback: StartChildWorkflowExecutionFailedEvent,
+   *     ChildWorkflowExecutionCompletedEvent, ChildWorkflowExecutionFailedEvent,
+   *     ChildWorkflowExecutionTimedOutEvent, ChildWorkflowExecutionCanceledEvent,
+   *     ChildWorkflowExecutionTerminatedEvent.
+   * @return cancellation callback that should be invoked to cancel the child
+   */
   public static ChildWorkflowCommands newInstance(
-      StartChildWorkflowExecutionCommandAttributes startAttributes,
-      Functions.Proc6<
-              StartChildWorkflowExecutionFailedEventAttributes,
-              ChildWorkflowExecutionCompletedEventAttributes,
-              ChildWorkflowExecutionFailedEventAttributes,
-              ChildWorkflowExecutionTimedOutEventAttributes,
-              ChildWorkflowExecutionCanceledEventAttributes,
-              ChildWorkflowExecutionTerminatedEventAttributes>
-          completionCallback,
+      StartChildWorkflowExecutionCommandAttributes attributes,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new ChildWorkflowCommands(startAttributes, completionCallback, commandSink);
+    return new ChildWorkflowCommands(attributes, completionCallback, commandSink);
   }
 
   private ChildWorkflowCommands(
       StartChildWorkflowExecutionCommandAttributes startAttributes,
-      Functions.Proc6<
-              StartChildWorkflowExecutionFailedEventAttributes,
-              ChildWorkflowExecutionCompletedEventAttributes,
-              ChildWorkflowExecutionFailedEventAttributes,
-              ChildWorkflowExecutionTimedOutEventAttributes,
-              ChildWorkflowExecutionCanceledEventAttributes,
-              ChildWorkflowExecutionTerminatedEventAttributes>
-          completionCallback,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.startAttributes = startAttributes;
@@ -161,86 +148,28 @@ public final class ChildWorkflowCommands
             .build());
   }
 
-  public void cancel() {
+  public void cancel(ChildWorkflowCancellationType cancellationType) {
+    // TODO: Cancellation type
     action(Action.CANCEL);
   }
 
   private void cancelStartChildCommand() {
     cancelInitialCommand();
     completionCallback.apply(
-        null,
-        null,
-        null,
-        null,
-        ChildWorkflowExecutionCanceledEventAttributes.newBuilder()
-            .setWorkflowType(startAttributes.getWorkflowType())
-            .setNamespace(startAttributes.getNamespace())
-            .setWorkflowExecution(
-                WorkflowExecution.newBuilder()
-                    .setWorkflowId(startAttributes.getWorkflowId())
-                    .build())
-            .build(),
-        null);
+        HistoryEvent.newBuilder()
+            .setEventType(EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED)
+            .setChildWorkflowExecutionCanceledEventAttributes(
+                ChildWorkflowExecutionCanceledEventAttributes.newBuilder()
+                    .setWorkflowType(startAttributes.getWorkflowType())
+                    .setNamespace(startAttributes.getNamespace())
+                    .setWorkflowExecution(
+                        WorkflowExecution.newBuilder()
+                            .setWorkflowId(startAttributes.getWorkflowId())))
+            .build());
   }
 
-  private void startChildWorklfowFailed() {
-    completionCallback.apply(
-        currentEvent.getStartChildWorkflowExecutionFailedEventAttributes(),
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  private void childWorklfowCompleted() {
-    completionCallback.apply(
-        null,
-        currentEvent.getChildWorkflowExecutionCompletedEventAttributes(),
-        null,
-        null,
-        null,
-        null);
-  }
-
-  private void childWorkflowFailed() {
-    completionCallback.apply(
-        null,
-        null,
-        currentEvent.getChildWorkflowExecutionFailedEventAttributes(),
-        null,
-        null,
-        null);
-  }
-
-  private void childWorkflowTimedOut() {
-    completionCallback.apply(
-        null,
-        null,
-        null,
-        currentEvent.getChildWorkflowExecutionTimedOutEventAttributes(),
-        null,
-        null);
-  }
-
-  private void childWorkflowCanceled() {
-    completionCallback.apply(
-        null,
-        null,
-        null,
-        null,
-        currentEvent.getChildWorkflowExecutionCanceledEventAttributes(),
-        null);
-  }
-
-  private void childWorkflowTerminated() {
-    completionCallback.apply(
-        null,
-        null,
-        null,
-        null,
-        null,
-        currentEvent.getChildWorkflowExecutionTerminatedEventAttributes());
+  private void notifyCompletion() {
+    completionCallback.apply(currentEvent);
   }
 
   public static String asPlantUMLStateDiagram() {

@@ -24,9 +24,7 @@ import io.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskCompletedEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskTimedOutEventAttributes;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class ActivityCommands
@@ -80,17 +78,17 @@ public final class ActivityCommands
             State.STARTED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
             State.COMPLETED,
-            ActivityCommands::activityTaskCompleted)
+            ActivityCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
             State.FAILED,
-            ActivityCommands::activityTaskFailed)
+            ActivityCommands::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
             State.TIMED_OUT,
-            ActivityCommands::activityTaskTimedOut)
+            ActivityCommands::notifyCompletion)
         .add(
             State.SCHEDULED_EVENT_RECORDED,
             Action.CANCEL,
@@ -108,7 +106,7 @@ public final class ActivityCommands
             State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
             State.CANCELED,
-            ActivityCommands::activityTaskCanceled)
+            ActivityCommands::notifyCompletion)
         .add(
             State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
@@ -126,58 +124,50 @@ public final class ActivityCommands
             State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
             State.COMPLETED,
-            ActivityCommands::cancelScheduleCommandCompleteActivity)
+            ActivityCommands::cancelScheduleCommandNotifyCompletion)
         .add(
             State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
             State.FAILED,
-            ActivityCommands::cancelScheduleCommandFailActivity)
+            ActivityCommands::cancelScheduleCommandNotifyCompletion)
         .add(
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
             State.FAILED,
-            ActivityCommands::activityTaskFailed)
+            ActivityCommands::notifyCompletion)
         .add(
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
             State.COMPLETED,
-            ActivityCommands::activityTaskCompleted)
+            ActivityCommands::notifyCompletion)
         .add(
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
             State.CANCELED,
-            ActivityCommands::activityTaskCanceled);
+            ActivityCommands::notifyCompletion);
   }
 
   private final ScheduleActivityTaskCommandAttributes scheduleAttr;
 
-  private final Functions.Proc4<
-          ActivityTaskCompletedEventAttributes,
-          ActivityTaskFailedEventAttributes,
-          ActivityTaskTimedOutEventAttributes,
-          ActivityTaskCanceledEventAttributes>
-      completionCallback;
+  private final Functions.Proc1<HistoryEvent> completionCallback;
 
+  /**
+   * @param scheduleAttr attributes used to schedule an activity
+   * @param completionCallback one of ActivityTaskCompletedEvent, ActivityTaskFailedEvent,
+   *     ActivityTaskTimedOutEvent, ActivityTaskCanceledEvents
+   * @param commandSink sink to send commands
+   * @return an instance of ActivityCommands
+   */
   public static ActivityCommands newInstance(
       ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc4<
-              ActivityTaskCompletedEventAttributes,
-              ActivityTaskFailedEventAttributes,
-              ActivityTaskTimedOutEventAttributes,
-              ActivityTaskCanceledEventAttributes>
-          completionCallback,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     return new ActivityCommands(scheduleAttr, completionCallback, commandSink);
   }
 
   private ActivityCommands(
       ScheduleActivityTaskCommandAttributes scheduleAttr,
-      Functions.Proc4<
-              ActivityTaskCompletedEventAttributes,
-              ActivityTaskFailedEventAttributes,
-              ActivityTaskTimedOutEventAttributes,
-              ActivityTaskCanceledEventAttributes>
-          completionCallback,
+      Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.scheduleAttr = scheduleAttr;
@@ -196,37 +186,20 @@ public final class ActivityCommands
   private void cancelScheduleCommand() {
     cancelInitialCommand();
     completionCallback.apply(
-        null,
-        null,
-        null,
-        ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow").build());
+        HistoryEvent.newBuilder()
+            .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED)
+            .setActivityTaskCanceledEventAttributes(
+                ActivityTaskCanceledEventAttributes.newBuilder().setIdentity("workflow"))
+            .build());
   }
 
-  private void activityTaskCompleted() {
-    completionCallback.apply(
-        currentEvent.getActivityTaskCompletedEventAttributes(), null, null, null);
+  private void notifyCompletion() {
+    completionCallback.apply(currentEvent);
   }
 
-  private void activityTaskFailed() {
-    completionCallback.apply(null, currentEvent.getActivityTaskFailedEventAttributes(), null, null);
-  }
-
-  private void activityTaskTimedOut() {
-    completionCallback.apply(
-        null, null, currentEvent.getActivityTaskTimedOutEventAttributes(), null);
-  }
-
-  private void activityTaskCanceled() {
-    completionCallback.apply(
-        null, null, null, currentEvent.getActivityTaskCanceledEventAttributes());
-  }
-
-  private void cancelScheduleCommandFailActivity() {
-    throw new UnsupportedOperationException("unimplemented");
-  }
-
-  private void cancelScheduleCommandCompleteActivity() {
-    throw new UnsupportedOperationException("unimplemented");
+  private void cancelScheduleCommandNotifyCompletion() {
+    cancelScheduleCommand();
+    notifyCompletion();
   }
 
   private void createRequestCancelActivityTaskCommand() {

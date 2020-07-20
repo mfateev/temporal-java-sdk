@@ -26,7 +26,6 @@ import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
-import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 import io.temporal.common.context.ContextPropagator;
 import java.time.Duration;
 import java.util.HashMap;
@@ -36,7 +35,6 @@ import java.util.Optional;
 
 final class WorkflowContext {
 
-  private final PollWorkflowTaskQueueResponseOrBuilder workflowTask;
   private final long runStartedTimestampMillis;
   private boolean cancelRequested;
   private ContinueAsNewWorkflowExecutionCommandAttributes continueAsNewOnCompletion;
@@ -47,15 +45,16 @@ final class WorkflowContext {
   private String currentRunId;
   private SearchAttributes.Builder searchAttributes;
   private List<ContextPropagator> contextPropagators;
+  private WorkflowExecution workflowExecution;
 
   WorkflowContext(
       String namespace,
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask,
+      WorkflowExecution workflowExecution,
       WorkflowExecutionStartedEventAttributes startedAttributes,
       long runStartedTimestampMillis,
       List<ContextPropagator> contextPropagators) {
     this.namespace = namespace;
-    this.workflowTask = workflowTask;
+    this.workflowExecution = workflowExecution;
     this.startedAttributes = startedAttributes;
     this.currentRunId = startedAttributes.getOriginalExecutionRunId();
     if (startedAttributes.hasSearchAttributes()) {
@@ -66,11 +65,11 @@ final class WorkflowContext {
   }
 
   WorkflowExecution getWorkflowExecution() {
-    return workflowTask.getWorkflowExecution();
+    return workflowExecution;
   }
 
   WorkflowType getWorkflowType() {
-    return workflowTask.getWorkflowType();
+    return startedAttributes.getWorkflowType();
   }
 
   boolean isCancelRequested() {

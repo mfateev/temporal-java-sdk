@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.workflow.Functions;
 
 public final class FailWorkflowCommands
@@ -30,10 +31,10 @@ public final class FailWorkflowCommands
 
   private final FailWorkflowExecutionCommandAttributes failWorkflowAttributes;
 
-  public static void newInstance(
-      FailWorkflowExecutionCommandAttributes failWorkflowAttributes,
-      Functions.Proc1<NewCommand> commandSink) {
-    new FailWorkflowCommands(failWorkflowAttributes, commandSink);
+  public static void newInstance(Failure failure, Functions.Proc1<NewCommand> commandSink) {
+    FailWorkflowExecutionCommandAttributes attributes =
+        FailWorkflowExecutionCommandAttributes.newBuilder().setFailure(failure).build();
+    new FailWorkflowCommands(attributes, commandSink);
   }
 
   private FailWorkflowCommands(
