@@ -174,7 +174,7 @@ public final class GrpcRetryer {
               if (e == null) {
                 unwrappedExceptionResult.complete(r);
               } else {
-                unwrappedExceptionResult.completeExceptionally(unwrap(e));
+                unwrappedExceptionResult.completeExceptionally(e);
               }
               return null;
             });

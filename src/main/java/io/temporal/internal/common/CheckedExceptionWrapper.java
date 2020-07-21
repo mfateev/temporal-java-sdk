@@ -19,8 +19,9 @@
 
 package io.temporal.internal.common;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Do not reference directly by the application level code. Use {@link
@@ -28,17 +29,6 @@ import java.lang.reflect.InvocationTargetException;
  * io.temporal.activity.Activity#wrap(Exception)} inside an activity code instead.
  */
 public final class CheckedExceptionWrapper extends RuntimeException {
-
-  private static final Field causeField;
-
-  static {
-    try {
-      causeField = Throwable.class.getDeclaredField("cause");
-      causeField.setAccessible(true);
-    } catch (NoSuchFieldException e) {
-      throw new RuntimeException("unexpected", e);
-    }
-  }
 
   /**
    * Returns CheckedExceptionWrapper if e is checked exception. If there is a need to return a
@@ -72,38 +62,15 @@ public final class CheckedExceptionWrapper extends RuntimeException {
    * Removes CheckedException wrapper from the whole chain of Exceptions. Assumes that wrapper
    * always has a cause which cannot be a wrapper.
    */
-  public static Exception unwrap(Throwable e) {
-    Throwable head = e;
-    if (head instanceof CheckedExceptionWrapper) {
-      head = head.getCause();
-    }
-    Throwable tail = head;
-    Throwable current = tail.getCause();
-    while (current != null) {
-      if (current instanceof CheckedExceptionWrapper) {
-        current = current.getCause();
-        setThrowableCause(tail, current);
+  public static List<Throwable> unwrap(Throwable e) {
+    List<Throwable> result = new ArrayList<>();
+    while (e != null) {
+      if (!(e instanceof CheckedExceptionWrapper)) {
+        result.add(e);
       }
-      tail = current;
-      current = tail.getCause();
+      e = e.getCause();
     }
-    if (head instanceof Error) {
-      // Error should be propagated without any handling.
-      throw (Error) head;
-    }
-    return (Exception) head;
-  }
-
-  /**
-   * Throwable.initCause throws IllegalStateException if cause is already set. This method uses
-   * reflection to set it directly.
-   */
-  private static void setThrowableCause(Throwable throwable, Throwable cause) {
-    try {
-      causeField.set(throwable, cause);
-    } catch (IllegalAccessException e) {
-      throw new RuntimeException("unexpected", e);
-    }
+    return result;
   }
 
   private CheckedExceptionWrapper(Exception e) {

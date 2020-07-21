@@ -40,6 +40,7 @@ import io.temporal.internal.common.CheckedExceptionWrapper;
 import io.temporal.testing.SimulatedTimeoutFailure;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -178,96 +179,99 @@ public class FailureConverter {
     }
   }
 
-  public static Failure exceptionToFailure(Throwable e) {
-    e = CheckedExceptionWrapper.unwrap(e);
-    return exceptionToFailureNoUnwrapping(e);
-  }
-
-  public static Failure exceptionToFailureNoUnwrapping(Throwable e) {
-    String message;
-    if (e instanceof TemporalFailure) {
-      TemporalFailure tf = (TemporalFailure) e;
-      if (tf.getFailure().isPresent()) {
-        return tf.getFailure().get();
+  public static Failure exceptionToFailure(Throwable exception) {
+    List<Throwable> chain = CheckedExceptionWrapper.unwrap(exception);
+    Failure.Builder result = null;
+    Failure.Builder previous = null;
+    // Reverse iteration
+    for (int i = chain.size() - 1; i >= 0; i--) {
+      Throwable e = chain.get(i);
+      result = Failure.newBuilder();
+      if (previous != null) {
+        result.setCause(previous);
       }
-      message = tf.getOriginalMessage();
-    } else {
-      message = e.getMessage() == null ? "" : e.getMessage();
+      previous = result;
+      String message;
+      if (e instanceof TemporalFailure) {
+        TemporalFailure tf = (TemporalFailure) e;
+        if (tf.getFailure().isPresent()) {
+          return tf.getFailure().get();
+        }
+        message = tf.getOriginalMessage();
+      } else {
+        message = e.getMessage() == null ? "" : e.getMessage();
+      }
+      String stackTrace = serializeStackTrace(e);
+      result.setMessage(message).setSource(JAVA_SDK).setStackTrace(stackTrace);
+      if (e instanceof ApplicationFailure) {
+        ApplicationFailure ae = (ApplicationFailure) e;
+        ApplicationFailureInfo.Builder info =
+            ApplicationFailureInfo.newBuilder()
+                .setType(ae.getType())
+                .setNonRetryable(ae.isNonRetryable());
+        Optional<Payloads> details = ((EncodedValue) ae.getDetails()).toPayloads();
+        if (details.isPresent()) {
+          info.setDetails(details.get());
+        }
+        result.setApplicationFailureInfo(info);
+      } else if (e instanceof TimeoutFailure) {
+        TimeoutFailure te = (TimeoutFailure) e;
+        TimeoutFailureInfo.Builder info =
+            TimeoutFailureInfo.newBuilder().setTimeoutType(te.getTimeoutType());
+        Optional<Payloads> details = ((EncodedValue) te.getLastHeartbeatDetails()).toPayloads();
+        if (details.isPresent()) {
+          info.setLastHeartbeatDetails(details.get());
+        }
+        result.setTimeoutFailureInfo(info);
+      } else if (e instanceof CanceledFailure) {
+        CanceledFailure ce = (CanceledFailure) e;
+        CanceledFailureInfo.Builder info = CanceledFailureInfo.newBuilder();
+        Optional<Payloads> details = ((EncodedValue) ce.getDetails()).toPayloads();
+        if (details.isPresent()) {
+          info.setDetails(details.get());
+        }
+        result.setCanceledFailureInfo(info);
+      } else if (e instanceof TerminatedFailure) {
+        TerminatedFailure te = (TerminatedFailure) e;
+        result.setTerminatedFailureInfo(TerminatedFailureInfo.getDefaultInstance());
+      } else if (e instanceof ServerFailure) {
+        ServerFailure se = (ServerFailure) e;
+        result.setServerFailureInfo(
+            ServerFailureInfo.newBuilder().setNonRetryable(se.isNonRetryable()));
+      } else if (e instanceof ActivityFailure) {
+        ActivityFailure ae = (ActivityFailure) e;
+        ActivityFailureInfo.Builder info =
+            ActivityFailureInfo.newBuilder()
+                .setActivityId(ae.getActivityId() == null ? "" : ae.getActivityId())
+                .setActivityType(ActivityType.newBuilder().setName(ae.getActivityType()))
+                .setIdentity(ae.getIdentity())
+                .setRetryState(ae.getRetryState())
+                .setScheduledEventId(ae.getScheduledEventId())
+                .setStartedEventId(ae.getStartedEventId());
+        result.setActivityFailureInfo(info);
+      } else if (e instanceof ChildWorkflowFailure) {
+        ChildWorkflowFailure ce = (ChildWorkflowFailure) e;
+        ChildWorkflowExecutionFailureInfo.Builder info =
+            ChildWorkflowExecutionFailureInfo.newBuilder()
+                .setInitiatedEventId(ce.getInitiatedEventId())
+                .setStartedEventId(ce.getStartedEventId())
+                .setNamespace(ce.getNamespace() == null ? "" : ce.getNamespace())
+                .setRetryState(ce.getRetryState())
+                .setWorkflowType(WorkflowType.newBuilder().setName(ce.getWorkflowType()))
+                .setWorkflowExecution(ce.getExecution());
+        result.setChildWorkflowExecutionFailureInfo(info);
+      } else if (e instanceof ActivityCancelledException) {
+        CanceledFailureInfo.Builder info = CanceledFailureInfo.newBuilder();
+        result.setCanceledFailureInfo(info);
+      } else {
+        ApplicationFailureInfo.Builder info =
+            ApplicationFailureInfo.newBuilder()
+                .setType(e.getClass().getName())
+                .setNonRetryable(false);
+        result.setApplicationFailureInfo(info);
+      }
     }
-    String stackTrace = serializeStackTrace(e);
-    Failure.Builder failure =
-        Failure.newBuilder().setMessage(message).setSource(JAVA_SDK).setStackTrace(stackTrace);
-    if (e.getCause() != null) {
-      failure.setCause(exceptionToFailure(e.getCause()));
-    }
-    if (e instanceof ApplicationFailure) {
-      ApplicationFailure ae = (ApplicationFailure) e;
-      ApplicationFailureInfo.Builder info =
-          ApplicationFailureInfo.newBuilder()
-              .setType(ae.getType())
-              .setNonRetryable(ae.isNonRetryable());
-      Optional<Payloads> details = ((EncodedValue) ae.getDetails()).toPayloads();
-      if (details.isPresent()) {
-        info.setDetails(details.get());
-      }
-      failure.setApplicationFailureInfo(info);
-    } else if (e instanceof TimeoutFailure) {
-      TimeoutFailure te = (TimeoutFailure) e;
-      TimeoutFailureInfo.Builder info =
-          TimeoutFailureInfo.newBuilder().setTimeoutType(te.getTimeoutType());
-      Optional<Payloads> details = ((EncodedValue) te.getLastHeartbeatDetails()).toPayloads();
-      if (details.isPresent()) {
-        info.setLastHeartbeatDetails(details.get());
-      }
-      failure.setTimeoutFailureInfo(info);
-    } else if (e instanceof CanceledFailure) {
-      CanceledFailure ce = (CanceledFailure) e;
-      CanceledFailureInfo.Builder info = CanceledFailureInfo.newBuilder();
-      Optional<Payloads> details = ((EncodedValue) ce.getDetails()).toPayloads();
-      if (details.isPresent()) {
-        info.setDetails(details.get());
-      }
-      failure.setCanceledFailureInfo(info);
-    } else if (e instanceof TerminatedFailure) {
-      TerminatedFailure te = (TerminatedFailure) e;
-      failure.setTerminatedFailureInfo(TerminatedFailureInfo.getDefaultInstance());
-    } else if (e instanceof ServerFailure) {
-      ServerFailure se = (ServerFailure) e;
-      failure.setServerFailureInfo(
-          ServerFailureInfo.newBuilder().setNonRetryable(se.isNonRetryable()));
-    } else if (e instanceof ActivityFailure) {
-      ActivityFailure ae = (ActivityFailure) e;
-      ActivityFailureInfo.Builder info =
-          ActivityFailureInfo.newBuilder()
-              .setActivityId(ae.getActivityId() == null ? "" : ae.getActivityId())
-              .setActivityType(ActivityType.newBuilder().setName(ae.getActivityType()))
-              .setIdentity(ae.getIdentity())
-              .setRetryState(ae.getRetryState())
-              .setScheduledEventId(ae.getScheduledEventId())
-              .setStartedEventId(ae.getStartedEventId());
-      failure.setActivityFailureInfo(info);
-    } else if (e instanceof ChildWorkflowFailure) {
-      ChildWorkflowFailure ce = (ChildWorkflowFailure) e;
-      ChildWorkflowExecutionFailureInfo.Builder info =
-          ChildWorkflowExecutionFailureInfo.newBuilder()
-              .setInitiatedEventId(ce.getInitiatedEventId())
-              .setStartedEventId(ce.getStartedEventId())
-              .setNamespace(ce.getNamespace() == null ? "" : ce.getNamespace())
-              .setRetryState(ce.getRetryState())
-              .setWorkflowType(WorkflowType.newBuilder().setName(ce.getWorkflowType()))
-              .setWorkflowExecution(ce.getExecution());
-      failure.setChildWorkflowExecutionFailureInfo(info);
-    } else if (e instanceof ActivityCancelledException) {
-      CanceledFailureInfo.Builder info = CanceledFailureInfo.newBuilder();
-      failure.setCanceledFailureInfo(info);
-    } else {
-      ApplicationFailureInfo.Builder info =
-          ApplicationFailureInfo.newBuilder()
-              .setType(e.getClass().getName())
-              .setNonRetryable(false);
-      failure.setApplicationFailureInfo(info);
-    }
-    return failure.build();
+    return result.build();
   }
 
   /** Parses stack trace serialized using {@link #serializeStackTrace(Throwable)}. */
