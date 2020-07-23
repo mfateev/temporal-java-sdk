@@ -79,16 +79,16 @@ public final class CancelExternalCommands
             CancelExternalCommands::createCancelExternalCommand)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_CREATED,
-            EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
+            EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
-            EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED,
+            EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
             State.CANCEL_REQUESTED,
             CancelExternalCommands::notifyCompletion)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
-            EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
+            EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
             State.REQUEST_CANCEL_FAILED,
             CancelExternalCommands::notifyCompletion);
   }

@@ -31,7 +31,9 @@ import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.WorkflowExecution;
+import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
+import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
@@ -211,16 +213,46 @@ public final class CommandsManager {
         ChildWorkflowCommands.newInstance(attributes, startedCallback, completionCallback, sink);
     return (cancellationType) -> {
       if (child.isCancellable()) {
-        child.cancel(cancellationType);
+        if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
+          notifyChildCancelled(attributes, completionCallback);
+          return;
+        }
+        child.cancel();
       } else if (!child.isFinalState()) {
+        if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
+          notifyChildCancelled(attributes, completionCallback);
+          return;
+        }
         newCancelExternal(
             RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
                 .setWorkflowId(attributes.getWorkflowId())
                 .setNamespace(attributes.getNamespace())
                 .build(),
-            (event) -> {});
+            (event) -> {
+              if (cancellationType == ChildWorkflowCancellationType.WAIT_CANCELLATION_REQUESTED) {
+                notifyChildCancelled(attributes, completionCallback);
+              }
+            });
+        if (cancellationType == ChildWorkflowCancellationType.TRY_CANCEL) {
+          notifyChildCancelled(attributes, completionCallback);
+        }
       }
     };
+  }
+
+  private static void notifyChildCancelled(
+      StartChildWorkflowExecutionCommandAttributes attributes,
+      Functions.Proc1<HistoryEvent> completionCallback) {
+    completionCallback.apply(
+        HistoryEvent.newBuilder()
+            .setEventType(EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED)
+            .setChildWorkflowExecutionCanceledEventAttributes(
+                ChildWorkflowExecutionCanceledEventAttributes.newBuilder()
+                    .setWorkflowType(attributes.getWorkflowType())
+                    .setNamespace(attributes.getNamespace())
+                    .setWorkflowExecution(
+                        WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId())))
+            .build());
   }
 
   /**

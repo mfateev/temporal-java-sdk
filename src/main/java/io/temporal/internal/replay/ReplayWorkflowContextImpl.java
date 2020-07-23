@@ -273,7 +273,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
         Optional<Payloads> result =
             completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
         callback.accept(result, null);
-        return;
+        break;
       case EVENT_TYPE_ACTIVITY_TASK_FAILED:
         ActivityTaskFailedEventAttributes failed = event.getActivityTaskFailedEventAttributes();
         ActivityTaskFailedException failure =
@@ -285,7 +285,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                 scheduleAttr.getActivityId(),
                 failed.getFailure());
         callback.accept(Optional.empty(), failure);
-        return;
+        break;
       case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
         ActivityTaskTimedOutEventAttributes timedOutAttr =
             event.getActivityTaskTimedOutEventAttributes();
@@ -299,7 +299,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                 timedOutAttr.getRetryState(),
                 timedOutAttr.getFailure());
         callback.accept(Optional.empty(), timeoutException);
-        return;
+        break;
       case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
         ActivityTaskCanceledEventAttributes canceledAttr =
             event.getActivityTaskCanceledEventAttributes();
@@ -309,7 +309,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                 .setCanceledFailureInfo(
                     CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
                 .build();
-        callback.accept(Optional.empty(), new FailureWrapperException(canceledFailure));
+        callback.accept(Optional.empty(), new CanceledFailure("Canceled"));
+        break;
       default:
         throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }

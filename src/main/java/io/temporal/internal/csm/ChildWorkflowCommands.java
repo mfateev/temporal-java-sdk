@@ -26,7 +26,6 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 
 public final class ChildWorkflowCommands
@@ -162,8 +161,12 @@ public final class ChildWorkflowCommands
     return State.START_COMMAND_CREATED == getState();
   }
 
-  public void cancel(ChildWorkflowCancellationType cancellationType) {
-    // TODO: Cancellation type
+  /**
+   * Cancellation through this class is valid only when start child workflow command is not sent
+   * yet. Cancellation of an initiated child workflow is done through CancelExternalCommands. So all
+   * of the types besides ABANDON are treated differently.
+   */
+  public void cancel() {
     action(Action.CANCEL);
   }
 

@@ -85,6 +85,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -480,11 +481,14 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
                     });
               }
             });
+    AtomicBoolean callbackCalled = new AtomicBoolean();
     CancellationScope.current()
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              cancellationCallback.accept(new CanceledFailure(reason));
+              if (!callbackCalled.getAndSet(true)) {
+                cancellationCallback.accept(new CanceledFailure(reason));
+              }
               return null;
             });
     return result;

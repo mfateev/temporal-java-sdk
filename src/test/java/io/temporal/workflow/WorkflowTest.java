@@ -2590,7 +2590,12 @@ public class WorkflowTest {
     @SuppressWarnings("AssertionFailureIgnored")
     public String execute(String taskQueue) {
       TestActivities testActivities =
-          Workflow.newActivityStub(TestActivities.class, newActivityOptions2());
+          Workflow.newActivityStub(
+              TestActivities.class,
+              newActivityOptions2()
+                  .toBuilder()
+                  .setRetryOptions(RetryOptions.newBuilder().setMaximumAttempts(1).build())
+                  .build());
       try {
         testActivities.throwIO();
         fail("unreachable");
