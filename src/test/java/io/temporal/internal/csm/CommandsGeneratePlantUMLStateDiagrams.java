@@ -47,6 +47,7 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(FailWorkflowCommands.class);
     generate(CancelWorkflowCommands.class);
     generate(ContinueAsNewWorkflowCommands.class);
+    generate(WorkflowTaskCommands.class);
   }
 
   private void generate(Class<? extends CommandsBase> commandClass) {

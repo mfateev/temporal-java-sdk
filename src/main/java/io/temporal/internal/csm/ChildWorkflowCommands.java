@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -52,6 +53,7 @@ public final class ChildWorkflowCommands
 
   private static StateMachine<State, Action, ChildWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, ChildWorkflowCommands>newInstance(
+            "ChildWorkflow",
             State.CREATED,
             State.START_FAILED,
             State.COMPLETED,
@@ -144,6 +146,7 @@ public final class ChildWorkflowCommands
   public void createStartChildCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION)
             .setStartChildWorkflowExecutionCommandAttributes(startAttributes)
             .build());
   }

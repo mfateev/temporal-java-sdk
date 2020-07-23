@@ -27,6 +27,7 @@ import com.google.protobuf.ByteString;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.Stopwatch;
 import io.grpc.Status;
+import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.QueryResultType;
@@ -79,21 +80,46 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private static final int MAXIMUM_PAGE_SIZE = 10000;
 
   private final ReplayWorkflowContextImpl context;
+
   private final WorkflowServiceStubs service;
+
   private final ReplayWorkflow workflow;
+
+  /**
+   * The eventId of the last event in the history which is expected to be startedEventId unless it
+   * is replay from a JSON file.
+   */
+  private final long workflowTaskStartedEventId;
+
+  /** The eventId of the started event of the last successfully executed workflow task. */
+  private final long previousStartedEventId;
+
   private boolean cancelRequested;
+
   private boolean completed;
+
   private WorkflowExecutionException failure;
+
   private long wakeUpTime;
+
   private Consumer<Exception> timerCancellationHandler;
+
   private final Scope metricsScope;
+
   private final long wfStartTimeNanos;
+
   private final WorkflowExecutionStartedEventAttributes startedEvent;
+
   private final Lock lock = new ReentrantLock();
+
   private final Consumer<HistoryEvent> localActivityCompletionSink;
+
   private final Map<String, WorkflowQueryResult> queryResults = new HashMap<>();
+
   private final DataConverter converter;
+
   private final CommandsManager commandsManager;
+
   private final HistoryEvent firstEvent;
 
   ReplayWorkflowExecutor(
@@ -106,19 +132,25 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       BiFunction<LocalActivityWorker.Task, Duration, Boolean> laTaskPoller) {
     this.service = service;
     this.workflow = workflow;
-    this.commandsManager =
-        new CommandsManager(
-            (s) -> handleWorkflowExecutionSignaled(s),
-            (c) -> handleWorkflowExecutionCancelRequested(c));
-    this.metricsScope = metricsScope;
-    this.converter = options.getDataConverter();
-
     firstEvent = workflowTask.getHistory().getEvents(0);
+    workflowTaskStartedEventId = workflowTask.getStartedEventId();
+    previousStartedEventId = workflowTask.getPreviousStartedEventId();
+
     if (!firstEvent.hasWorkflowExecutionStartedEventAttributes()) {
       throw new IllegalArgumentException(
           "First event in the history is not WorkflowExecutionStarted");
     }
     startedEvent = firstEvent.getWorkflowExecutionStartedEventAttributes();
+    this.commandsManager =
+        new CommandsManager(
+            previousStartedEventId,
+            workflowTaskStartedEventId,
+            () -> eventLoop(),
+            (s) -> handleWorkflowExecutionSignaled(s),
+            (c) -> handleWorkflowExecutionCancelRequested(c));
+    this.metricsScope = metricsScope;
+    this.converter = options.getDataConverter();
+
     wfStartTimeNanos = firstEvent.getTimestamp();
 
     context =
@@ -153,10 +185,13 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   private void handleEvent(HistoryEvent event) {
+    System.out.println("handleEvent " + event.getEventType());
     commandsManager.handleEvent(event);
   }
 
   private void eventLoop() {
+    System.out.println("EVENT LOOP");
+
     if (completed) {
       return;
     }
@@ -241,6 +276,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         context.createTimer(
             delaySeconds,
             (t) -> {
+              System.out.println("Empty TIMER Callback");
               // Intentionally left empty.
               // Timer ensures that a workflow task is scheduled at the time workflow can make
               // progress.
@@ -275,8 +311,10 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     try {
       queryResults.clear();
       boolean forceCreateNewWorkflowTask = handleWorkflowTaskImpl(workflowTask, null);
-      return new WorkflowTaskResult(
-          commandsManager.takeCommands(), queryResults, forceCreateNewWorkflowTask, completed);
+      List<Command> commands = commandsManager.takeCommands();
+      System.out.println("Completed workflow task with commands: " + commands);
+
+      return new WorkflowTaskResult(commands, queryResults, forceCreateNewWorkflowTask, completed);
     } finally {
       lock.unlock();
     }
@@ -292,46 +330,44 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     boolean timerStopped = false;
     try {
       long startTime = System.currentTimeMillis();
-      Iterator<WorkflowTaskEvents> iterator = getWorkflowTaskEventsIterator(workflowTask);
+      WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
+          new WorkflowTaskWithHistoryIteratorImpl(
+              workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
+      Iterator<HistoryEvent> iterator = workflowTaskWithHistoryIterator.getHistory();
       handleWorkflowExecutionStarted(firstEvent);
+      //      while (iterator.hasNext()) {
+      //        if (!timerStopped && !taskEvents.isReplay()) {
+      //          sw.stop();
+      //          timerStopped = true;
+      //        }
+
+      // Markers must be cached first as their data is needed when processing events.
+      // TODO(maxim): Markers
+      //        for (HistoryEvent event : taskEvents.getMarkers()) {
+      //          if (!event
+      //              .getMarkerRecordedEventAttributes()
+      //              .getMarkerName()
+      //              .equals(ReplayClockContext.LOCAL_ACTIVITY_MARKER_NAME)) {
+      //            handleEvent(event);
+      //          }
+      //        }
+
+      //        System.out.println("\n\nTASK_EVENTS: " + taskEvents);
       while (iterator.hasNext()) {
-        WorkflowTaskEvents taskEvents = iterator.next();
-        if (!timerStopped && !taskEvents.isReplay()) {
-          sw.stop();
-          timerStopped = true;
-        }
-        context.setReplaying(taskEvents.isReplay());
-        context.setReplayCurrentTimeMilliseconds(taskEvents.getReplayCurrentTimeMilliseconds());
-        commandsManager.setLastStartedEventId(taskEvents.getNextCommandEventId() - 2);
-
-        // Markers must be cached first as their data is needed when processing events.
-        // TODO(maxim): Markers
-        //        for (HistoryEvent event : taskEvents.getMarkers()) {
-        //          if (!event
-        //              .getMarkerRecordedEventAttributes()
-        //              .getMarkerName()
-        //              .equals(ReplayClockContext.LOCAL_ACTIVITY_MARKER_NAME)) {
-        //            handleEvent(event);
-        //          }
-        //        }
-
-        for (HistoryEvent event : taskEvents.getEvents()) {
-          handleEvent(event);
-        }
-
-        forceCreateNewWorkflowTask =
-            processEventLoop(
-                startTime,
-                startedEvent.getWorkflowTaskTimeoutSeconds(),
-                taskEvents,
-                workflowTask.hasQuery());
-
-        mayBeCompleteWorkflow();
-        if (taskEvents.isReplay()) {
-          commandsManager.takeCommands();
-        }
+        HistoryEvent event = iterator.next();
+        handleEvent(event);
       }
-      return forceCreateNewWorkflowTask;
+      //        eventLoop();
+      //        forceCreateNewWorkflowTask =
+      //            processEventLoop(
+      //                startTime,
+      //                startedEvent.getWorkflowTaskTimeoutSeconds(),
+      //                taskEvents,
+      //                workflowTask.hasQuery());
+
+      mayBeCompleteWorkflow();
+      //      }
+      return false; // forceCreateNewWorkflowTask;
     } catch (Error e) {
       if (this.workflow.getWorkflowImplementationOptions().getWorkflowErrorPolicy()
           == FailWorkflow) {

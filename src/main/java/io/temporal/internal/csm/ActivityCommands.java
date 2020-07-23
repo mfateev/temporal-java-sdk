@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -55,7 +56,12 @@ public final class ActivityCommands
 
   private static StateMachine<State, Action, ActivityCommands> newStateMachine() {
     return StateMachine.<State, Action, ActivityCommands>newInstance(
-            State.CREATED, State.COMPLETED, State.FAILED, State.TIMED_OUT, State.CANCELED)
+            "Activity",
+            State.CREATED,
+            State.COMPLETED,
+            State.FAILED,
+            State.TIMED_OUT,
+            State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -176,7 +182,11 @@ public final class ActivityCommands
   }
 
   public void createScheduleActivityTaskCommand() {
-    addCommand(Command.newBuilder().setScheduleActivityTaskCommandAttributes(scheduleAttr).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK)
+            .setScheduleActivityTaskCommandAttributes(scheduleAttr)
+            .build());
   }
 
   public void cancel() {
@@ -205,6 +215,7 @@ public final class ActivityCommands
   private void createRequestCancelActivityTaskCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK)
             .setRequestCancelActivityTaskCommandAttributes(
                 RequestCancelActivityTaskCommandAttributes.newBuilder()
                     .setScheduledEventId(getInitialCommandEventId()))

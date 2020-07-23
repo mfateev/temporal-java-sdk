@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
@@ -70,7 +71,7 @@ public final class CancelExternalCommands
 
   private static StateMachine<State, Action, CancelExternalCommands> newStateMachine() {
     return StateMachine.<State, Action, CancelExternalCommands>newInstance(
-            State.CREATED, State.CANCEL_REQUESTED, State.REQUEST_CANCEL_FAILED)
+            "CancelExternal", State.CREATED, State.CANCEL_REQUESTED, State.REQUEST_CANCEL_FAILED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -95,6 +96,7 @@ public final class CancelExternalCommands
   private void createCancelExternalCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION)
             .setRequestCancelExternalWorkflowExecutionCommandAttributes(requestCancelAttributes)
             .build());
   }

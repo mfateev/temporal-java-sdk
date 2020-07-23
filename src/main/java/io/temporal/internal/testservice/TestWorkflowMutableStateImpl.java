@@ -566,6 +566,10 @@ class TestWorkflowMutableStateImpl implements TestWorkflowMutableState {
         processUpsertWorkflowSearchAttributes(
             ctx, d.getUpsertWorkflowSearchAttributesCommandAttributes(), workflowTaskCompletedId);
         break;
+      default:
+        throw Status.INVALID_ARGUMENT
+            .withDescription("Unknown command type: " + d.getCommandType() + " for " + d)
+            .asRuntimeException();
     }
   }
 

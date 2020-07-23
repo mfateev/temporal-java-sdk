@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.workflow.Functions;
@@ -57,7 +58,7 @@ public final class FailWorkflowCommands
 
   private static StateMachine<State, Action, FailWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, FailWorkflowCommands>newInstance(
-            State.CREATED, State.FAIL_WORKFLOW_COMMAND_RECORDED)
+            "FailWorkflow", State.CREATED, State.FAIL_WORKFLOW_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -72,6 +73,7 @@ public final class FailWorkflowCommands
   private void createFailWorkflowCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION)
             .setFailWorkflowExecutionCommandAttributes(failWorkflowAttributes)
             .build());
   }

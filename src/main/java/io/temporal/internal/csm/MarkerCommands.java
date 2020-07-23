@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
@@ -53,7 +54,7 @@ public final class MarkerCommands
 
   private static StateMachine<State, Action, MarkerCommands> newStateMachine() {
     return StateMachine.<State, Action, MarkerCommands>newInstance(
-            State.CREATED, State.MARKER_COMMAND_RECORDED)
+            "Marker", State.CREATED, State.MARKER_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -66,7 +67,11 @@ public final class MarkerCommands
   }
 
   private void createMarkerCommand() {
-    addCommand(Command.newBuilder().setRecordMarkerCommandAttributes(markerAttributes).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
+            .setRecordMarkerCommandAttributes(markerAttributes)
+            .build());
   }
 
   public static String asPlantUMLStateDiagram() {

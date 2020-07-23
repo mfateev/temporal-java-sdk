@@ -100,9 +100,6 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   private final Scope metricsScope;
   private final boolean enableLoggingInReplay;
   private final CommandsManager commandsManager;
-  private long replayCurrentTimeMilliseconds;
-  private boolean replaying;
-  private long currentTimeMillis;
 
   ReplayWorkflowContextImpl(
       CommandsManager commandsManager,
@@ -514,28 +511,13 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     //    workflowClient.continueAsNewOnCompletion(attributes);
   }
 
-  void setReplayCurrentTimeMilliseconds(long replayCurrentTimeMilliseconds) {
-    if (replayCurrentTimeMilliseconds < this.replayCurrentTimeMilliseconds) {
-      if (log.isWarnEnabled()) {
-        log.warn(
-            "Trying to set workflow clock back from "
-                + this.replayCurrentTimeMilliseconds
-                + " to "
-                + replayCurrentTimeMilliseconds
-                + ". This will be a no-op.");
-      }
-      return;
-    }
-    this.replayCurrentTimeMilliseconds = replayCurrentTimeMilliseconds;
-  }
-
   long getReplayCurrentTimeMilliseconds() {
-    return replayCurrentTimeMilliseconds;
+    return commandsManager.currentTimeMillis();
   }
 
   @Override
   public boolean isReplaying() {
-    return replaying;
+    return commandsManager.isReplaying();
   }
 
   @Override
@@ -563,9 +545,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
         {
           // Server doesn't guarantee that the timer fire timestamp is larger or equal of the
           // expected fire time. So fix the time or timer firing will be ignored.
-          if (replayCurrentTimeMilliseconds < firingTime) {
-            setReplayCurrentTimeMilliseconds(firingTime);
-          }
+          //          if (replayCurrentTimeMilliseconds < firingTime) {
+          //            setReplayCurrentTimeMilliseconds(firingTime);
+          //          }
           callback.accept(null);
           return;
         }
@@ -602,11 +584,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public long currentTimeMillis() {
-    return currentTimeMillis;
-  }
-
-  void setReplaying(boolean replaying) {
-    this.replaying = replaying;
+    return commandsManager.currentTimeMillis();
   }
 
   public void handleWorkflowTaskFailed(HistoryEvent event) {

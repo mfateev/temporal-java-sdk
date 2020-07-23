@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
@@ -58,7 +59,7 @@ public final class UpsertSearchAttributesCommands
 
   private static StateMachine<State, Action, UpsertSearchAttributesCommands> newStateMachine() {
     return StateMachine.<State, Action, UpsertSearchAttributesCommands>newInstance(
-            State.CREATED, State.UPSERT_COMMAND_RECORDED)
+            "UpsertSearchAttributes", State.CREATED, State.UPSERT_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -73,6 +74,7 @@ public final class UpsertSearchAttributesCommands
   private void createUpsertCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES)
             .setUpsertWorkflowSearchAttributesCommandAttributes(upsertAttributes)
             .build());
   }

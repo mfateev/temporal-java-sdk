@@ -20,6 +20,7 @@
 package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
@@ -58,6 +59,9 @@ public class CommandsBase<State, Action, Data> {
   }
 
   protected final void addCommand(Command command) {
+    if (command.getCommandType() == CommandType.COMMAND_TYPE_UNSPECIFIED) {
+      throw new IllegalArgumentException("unspecified command type");
+    }
     initialCommand = new NewCommand(command, this);
     commandSink.apply(initialCommand);
   }

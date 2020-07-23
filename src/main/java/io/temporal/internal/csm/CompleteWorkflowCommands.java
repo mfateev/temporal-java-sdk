@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
@@ -62,7 +63,7 @@ public final class CompleteWorkflowCommands
 
   private static StateMachine<State, Action, CompleteWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, CompleteWorkflowCommands>newInstance(
-            State.CREATED, State.COMPLETE_WORKFLOW_COMMAND_RECORDED)
+            "CompleteWorkflow", State.CREATED, State.COMPLETE_WORKFLOW_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -77,6 +78,7 @@ public final class CompleteWorkflowCommands
   private void createCompleteWorkflowCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
             .setCompleteWorkflowExecutionCommandAttributes(completeWorkflowAttributes)
             .build());
   }

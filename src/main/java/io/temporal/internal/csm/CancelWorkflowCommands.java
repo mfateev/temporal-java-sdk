@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
@@ -56,7 +57,7 @@ public final class CancelWorkflowCommands
 
   private static StateMachine<State, Action, CancelWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, CancelWorkflowCommands>newInstance(
-            State.CREATED, State.CANCEL_WORKFLOW_COMMAND_RECORDED)
+            "CancelWorkflow", State.CREATED, State.CANCEL_WORKFLOW_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -71,6 +72,7 @@ public final class CancelWorkflowCommands
   private void createCancelWorkflowCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_CANCEL_WORKFLOW_EXECUTION)
             .setCancelWorkflowExecutionCommandAttributes(cancelWorkflowAttributes)
             .build());
   }

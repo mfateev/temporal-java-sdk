@@ -23,6 +23,7 @@ import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttributes;
 import io.temporal.workflow.Functions;
@@ -46,7 +47,7 @@ public final class WorkflowCommands
 
   private static StateMachine<State, Action, WorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, WorkflowCommands>newInstance(
-            State.STARTED, State.COMPLETED, State.FAILED, State.CANCELED)
+            "Workflow", State.STARTED, State.COMPLETED, State.FAILED, State.CANCELED)
         .add(State.STARTED, Action.COMPLETE, State.COMPLETED)
         .add(State.STARTED, Action.FAIL, State.FAILED)
         .add(
@@ -76,17 +77,29 @@ public final class WorkflowCommands
   }
 
   public void complete(CompleteWorkflowExecutionCommandAttributes attr) {
-    addCommand(Command.newBuilder().setCompleteWorkflowExecutionCommandAttributes(attr).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
+            .setCompleteWorkflowExecutionCommandAttributes(attr)
+            .build());
     action(Action.COMPLETE);
   }
 
   public void fail(FailWorkflowExecutionCommandAttributes attr) {
-    addCommand(Command.newBuilder().setFailWorkflowExecutionCommandAttributes(attr).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION)
+            .setFailWorkflowExecutionCommandAttributes(attr)
+            .build());
     action(Action.FAIL);
   }
 
   public void reportCancellation(CancelWorkflowExecutionCommandAttributes attr) {
-    addCommand(Command.newBuilder().setCancelWorkflowExecutionCommandAttributes(attr).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_CANCEL_WORKFLOW_EXECUTION)
+            .setCancelWorkflowExecutionCommandAttributes(attr)
+            .build());
     action(Action.REPORT_CANCELLATION);
   }
 

@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
@@ -78,7 +79,7 @@ public final class SignalExternalCommands
 
   private static StateMachine<State, Action, SignalExternalCommands> newStateMachine() {
     return StateMachine.<State, Action, SignalExternalCommands>newInstance(
-            State.CREATED, State.SIGNALED, State.FAILED, State.CANCELED)
+            "SignalExternal", State.CREATED, State.SIGNALED, State.FAILED, State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -112,6 +113,7 @@ public final class SignalExternalCommands
   private void createSignalExternalCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION)
             .setSignalExternalWorkflowExecutionCommandAttributes(signalAttributes)
             .build());
   }

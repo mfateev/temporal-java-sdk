@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
@@ -58,7 +59,7 @@ public final class ContinueAsNewWorkflowCommands
 
   private static StateMachine<State, Action, ContinueAsNewWorkflowCommands> newStateMachine() {
     return StateMachine.<State, Action, ContinueAsNewWorkflowCommands>newInstance(
-            State.CREATED, State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_RECORDED)
+            "ContinueAsNewWorkflow", State.CREATED, State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -73,6 +74,7 @@ public final class ContinueAsNewWorkflowCommands
   private void createContinueAsNewWorkflowCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_CONTINUE_AS_NEW_WORKFLOW_EXECUTION)
             .setContinueAsNewWorkflowExecutionCommandAttributes(continueAsNewWorkflowAttributes)
             .build());
   }

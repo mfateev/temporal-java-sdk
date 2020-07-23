@@ -127,7 +127,7 @@ public class WorkflowTestingTest {
 
     @Override
     public String workflow1(String input) {
-      Workflow.sleep(Duration.ofHours(1)); // test time skipping
+      Workflow.sleep(Duration.ofMinutes(5)); // test time skipping
       return Workflow.getInfo().getWorkflowType() + "-" + input;
     }
   }

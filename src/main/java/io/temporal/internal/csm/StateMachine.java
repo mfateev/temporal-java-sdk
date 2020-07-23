@@ -19,7 +19,6 @@
 
 package io.temporal.internal.csm;
 
-import io.grpc.Status;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.ArrayList;
@@ -27,6 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * State machine of a single server side entity like activity, workflow task or the whole workflow.
@@ -44,21 +44,20 @@ final class StateMachine<State, Action, Data> {
       transitions =
           new LinkedHashMap<>(); // linked to maintain the same order for diagram generation
 
+  private final String name;
   private final State initialState;
   private final List<State> finalStates;
 
   private State state;
 
   public static <State, Action, Data> StateMachine<State, Action, Data> newInstance(
-      State initialState, State... finalStates) {
-    return new StateMachine<>(initialState, finalStates);
+      String name, State initialState, State... finalStates) {
+    return new StateMachine<>(name, initialState, finalStates);
   }
 
-  public StateMachine(State initialState, State[] finalStates) {
-    this.initialState = initialState;
-    if (finalStates.length == 0) {
-      throw new IllegalArgumentException("At least one final state is required");
-    }
+  public StateMachine(String name, State initialState, State[] finalStates) {
+    this.name = Objects.requireNonNull(name);
+    this.initialState = Objects.requireNonNull(initialState);
     this.finalStates = Arrays.asList(finalStates);
     this.state = initialState;
   }
@@ -139,9 +138,8 @@ final class StateMachine<State, Action, Data> {
         new Transition<>(state, actionOrEventType);
     TransitionTarget<State, Data> destination = transitions.get(transition);
     if (destination == null) {
-      throw Status.INTERNAL
-          .withDescription("Invalid " + transition + ", history: " + transitionHistory)
-          .asRuntimeException();
+      throw new IllegalArgumentException(
+          name + ": invalid " + transition + ", transition hisotry is " + transitionHistory);
     }
     state = destination.apply(data);
     transitionHistory.add(transition);

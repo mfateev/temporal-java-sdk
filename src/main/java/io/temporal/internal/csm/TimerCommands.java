@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import io.temporal.api.command.v1.CancelTimerCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.TimerCanceledEventAttributes;
@@ -75,7 +76,7 @@ public final class TimerCommands
 
   private static StateMachine<State, Action, TimerCommands> newStateMachine() {
     return StateMachine.<State, Action, TimerCommands>newInstance(
-            State.CREATED, State.FIRED, State.CANCELED)
+            "Timer", State.CREATED, State.FIRED, State.CANCELED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
@@ -113,7 +114,11 @@ public final class TimerCommands
   }
 
   private void createStartTimerCommand() {
-    addCommand(Command.newBuilder().setStartTimerCommandAttributes(startAttributes).build());
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_START_TIMER)
+            .setStartTimerCommandAttributes(startAttributes)
+            .build());
   }
 
   public void cancel() {
@@ -139,6 +144,7 @@ public final class TimerCommands
   private void createCancelTimerCommand() {
     addCommand(
         Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_CANCEL_TIMER)
             .setCancelTimerCommandAttributes(
                 CancelTimerCommandAttributes.newBuilder().setTimerId(startAttributes.getTimerId()))
             .build());
