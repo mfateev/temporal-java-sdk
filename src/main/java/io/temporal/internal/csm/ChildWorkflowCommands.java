@@ -68,7 +68,7 @@ public final class ChildWorkflowCommands
             ChildWorkflowCommands::createStartChildCommand)
         .add(
             State.START_COMMAND_CREATED,
-            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED,
             State.START_EVENT_RECORDED)
         .add(
             State.START_COMMAND_CREATED,

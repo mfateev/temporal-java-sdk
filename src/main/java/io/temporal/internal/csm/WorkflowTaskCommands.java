@@ -22,45 +22,38 @@ package io.temporal.internal.csm;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
-import io.temporal.workflow.Functions;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public final class WorkflowTaskCommands
     extends CommandsBase<
         WorkflowTaskCommands.State, WorkflowTaskCommands.Action, WorkflowTaskCommands> {
 
-  private final Functions.Proc1<Long> timeCallback;
+  public interface Listener {
+    void workflowTaskStarted(long startEventId, long currentTimeMillis);
 
-  private final Functions.Proc1<String> runIdCallback;
-
-  private final long workflowTaskStartedEventId;
-  private final Functions.Proc eventLoopCallback;
-
-  private long currentTimeMillis;
-
-  public static WorkflowTaskCommands newInstance(
-      long workflowTaskStartedEventId,
-      Functions.Proc eventLoopCallback,
-      Functions.Proc1<Long> timeCallback,
-      Functions.Proc1<String> runIdCallback) {
-    return new WorkflowTaskCommands(
-        workflowTaskStartedEventId, eventLoopCallback, timeCallback, runIdCallback);
+    void updateRunId(String currentRunId);
   }
 
-  private WorkflowTaskCommands(
-      long workflowTaskStartedEventId,
-      Functions.Proc eventLoopCallback,
-      Functions.Proc1<Long> timeCallback,
-      Functions.Proc1<String> runIdCallback) {
+  private final long workflowTaskStartedEventId;
+  private final Listener listener;
+
+  private long currentTimeMillis;
+  private long startedEventId;
+
+  public static WorkflowTaskCommands newInstance(
+      long workflowTaskStartedEventId, Listener listener) {
+    return new WorkflowTaskCommands(workflowTaskStartedEventId, listener);
+  }
+
+  private WorkflowTaskCommands(long workflowTaskStartedEventId, Listener listener) {
     super(
         newStateMachine(),
         (c) -> {
           throw new UnsupportedOperationException("doesn't generate commands");
         });
     this.workflowTaskStartedEventId = workflowTaskStartedEventId;
-    this.eventLoopCallback = eventLoopCallback;
-    this.timeCallback = timeCallback;
-    this.runIdCallback = runIdCallback;
+    this.listener = Objects.requireNonNull(listener);
   }
 
   enum Action {}
@@ -80,44 +73,42 @@ public final class WorkflowTaskCommands
             State.SCHEDULED,
             EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED,
             State.STARTED,
-            WorkflowTaskCommands::updateCurrentTime)
+            WorkflowTaskCommands::handleStarted)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED,
             State.COMPLETED,
-            WorkflowTaskCommands::runEventLoop)
+            WorkflowTaskCommands::handleCompleted)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED,
             State.FAILED,
-            WorkflowTaskCommands::mayBeUpdateCurrentRunId)
+            WorkflowTaskCommands::handleFailed)
         .add(State.STARTED, EventType.EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT, State.TIMED_OUT);
   }
 
-  private void updateCurrentTime() {
+  private void handleStarted() {
     currentTimeMillis = TimeUnit.NANOSECONDS.toMillis(currentEvent.getTimestamp());
-    // The last started event in the history
-    if (currentEvent.getEventId() == workflowTaskStartedEventId) {
-      runEventLoop();
-    } else if (currentEvent.getEventId() > workflowTaskStartedEventId) {
-      throw new IllegalStateException("Unexpected history event: " + currentEvent.getEventId());
+    startedEventId = currentEvent.getEventId();
+    // The last started event in the history. So no completed is expected.
+    if (currentEvent.getEventId() >= workflowTaskStartedEventId) {
+      handleCompleted();
     }
   }
 
   /** Only update current time if a decision task has completed successfully. */
-  private void runEventLoop() {
-    timeCallback.apply(currentTimeMillis);
-    eventLoopCallback.apply();
+  private void handleCompleted() {
+    listener.workflowTaskStarted(startedEventId, currentTimeMillis);
   }
 
-  private void mayBeUpdateCurrentRunId() {
+  private void handleFailed() {
     // Reset creates a new run of a workflow. The tricky part is that that the replay
     // of the reset workflow has to use the original runId up to the reset point to
     // maintain the same results. This code resets the id to the new one after the reset to
     // ensure that the new random and UUID are generated form this point.
     WorkflowTaskFailedEventAttributes attr = currentEvent.getWorkflowTaskFailedEventAttributes();
     if (attr.getCause() == WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_RESET_WORKFLOW) {
-      this.runIdCallback.apply(attr.getNewRunId());
+      this.listener.updateRunId(attr.getNewRunId());
     }
   }
 

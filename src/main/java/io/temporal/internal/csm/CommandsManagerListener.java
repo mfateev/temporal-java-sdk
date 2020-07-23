@@ -21,10 +21,13 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.history.v1.HistoryEvent;
 
-public interface CommandsManagerCallbacks {
-  void eventLoop();
+public interface CommandsManagerListener {
+
+  void start(HistoryEvent startWorkflowEvent);
 
   void signal(HistoryEvent signalEvent);
 
   void cancel(HistoryEvent cancelEvent);
+
+  void eventLoop();
 }

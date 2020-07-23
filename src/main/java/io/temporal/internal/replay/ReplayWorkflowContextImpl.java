@@ -39,6 +39,7 @@ import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
+import io.temporal.api.history.v1.ActivityTaskCompletedEventAttributes;
 import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
 import io.temporal.api.history.v1.ActivityTaskTimedOutEventAttributes;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
@@ -50,7 +51,6 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes;
 import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
 import io.temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes;
-import io.temporal.api.history.v1.WorkflowExecutionCompletedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import io.temporal.client.WorkflowExecutionAlreadyStarted;
@@ -268,8 +268,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       HistoryEvent event) {
     switch (event.getEventType()) {
       case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
-        WorkflowExecutionCompletedEventAttributes completedAttr =
-            event.getWorkflowExecutionCompletedEventAttributes();
+        ActivityTaskCompletedEventAttributes completedAttr =
+            event.getActivityTaskCompletedEventAttributes();
         Optional<Payloads> result =
             completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
         callback.accept(result, null);
@@ -453,7 +453,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       return;
     }
     switch (event.getEventType()) {
-      case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
+      case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED:
         callback.accept(null, null);
         return;
       case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:

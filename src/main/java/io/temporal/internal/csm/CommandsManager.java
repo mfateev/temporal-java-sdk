@@ -32,7 +32,6 @@ import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttribute
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttributes;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 import java.nio.charset.StandardCharsets;
@@ -56,11 +55,7 @@ public final class CommandsManager {
   /** The eventId of the started event of the last successfully executed workflow task. */
   private final long previousStartedEventId;
 
-  private final Functions.Proc1<HistoryEvent> signalCallback;
-
-  private final Functions.Proc1<WorkflowExecutionCancelRequestedEventAttributes> cancelCallback;
-
-  private final Functions.Proc eventLoopCallback;
+  private final CommandsManagerListener callbacks;
 
   private Functions.Proc1<NewCommand> sink;
 
@@ -88,13 +83,9 @@ public final class CommandsManager {
   public CommandsManager(
       long previousStartedEventId,
       long workflowTaskStartedEventId,
-      Functions.Proc eventLoopCallback,
-      Functions.Proc1<HistoryEvent> signalCallback,
-      Functions.Proc1<WorkflowExecutionCancelRequestedEventAttributes> cancelCallback) {
+      CommandsManagerListener callbacks) {
     System.out.println("NEW " + this);
-    this.eventLoopCallback = Objects.requireNonNull(eventLoopCallback);
-    this.signalCallback = Objects.requireNonNull(signalCallback);
-    this.cancelCallback = Objects.requireNonNull(cancelCallback);
+    this.callbacks = Objects.requireNonNull(callbacks);
     this.previousStartedEventId = previousStartedEventId;
     this.workflowTaskStartedEventId = workflowTaskStartedEventId;
     sink = (command) -> newCommands.add(command);
@@ -119,23 +110,22 @@ public final class CommandsManager {
       case EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
         this.currentRunId =
             event.getWorkflowExecutionStartedEventAttributes().getOriginalExecutionRunId();
+        callbacks.start(event);
         break;
       case EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
         WorkflowTaskCommands c =
             WorkflowTaskCommands.newInstance(
-                workflowTaskStartedEventId,
-                eventLoopCallback,
-                (t) -> this.setCurrentTimeMillis(t),
-                (r) -> this.currentRunId = r);
+                workflowTaskStartedEventId, new WorkflowTaskCommandsListener());
         commands.put(event.getEventId(), c);
         break;
       case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
-        signalCallback.apply(event);
+        callbacks.signal(event);
         break;
       case EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
-        cancelCallback.apply(event.getWorkflowExecutionCancelRequestedEventAttributes());
+        callbacks.cancel(event);
         break;
       default:
+        System.out.println("Skipping processing of " + event);
         // TODO(maxim)
     }
   }
@@ -151,10 +141,6 @@ public final class CommandsManager {
     return startedEventId;
   }
 
-  public void setLastStartedEventId(long lastStartedEventId) {
-    this.startedEventId = lastStartedEventId;
-  }
-
   public List<Command> takeCommands() {
     System.out.println("TAKE COMMANDS");
     // Account for workflow task completed
@@ -165,10 +151,12 @@ public final class CommandsManager {
       if (command.isPresent()) {
         result.add(command.get());
         newCommand.setInitialCommandEventId(commandEventId);
-        System.out.println("commands.put " + commandEventId);
+        System.out.println("commands.put " + commandEventId + ", command=" + command);
 
         commands.put(commandEventId, newCommand.getCommands());
         commandEventId++;
+      } else {
+        System.out.println("Cancelled command:  " + commandEventId);
       }
     }
     newCommands.clear();
@@ -354,7 +342,7 @@ public final class CommandsManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId <= startedEventId;
+    return previousStartedEventId > startedEventId;
   }
 
   public long currentTimeMillis() {
@@ -373,5 +361,23 @@ public final class CommandsManager {
 
   public Random newRandom() {
     return new Random(randomUUID().getLeastSignificantBits());
+  }
+
+  private class WorkflowTaskCommandsListener implements WorkflowTaskCommands.Listener {
+    @Override
+    public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
+      CommandsManager.this.startedEventId = startedEventId;
+      CommandsManager.this.currentTimeMillis = currentTimeMillis;
+      CommandsManager.this.callbacks.eventLoop();
+      if (isReplaying()) {
+        System.out.println("takeCommands while replaying");
+        takeCommands();
+      }
+    }
+
+    @Override
+    public void updateRunId(String currentRunId) {
+      CommandsManager.this.currentRunId = currentRunId;
+    }
   }
 }

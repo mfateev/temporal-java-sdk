@@ -48,6 +48,7 @@ import io.temporal.internal.common.GrpcRetryer;
 import io.temporal.internal.common.OptionsUtils;
 import io.temporal.internal.common.RpcRetryOptions;
 import io.temporal.internal.csm.CommandsManager;
+import io.temporal.internal.csm.CommandsManagerListener;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.HistoryHelper.WorkflowTaskEvents;
 import io.temporal.internal.worker.LocalActivityWorker;
@@ -143,11 +144,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     startedEvent = firstEvent.getWorkflowExecutionStartedEventAttributes();
     this.commandsManager =
         new CommandsManager(
-            previousStartedEventId,
-            workflowTaskStartedEventId,
-            () -> eventLoop(),
-            (s) -> handleWorkflowExecutionSignaled(s),
-            (c) -> handleWorkflowExecutionCancelRequested(c));
+            previousStartedEventId, workflowTaskStartedEventId, new CommandsManagerListenerImpl());
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
@@ -285,8 +282,9 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
             });
   }
 
-  private void handleWorkflowExecutionCancelRequested(
-      WorkflowExecutionCancelRequestedEventAttributes attributes) {
+  private void handleWorkflowExecutionCancelRequested(HistoryEvent event) {
+    WorkflowExecutionCancelRequestedEventAttributes attributes =
+        event.getWorkflowExecutionCancelRequestedEventAttributes();
     context.setCancelRequested(true);
     String cause = attributes.getCause();
     workflow.cancel(cause);
@@ -334,7 +332,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           new WorkflowTaskWithHistoryIteratorImpl(
               workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
       Iterator<HistoryEvent> iterator = workflowTaskWithHistoryIterator.getHistory();
-      handleWorkflowExecutionStarted(firstEvent);
+      //      handleWorkflowExecutionStarted(firstEvent);
       //      while (iterator.hasNext()) {
       //        if (!timerStopped && !taskEvents.isReplay()) {
       //          sw.stop();
@@ -636,6 +634,29 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           return current.next();
         }
       };
+    }
+  }
+
+  private class CommandsManagerListenerImpl implements CommandsManagerListener {
+    @Override
+    public void start(HistoryEvent startWorkflowEvent) {
+      System.out.println("WORKFLOW START");
+      workflow.start(startWorkflowEvent, context);
+    }
+
+    @Override
+    public void eventLoop() {
+      ReplayWorkflowExecutor.this.eventLoop();
+    }
+
+    @Override
+    public void signal(HistoryEvent signalEvent) {
+      handleWorkflowExecutionSignaled(signalEvent);
+    }
+
+    @Override
+    public void cancel(HistoryEvent cancelEvent) {
+      handleWorkflowExecutionCancelRequested(cancelEvent);
     }
   }
 }

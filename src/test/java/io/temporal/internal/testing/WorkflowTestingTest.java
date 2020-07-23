@@ -76,7 +76,6 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestWatcher;
-import org.junit.rules.Timeout;
 import org.junit.runner.Description;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,8 +83,6 @@ import org.slf4j.MDC;
 
 public class WorkflowTestingTest {
   private static final Logger log = LoggerFactory.getLogger(WorkflowTestingTest.class);
-
-  @Rule public Timeout globalTimeout = Timeout.seconds(10);
 
   @Rule
   public TestWatcher watchman =
@@ -194,6 +191,7 @@ public class WorkflowTestingTest {
 
     @Override
     public String workflow1(String input) {
+      System.out.println("ActivityWorkflow workflow1 start");
       Workflow.sleep(Duration.ofHours(1)); // test time skipping
       try {
         return activity.activity1(input);
@@ -567,7 +565,7 @@ public class WorkflowTestingTest {
     }
   }
 
-  @Test
+  @Test(timeout = 2000)
   public void testActivityCancellation() {
     Worker worker = testEnvironment.newWorker(TASK_QUEUE);
     worker.registerWorkflowImplementationTypes(TestCancellationWorkflow.class);
