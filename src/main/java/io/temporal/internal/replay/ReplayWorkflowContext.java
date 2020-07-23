@@ -164,9 +164,11 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * re-executed giving SideEffect another chance to succeed.
    *
    * @param func function that is called once to return a value.
-   * @return value of the side effect.
+   * @return callback value of the side effect.
    */
-  Optional<Payloads> sideEffect(Func<Optional<Payloads>> func);
+  void sideEffect(
+      Func<Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback);
 
   /**
    * GetVersion is used to safely perform backwards incompatible changes to workflow definitions. It

@@ -565,9 +565,10 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Optional<Payloads> sideEffect(Func<Optional<Payloads>> func) {
-    //    return workflowClock.sideEffect(func);
-    throw new UnsupportedOperationException("TODO");
+  public void sideEffect(
+      Func<Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+    commandsManager.sideEffect(func, callback);
   }
 
   @Override

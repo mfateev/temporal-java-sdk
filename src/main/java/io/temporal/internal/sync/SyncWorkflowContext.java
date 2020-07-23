@@ -570,13 +570,20 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
   public <R> R sideEffect(Class<R> resultClass, Type resultType, Func<R> func) {
     try {
       DataConverter dataConverter = getDataConverter();
-      Optional<Payloads> result =
-          context.sideEffect(
-              () -> {
-                R r = func.apply();
-                return dataConverter.toPayloads(r);
-              });
-      return dataConverter.fromPayloads(result, resultClass, resultType);
+      CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
+      context.sideEffect(
+          () -> {
+            R r = func.apply();
+            return dataConverter.toPayloads(r);
+          },
+          (p, e) -> {
+            if (e == null) {
+              result.complete(p);
+            } else {
+              result.completeExceptionally(e);
+            }
+          });
+      return dataConverter.fromPayloads(result.get(), resultClass, resultType);
     } catch (Error e) {
       throw e;
     } catch (Exception e) {

@@ -738,9 +738,9 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Optional<Payloads> sideEffect(Func<Optional<Payloads>> func) {
-      throw new UnsupportedOperationException("not implemented");
-    }
+    public void sideEffect(
+        Func<Optional<Payloads>> func,
+        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {}
 
     @Override
     public int getVersion(

@@ -23,22 +23,29 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class MarkerCommands
     extends CommandsBase<MarkerCommands.State, MarkerCommands.Action, MarkerCommands> {
 
   private final RecordMarkerCommandAttributes markerAttributes;
+  private final Functions.Proc1<HistoryEvent> callback;
 
   public static void newInstance(
-      RecordMarkerCommandAttributes markerAttributes, Functions.Proc1<NewCommand> commandSink) {
-    new MarkerCommands(markerAttributes, commandSink);
+      RecordMarkerCommandAttributes markerAttributes,
+      Functions.Proc1<HistoryEvent> callback,
+      Functions.Proc1<NewCommand> commandSink) {
+    new MarkerCommands(markerAttributes, callback, commandSink);
   }
 
   private MarkerCommands(
-      RecordMarkerCommandAttributes markerAttributes, Functions.Proc1<NewCommand> commandSink) {
+      RecordMarkerCommandAttributes markerAttributes,
+      Functions.Proc1<HistoryEvent> callback,
+      Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.markerAttributes = markerAttributes;
+    this.callback = callback;
     action(Action.SCHEDULE);
   }
 
@@ -63,7 +70,8 @@ public final class MarkerCommands
         .add(
             State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED);
+            State.MARKER_COMMAND_RECORDED,
+            MarkerCommands::notifyRecorded);
   }
 
   private void createMarkerCommand() {
@@ -72,6 +80,10 @@ public final class MarkerCommands
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes)
             .build());
+  }
+
+  private void notifyRecorded() {
+    callback.apply(currentEvent);
   }
 
   public static String asPlantUMLStateDiagram() {

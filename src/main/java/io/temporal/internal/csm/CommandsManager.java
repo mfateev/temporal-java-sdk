@@ -35,6 +35,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 import java.nio.charset.StandardCharsets;
@@ -48,6 +49,10 @@ import java.util.Random;
 import java.util.UUID;
 
 public final class CommandsManager {
+
+  private static final String MARKER_HEADER_KEY = "header";
+  private static final String MARKER_DATA_KEY = "data";
+  private static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
 
   /**
    * The eventId of the last event in the history which is expected to be startedEventId unless it
@@ -283,10 +288,6 @@ public final class CommandsManager {
     UpsertSearchAttributesCommands.newInstance(attributes, sink);
   }
 
-  public void newMarker(RecordMarkerCommandAttributes attributes) {
-    MarkerCommands.newInstance(attributes, sink);
-  }
-
   public void newCompleteWorkflow(Optional<Payloads> workflowOutput) {
     CompleteWorkflowCommands.newInstance(workflowOutput, sink);
   }
@@ -407,6 +408,45 @@ public final class CommandsManager {
 
   public Random newRandom() {
     return new Random(randomUUID().getLeastSignificantBits());
+  }
+
+  public void sideEffect(
+      Functions.Func<Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+    if (isReplaying()) {
+      MarkerCommands.newInstance(
+          RecordMarkerCommandAttributes.getDefaultInstance(),
+          (event -> {
+            MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
+            if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
+              throw new IllegalStateException(
+                  "Expected " + SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
+            }
+            Map<String, Payloads> map = attributes.getDetailsMap();
+            Optional<Payloads> recorded = Optional.ofNullable(map.get(MARKER_DATA_KEY));
+            callback.apply(recorded, null);
+          }),
+          sink);
+    } else {
+      Optional<Payloads> result;
+      try {
+        result = func.apply();
+      } catch (RuntimeException e) {
+        callback.apply(Optional.empty(), e);
+        return;
+      }
+      Map<String, Payloads> details = new HashMap<>();
+      if (result.isPresent()) {
+        details.put(MARKER_DATA_KEY, result.get());
+      }
+      RecordMarkerCommandAttributes attributes =
+          RecordMarkerCommandAttributes.newBuilder()
+              .setMarkerName(SIDE_EFFECT_MARKER_NAME)
+              .putAllDetails(details)
+              .build();
+      MarkerCommands.newInstance(attributes, (event) -> {}, sink);
+      callback.apply(result, null);
+    }
   }
 
   private class WorkflowTaskCommandsListener implements WorkflowTaskCommands.Listener {
