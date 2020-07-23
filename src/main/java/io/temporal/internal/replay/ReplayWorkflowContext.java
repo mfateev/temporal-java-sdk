@@ -29,6 +29,7 @@ import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import io.temporal.workflow.Promise;
@@ -123,7 +124,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
    */
   Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      Consumer<WorkflowExecution> executionCallback,
+      Functions.Proc1<WorkflowExecution> executionCallback,
       BiConsumer<Optional<Payloads>, Exception> callback);
 
   Consumer<Exception> signalExternalWorkflowExecution(

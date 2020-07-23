@@ -327,12 +327,13 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      Consumer<WorkflowExecution> executionCallback,
+      Functions.Proc1<WorkflowExecution> executionCallback,
       BiConsumer<Optional<Payloads>, Exception> callback) {
     StartChildWorkflowExecutionCommandAttributes startAttributes = parameters.getRequest().build();
     Functions.Proc1<ChildWorkflowCancellationType> cancellationHandler =
         commandsManager.newChildWorkflow(
             startAttributes,
+            executionCallback,
             event -> handleChildWorkflowCallback(callback, startAttributes, event));
     return (exception) -> cancellationHandler.apply(parameters.getCancellationType());
   }
@@ -508,7 +509,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public void continueAsNewOnCompletion(
       ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
-    //    workflowClient.continueAsNewOnCompletion(attributes);
+    commandsManager.newContinueAsNewWorkflow(attributes);
   }
 
   long getReplayCurrentTimeMilliseconds() {

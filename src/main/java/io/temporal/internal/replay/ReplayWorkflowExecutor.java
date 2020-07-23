@@ -182,7 +182,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   private void handleEvent(HistoryEvent event) {
-    System.out.println("handleEvent " + event.getEventType());
+    System.out.println("handleEvent " + event.getEventId() + ": " + event.getEventType());
     commandsManager.handleEvent(event);
   }
 
@@ -323,6 +323,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private boolean handleWorkflowTaskImpl(
       PollWorkflowTaskQueueResponseOrBuilder workflowTask, Functions.Proc legacyQueryCallback)
       throws Throwable {
+    System.out.println(
+        "handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
     boolean forceCreateNewWorkflowTask = false;
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
     boolean timerStopped = false;
@@ -412,6 +414,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       if (completed) {
         close();
       }
+      System.out.println(
+          "done handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
     }
   }
 

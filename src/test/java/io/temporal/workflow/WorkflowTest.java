@@ -3122,7 +3122,10 @@ public class WorkflowTest {
       Promise<String> r1 = Async.function(child1::execute, "Hello ", 0);
       String r2 = child2.execute("World!");
       assertEquals(child2Id, Workflow.getWorkflowExecution(child2).get().getWorkflowId());
-      return r1.get() + r2;
+      String result = r1.get() + r2;
+      System.out.println("TestParentWorkflow completed with result=" + result);
+
+      return result;
     }
   }
 

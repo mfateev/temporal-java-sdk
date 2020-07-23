@@ -30,6 +30,7 @@ import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
+import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.ChildWorkflowCancellationType;
@@ -194,6 +195,7 @@ public final class CommandsManager {
    * Creates a new child state machine
    *
    * @param attributes child workflow start command attributes
+   * @param startedCallback callback that is notified about child start
    * @param completionCallback invoked when child reports completion or failure. The following types
    *     of events can be passed to the callback: StartChildWorkflowExecutionFailedEvent,
    *     ChildWorkflowExecutionCompletedEvent, ChildWorkflowExecutionFailedEvent,
@@ -203,9 +205,10 @@ public final class CommandsManager {
    */
   public Functions.Proc1<ChildWorkflowCancellationType> newChildWorkflow(
       StartChildWorkflowExecutionCommandAttributes attributes,
+      Functions.Proc1<WorkflowExecution> startedCallback,
       Functions.Proc1<HistoryEvent> completionCallback) {
     ChildWorkflowCommands child =
-        ChildWorkflowCommands.newInstance(attributes, completionCallback, sink);
+        ChildWorkflowCommands.newInstance(attributes, startedCallback, completionCallback, sink);
     return (cancellationType) -> {
       if (child.isCancellable()) {
         child.cancel(cancellationType);

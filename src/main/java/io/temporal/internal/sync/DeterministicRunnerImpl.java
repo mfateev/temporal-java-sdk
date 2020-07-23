@@ -39,6 +39,7 @@ import io.temporal.internal.replay.ExecuteLocalActivityParameters;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.StartChildWorkflowExecutionParameters;
 import io.temporal.internal.replay.WorkflowExecutorCache;
+import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import io.temporal.workflow.Promise;
@@ -692,7 +693,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     @Override
     public Consumer<Exception> startChildWorkflow(
         StartChildWorkflowExecutionParameters parameters,
-        Consumer<WorkflowExecution> executionCallback,
+        Functions.Proc1<WorkflowExecution> executionCallback,
         BiConsumer<Optional<Payloads>, Exception> callback) {
       throw new UnsupportedOperationException("not implemented");
     }

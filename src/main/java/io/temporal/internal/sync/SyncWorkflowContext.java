@@ -473,7 +473,11 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
                     () -> result.completeExceptionally(mapChildWorkflowException(failure)));
               } else {
                 runner.executeInWorkflowThread(
-                    "child workflow completion callback", () -> result.complete(output));
+                    "child workflow completion callback",
+                    () -> {
+                      System.out.println("Child completion callback: " + output);
+                      result.complete(output);
+                    });
               }
             });
     CancellationScope.current()

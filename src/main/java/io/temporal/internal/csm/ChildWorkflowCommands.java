@@ -78,7 +78,8 @@ public final class ChildWorkflowCommands
         .add(
             State.START_EVENT_RECORDED,
             EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_STARTED,
-            State.STARTED)
+            State.STARTED,
+            ChildWorkflowCommands::notifyStarted)
         .add(
             State.START_EVENT_RECORDED,
             EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED,
@@ -113,12 +114,15 @@ public final class ChildWorkflowCommands
 
   private final StartChildWorkflowExecutionCommandAttributes startAttributes;
 
+  private final Functions.Proc1<WorkflowExecution> startedCallback;
+
   private final Functions.Proc1<HistoryEvent> completionCallback;
 
   /**
    * Creates a new child workflow state machine
    *
    * @param attributes child workflow start command attributes
+   * @param startedCallback
    * @param completionCallback invoked when child reports completion or failure. The following types
    *     of events can be passed to the callback: StartChildWorkflowExecutionFailedEvent,
    *     ChildWorkflowExecutionCompletedEvent, ChildWorkflowExecutionFailedEvent,
@@ -128,17 +132,20 @@ public final class ChildWorkflowCommands
    */
   public static ChildWorkflowCommands newInstance(
       StartChildWorkflowExecutionCommandAttributes attributes,
+      Functions.Proc1<WorkflowExecution> startedCallback,
       Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new ChildWorkflowCommands(attributes, completionCallback, commandSink);
+    return new ChildWorkflowCommands(attributes, startedCallback, completionCallback, commandSink);
   }
 
   private ChildWorkflowCommands(
       StartChildWorkflowExecutionCommandAttributes startAttributes,
+      Functions.Proc1<WorkflowExecution> startedCallback,
       Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.startAttributes = startAttributes;
+    this.startedCallback = startedCallback;
     this.completionCallback = completionCallback;
     action(Action.SCHEDULE);
   }
@@ -177,6 +184,11 @@ public final class ChildWorkflowCommands
 
   private void notifyCompletion() {
     completionCallback.apply(currentEvent);
+  }
+
+  private void notifyStarted() {
+    startedCallback.apply(
+        currentEvent.getChildWorkflowExecutionStartedEventAttributes().getWorkflowExecution());
   }
 
   public static String asPlantUMLStateDiagram() {
