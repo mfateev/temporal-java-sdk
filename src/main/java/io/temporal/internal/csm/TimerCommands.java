@@ -110,7 +110,8 @@ public final class TimerCommands
             State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_FIRED,
             State.FIRED,
-            TimerCommands::cancelTimerCommandFireTimer);
+            TimerCommands::cancelTimerCommandFireTimer)
+        .add(State.FIRED, Action.CANCEL, State.FIRED);
   }
 
   private void createStartTimerCommand() {

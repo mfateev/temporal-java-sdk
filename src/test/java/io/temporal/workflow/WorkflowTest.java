@@ -177,7 +177,7 @@ public class WorkflowTest {
 
   @Rule public TestName testName = new TestName();
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 30);
+  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 5);
 
   @Rule
   public TestWatcher watchman =

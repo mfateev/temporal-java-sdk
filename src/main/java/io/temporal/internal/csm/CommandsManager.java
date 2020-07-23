@@ -121,7 +121,7 @@ public final class CommandsManager {
       case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
         callbacks.signal(event);
         break;
-      case EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
+      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
         callbacks.cancel(event);
         break;
       default:
@@ -206,7 +206,18 @@ public final class CommandsManager {
       Functions.Proc1<HistoryEvent> completionCallback) {
     ChildWorkflowCommands child =
         ChildWorkflowCommands.newInstance(attributes, completionCallback, sink);
-    return (cancellationType) -> child.cancel(cancellationType);
+    return (cancellationType) -> {
+      if (child.isCancellable()) {
+        child.cancel(cancellationType);
+      } else if (!child.isFinalState()) {
+        newCancelExternal(
+            RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
+                .setWorkflowId(attributes.getWorkflowId())
+                .setNamespace(attributes.getNamespace())
+                .build(),
+            (event) -> {});
+      }
+    };
   }
 
   /**

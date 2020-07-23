@@ -151,6 +151,10 @@ public final class ChildWorkflowCommands
             .build());
   }
 
+  public boolean isCancellable() {
+    return State.START_COMMAND_CREATED == getState();
+  }
+
   public void cancel(ChildWorkflowCancellationType cancellationType) {
     // TODO: Cancellation type
     action(Action.CANCEL);

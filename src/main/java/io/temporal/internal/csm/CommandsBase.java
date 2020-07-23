@@ -81,4 +81,8 @@ public class CommandsBase<State, Action, Data> {
   public boolean isFinalState() {
     return stateMachine.isFinalState();
   }
+
+  protected State getState() {
+    return stateMachine.getState();
+  }
 }
