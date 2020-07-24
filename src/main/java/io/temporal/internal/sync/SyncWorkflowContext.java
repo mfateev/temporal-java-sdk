@@ -86,7 +86,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -610,36 +609,39 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   private <R> R mutableSideEffectImpl(
       String id, Class<R> resultClass, Type resultType, BiPredicate<R, R> updated, Func<R> func) {
-    AtomicReference<R> unserializedResult = new AtomicReference<>();
-    Optional<Payloads> payloads =
-        context.mutableSideEffect(
-            id,
-            converter,
-            (storedBinary) -> {
-              Optional<R> stored =
-                  storedBinary.map(
-                      (b) -> converter.fromPayloads(Optional.of(b), resultClass, resultType));
-              R funcResult =
-                  Objects.requireNonNull(
-                      func.apply(), "mutableSideEffect function " + "returned null");
-              if (!stored.isPresent() || updated.test(stored.get(), funcResult)) {
-                unserializedResult.set(funcResult);
-                return converter.toPayloads(funcResult);
-              }
-              return Optional.empty(); // returned only when value doesn't need to be updated
-            });
-    if (!payloads.isPresent()) {
-      throw new IllegalArgumentException(
-          "No value found for mutableSideEffectId="
-              + id
-              + ", during replay it usually indicates a different workflow runId than the original one");
-    }
-    // An optimization that avoids unnecessary deserialization of the result.
-    R unserialized = unserializedResult.get();
-    if (unserialized != null) {
-      return unserialized;
-    }
-    return converter.fromPayloads(payloads, resultClass, resultType);
+    //    AtomicReference<R> unserializedResult = new AtomicReference<>();
+    //    Optional<Payloads> payloads =
+    //        context.mutableSideEffect(
+    //            id,
+    //            converter,
+    //            (storedBinary) -> {
+    //              Optional<R> stored =
+    //                  storedBinary.map(
+    //                      (b) -> converter.fromPayloads(Optional.of(b), resultClass, resultType));
+    //              R funcResult =
+    //                  Objects.requireNonNull(
+    //                      func.apply(), "mutableSideEffect function " + "returned null");
+    //              if (!stored.isPresent() || updated.test(stored.get(), funcResult)) {
+    //                unserializedResult.set(funcResult);
+    //                return converter.toPayloads(funcResult);
+    //              }
+    //              return Optional.empty(); // returned only when value doesn't need to be updated
+    //            },
+    //            (r, e) -> {});
+    //    if (!payloads.isPresent()) {
+    //      throw new IllegalArgumentException(
+    //          "No value found for mutableSideEffectId="
+    //              + id
+    //              + ", during replay it usually indicates a different workflow runId than the
+    // original one");
+    //    }
+    //    // An optimization that avoids unnecessary deserialization of the result.
+    //    R unserialized = unserializedResult.get();
+    //    if (unserialized != null) {
+    //      return unserialized;
+    //    }
+    //    return converter.fromPayloads(payloads, resultClass, resultType);
+    return null;
   }
 
   @Override

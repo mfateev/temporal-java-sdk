@@ -717,12 +717,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Optional<Payloads> mutableSideEffect(
-        String id, DataConverter converter, Func1<Optional<Payloads>, Optional<Payloads>> func) {
-      return func.apply(Optional.empty());
-    }
-
-    @Override
     public long currentTimeMillis() {
       throw new UnsupportedOperationException("not implemented");
     }
@@ -741,6 +735,14 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     public void sideEffect(
         Func<Optional<Payloads>> func,
         Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {}
+
+    @Override
+    public Optional<Payloads> mutableSideEffect(
+        String id,
+        Func1<Optional<Payloads>, Optional<Payloads>> func,
+        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      return Optional.empty();
+    }
 
     @Override
     public int getVersion(

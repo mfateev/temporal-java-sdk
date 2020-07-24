@@ -56,6 +56,7 @@ import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowTaskWithHistoryIterator;
 import io.temporal.serviceclient.WorkflowServiceStubs;
+import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -214,8 +215,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private void mayBeCompleteWorkflow() {
     if (completed) {
       completeWorkflow();
-    } else {
-      updateTimers();
     }
   }
 
@@ -242,44 +241,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     long nanoTime = TimeUnit.NANOSECONDS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     com.uber.m3.util.Duration d = com.uber.m3.util.Duration.ofNanos(nanoTime - wfStartTimeNanos);
     metricsScope.timer(MetricsType.WORKFLOW_E2E_LATENCY).record(d);
-  }
-
-  private void updateTimers() {
-    long nextWakeUpTime = workflow.getNextWakeUpTime();
-    if (nextWakeUpTime == 0) {
-      if (timerCancellationHandler != null) {
-        timerCancellationHandler.accept(null);
-        timerCancellationHandler = null;
-      }
-      wakeUpTime = nextWakeUpTime;
-      return;
-    }
-    if (wakeUpTime == nextWakeUpTime && timerCancellationHandler != null) {
-      return; // existing timer
-    }
-    long delayMilliseconds = nextWakeUpTime - context.currentTimeMillis();
-    if (delayMilliseconds < 0) {
-      throw new IllegalStateException("Negative delayMilliseconds=" + delayMilliseconds);
-    }
-    // Round up to the nearest second as we don't want to deliver a timer
-    // earlier than requested.
-    long delaySeconds = OptionsUtils.roundUpToSeconds(Duration.ofMillis(delayMilliseconds));
-    if (timerCancellationHandler != null) {
-      timerCancellationHandler.accept(null);
-      timerCancellationHandler = null;
-    }
-    wakeUpTime = nextWakeUpTime;
-    timerCancellationHandler =
-        context.createTimer(
-            delaySeconds,
-            (t) -> {
-              System.out.println("Empty TIMER Callback");
-              // Intentionally left empty.
-              // Timer ensures that a workflow task is scheduled at the time workflow can make
-              // progress.
-              // But no specific timer related action is necessary as Workflow.sleep is just a
-              // Workflow.await with a time based condition.
-            });
   }
 
   private void handleWorkflowExecutionCancelRequested(HistoryEvent event) {
@@ -369,8 +330,9 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       //      }
       return false; // forceCreateNewWorkflowTask;
     } catch (Error e) {
-      if (this.workflow.getWorkflowImplementationOptions().getWorkflowErrorPolicy()
-          == FailWorkflow) {
+      WorkflowImplementationOptions implementationOptions =
+          this.workflow.getWorkflowImplementationOptions();
+      if (implementationOptions.getWorkflowErrorPolicy() == FailWorkflow) {
         // fail workflow
         failure = workflow.mapError(e);
         completed = true;
@@ -385,29 +347,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       if (!timerStopped) {
         sw.stop();
       }
-      Map<String, WorkflowQuery> queries = workflowTask.getQueriesMap();
-      for (Map.Entry<String, WorkflowQuery> entry : queries.entrySet()) {
-        WorkflowQuery query = entry.getValue();
-        try {
-          Optional<Payloads> queryResult = workflow.query(query);
-          WorkflowQueryResult.Builder result =
-              WorkflowQueryResult.newBuilder()
-                  .setResultType(QueryResultType.QUERY_RESULT_TYPE_ANSWERED);
-          if (queryResult.isPresent()) {
-            result.setAnswer(queryResult.get());
-          }
-          queryResults.put(entry.getKey(), result.build());
-        } catch (Exception e) {
-          String stackTrace = Throwables.getStackTraceAsString(e);
-          queryResults.put(
-              entry.getKey(),
-              WorkflowQueryResult.newBuilder()
-                  .setResultType(QueryResultType.QUERY_RESULT_TYPE_FAILED)
-                  .setErrorMessage(e.getMessage())
-                  .setAnswer(converter.toPayloads(stackTrace).get())
-                  .build());
-        }
-      }
+      executeQueries(workflowTask.getQueriesMap());
       if (legacyQueryCallback != null) {
         legacyQueryCallback.apply();
       }
@@ -416,6 +356,31 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       }
       System.out.println(
           "done handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
+    }
+  }
+
+  private void executeQueries(Map<String, WorkflowQuery> queries) {
+    for (Map.Entry<String, WorkflowQuery> entry : queries.entrySet()) {
+      WorkflowQuery query = entry.getValue();
+      try {
+        Optional<Payloads> queryResult = workflow.query(query);
+        WorkflowQueryResult.Builder result =
+            WorkflowQueryResult.newBuilder()
+                .setResultType(QueryResultType.QUERY_RESULT_TYPE_ANSWERED);
+        if (queryResult.isPresent()) {
+          result.setAnswer(queryResult.get());
+        }
+        queryResults.put(entry.getKey(), result.build());
+      } catch (Exception e) {
+        String stackTrace = Throwables.getStackTraceAsString(e);
+        queryResults.put(
+            entry.getKey(),
+            WorkflowQueryResult.newBuilder()
+                .setResultType(QueryResultType.QUERY_RESULT_TYPE_FAILED)
+                .setErrorMessage(e.getMessage())
+                .setAnswer(converter.toPayloads(stackTrace).get())
+                .build());
+      }
     }
   }
 

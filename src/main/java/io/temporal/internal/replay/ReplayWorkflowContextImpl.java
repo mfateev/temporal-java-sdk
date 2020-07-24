@@ -573,9 +573,11 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public Optional<Payloads> mutableSideEffect(
-      String id, DataConverter converter, Func1<Optional<Payloads>, Optional<Payloads>> func) {
-    //    return workflowClock.mutableSideEffect(id, converter, func);
-    throw new UnsupportedOperationException("TODO");
+      String id,
+      Func1<Optional<Payloads>, Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+    commandsManager.mutableSideEffect(id, func, callback);
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override

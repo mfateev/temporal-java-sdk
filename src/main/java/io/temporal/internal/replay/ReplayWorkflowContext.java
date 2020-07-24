@@ -135,9 +135,6 @@ public interface ReplayWorkflowContext extends ReplayAware {
 
   void continueAsNewOnCompletion(ContinueAsNewWorkflowExecutionCommandAttributes attributes);
 
-  Optional<Payloads> mutableSideEffect(
-      String id, DataConverter dataConverter, Func1<Optional<Payloads>, Optional<Payloads>> func);
-
   /**
    * @return time of the {@link PollWorkflowTaskQueueResponse} start event of the workflow task
    *     being processed or replayed.
@@ -168,6 +165,11 @@ public interface ReplayWorkflowContext extends ReplayAware {
    */
   void sideEffect(
       Func<Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback);
+
+  Optional<Payloads> mutableSideEffect(
+      String id,
+      Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc2<Optional<Payloads>, RuntimeException> callback);
 
   /**

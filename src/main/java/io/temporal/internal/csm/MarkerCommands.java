@@ -31,20 +31,24 @@ public final class MarkerCommands
 
   private final RecordMarkerCommandAttributes markerAttributes;
   private final Functions.Proc1<HistoryEvent> callback;
+  private final Functions.Proc eventLoopCallback;
 
   public static void newInstance(
       RecordMarkerCommandAttributes markerAttributes,
       Functions.Proc1<HistoryEvent> callback,
+      Functions.Proc eventLoopCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    new MarkerCommands(markerAttributes, callback, commandSink);
+    new MarkerCommands(markerAttributes, eventLoopCallback, callback, commandSink);
   }
 
   private MarkerCommands(
       RecordMarkerCommandAttributes markerAttributes,
+      Functions.Proc eventLoopCallback,
       Functions.Proc1<HistoryEvent> callback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.markerAttributes = markerAttributes;
+    this.eventLoopCallback = eventLoopCallback;
     this.callback = callback;
     action(Action.SCHEDULE);
   }
@@ -70,8 +74,7 @@ public final class MarkerCommands
         .add(
             State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED,
-            MarkerCommands::notifyRecorded);
+            State.MARKER_COMMAND_RECORDED);
   }
 
   private void createMarkerCommand() {
@@ -79,11 +82,19 @@ public final class MarkerCommands
         Command.newBuilder()
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes)
-            .build());
+            .build(),
+        (event) -> {
+          callback.apply(event);
+          eventLoopCallback.apply();
+        });
   }
 
-  private void notifyRecorded() {
-    callback.apply(currentEvent);
+  @Override
+  public void handleEvent(HistoryEvent event) {
+    if (getState() == State.MARKER_COMMAND_CREATED
+        && event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED) {}
+
+    super.handleEvent(event);
   }
 
   public static String asPlantUMLStateDiagram() {

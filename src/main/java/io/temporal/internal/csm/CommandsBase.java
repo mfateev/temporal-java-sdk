@@ -41,7 +41,7 @@ public class CommandsBase<State, Action, Data> {
     this.commandSink = commandSink;
   }
 
-  public final void handleEvent(HistoryEvent event) {
+  public void handleEvent(HistoryEvent event) {
     this.currentEvent = event;
     try {
       stateMachine.handleEvent(event.getEventType(), (Data) this);
@@ -59,10 +59,15 @@ public class CommandsBase<State, Action, Data> {
   }
 
   protected final void addCommand(Command command) {
+    addCommand(command, null);
+  }
+
+  protected final void addCommand(
+      Command command, Functions.Proc1<HistoryEvent> matchingEventCallback) {
     if (command.getCommandType() == CommandType.COMMAND_TYPE_UNSPECIFIED) {
       throw new IllegalArgumentException("unspecified command type");
     }
-    initialCommand = new NewCommand(command, this);
+    initialCommand = new NewCommand(command, this, matchingEventCallback);
     commandSink.apply(initialCommand);
   }
 
