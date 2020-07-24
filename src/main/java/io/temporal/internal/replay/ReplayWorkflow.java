@@ -43,12 +43,6 @@ public interface ReplayWorkflow {
   void close();
 
   /**
-   * @return time at which workflow can make progress. For example when {@link
-   *     io.temporal.workflow.Workflow#sleep(long)} expires.
-   */
-  long getNextWakeUpTime();
-
-  /**
    * Called after all history is replayed and workflow cannot make any progress if workflow task is
    * a query.
    *

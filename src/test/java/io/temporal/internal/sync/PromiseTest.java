@@ -34,20 +34,12 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
 public class PromiseTest {
 
   @Rule public final Tracer trace = new Tracer();
-
-  private long currentTime;
-
-  @Before
-  public void setUp() {
-    currentTime = 10;
-  }
 
   @Test
   public void testFailure() throws Throwable {
@@ -153,8 +145,6 @@ public class PromiseTest {
         DeterministicRunner.newRunner(
             threadPool,
             null,
-            () -> currentTime,
-            "test-thread",
             () -> {
               CompletablePromise<String> f = Workflow.newPromise();
               trace.add("root begin");
@@ -187,7 +177,6 @@ public class PromiseTest {
     trace.setExpected(expected);
     trace.assertExpected();
 
-    currentTime += 11000;
     r.runUntilAllBlocked();
     expected =
         new String[] {

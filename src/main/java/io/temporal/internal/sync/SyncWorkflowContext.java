@@ -84,7 +84,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -543,26 +542,25 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   @Override
   public Promise<Void> newTimer(Duration delay) {
-    Objects.requireNonNull(delay);
-    long delaySeconds = roundUpToSeconds(delay);
-    if (delaySeconds < 0) {
-      throw new IllegalArgumentException("negative delay");
-    }
-    if (delaySeconds == 0) {
-      return Workflow.newPromise(null);
-    }
-    CompletablePromise<Void> timer = Workflow.newPromise();
-    long fireTime = context.currentTimeMillis() + TimeUnit.SECONDS.toMillis(delaySeconds);
-    timers.addTimer(fireTime, timer);
+    CompletablePromise<Void> p = Workflow.newPromise();
+    Functions.Proc1<RuntimeException> cancellationHandler =
+        context.newTimer(
+            delay,
+            (e) -> {
+              if (e == null) {
+                p.complete(null);
+              } else {
+                p.completeExceptionally(e);
+              }
+            });
     CancellationScope.current()
         .getCancellationRequest()
         .thenApply(
-            (reason) -> {
-              timers.removeTimer(fireTime, timer);
-              timer.completeExceptionally(new CanceledFailure(reason));
-              return null;
+            (r) -> {
+              cancellationHandler.apply(new CanceledFailure(r));
+              return r;
             });
-    return timer;
+    return p;
   }
 
   @Override
@@ -577,7 +575,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
           },
           (p, e) -> {
             if (e == null) {
-              result.complete(p);
+              result.complete(Objects.requireNonNull(p));
             } else {
               result.completeExceptionally(e);
             }
@@ -800,18 +798,14 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   @Override
   public void sleep(Duration duration) {
-    WorkflowThread.await(
-        duration.toMillis(),
-        "sleep",
-        () -> {
-          CancellationScope.throwCancelled();
-          return false;
-        });
+    newTimer(duration).get();
   }
 
   @Override
   public boolean await(Duration timeout, String reason, Supplier<Boolean> unblockCondition) {
-    return WorkflowThread.await(timeout.toMillis(), reason, unblockCondition);
+    Promise<Void> timer = newTimer(timeout);
+    WorkflowThread.await(reason, () -> (timer.isCompleted() || unblockCondition.get()));
+    return timer.isCompleted();
   }
 
   @Override
@@ -902,5 +896,10 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
   @Override
   public Object newThread(Runnable runnable, boolean detached, String name) {
     return runner.newThread(runnable, detached, name);
+  }
+
+  @Override
+  public long currentTimeMillis() {
+    return context.currentTimeMillis();
   }
 }

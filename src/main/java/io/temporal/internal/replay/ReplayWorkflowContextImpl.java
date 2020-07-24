@@ -20,6 +20,7 @@
 package io.temporal.internal.replay;
 
 import static io.temporal.failure.FailureConverter.JAVA_SDK;
+import static io.temporal.internal.common.OptionsUtils.roundUpToSeconds;
 
 import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
@@ -81,7 +82,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -523,40 +523,30 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Consumer<Exception> createTimer(long delaySeconds, Consumer<Exception> callback) {
-    if (delaySeconds == 0) {
-      callback.accept(null);
-      return null;
-    }
-    long firingTime = currentTimeMillis() + TimeUnit.SECONDS.toMillis(delaySeconds);
-    StartTimerCommandAttributes timer =
+  public Functions.Proc1<RuntimeException> newTimer(
+      Duration delay, Functions.Proc1<RuntimeException> callback) {
+    int delaySeconds = roundUpToSeconds(delay);
+    StartTimerCommandAttributes attributes =
         StartTimerCommandAttributes.newBuilder()
             .setStartToFireTimeoutSeconds(delaySeconds)
             .setTimerId(commandsManager.randomUUID().toString())
             .build();
     Functions.Proc cancellationHandler =
-        commandsManager.newTimer(
-            timer, (event) -> handleTimerCallback(callback, firingTime, event));
+        commandsManager.newTimer(attributes, (event) -> handleTimerCallback(callback, event));
     return (e) -> cancellationHandler.apply();
   }
 
-  private void handleTimerCallback(
-      Consumer<Exception> callback, long firingTime, HistoryEvent event) {
+  private void handleTimerCallback(Functions.Proc1<RuntimeException> callback, HistoryEvent event) {
     switch (event.getEventType()) {
       case EVENT_TYPE_TIMER_FIRED:
         {
-          // Server doesn't guarantee that the timer fire timestamp is larger or equal of the
-          // expected fire time. So fix the time or timer firing will be ignored.
-          //          if (replayCurrentTimeMilliseconds < firingTime) {
-          //            setReplayCurrentTimeMilliseconds(firingTime);
-          //          }
-          callback.accept(null);
+          callback.apply(null);
           return;
         }
       case EVENT_TYPE_TIMER_CANCELED:
         {
           CanceledFailure exception = new CanceledFailure("Cancelled by request");
-          callback.accept(exception);
+          callback.apply(exception);
           return;
         }
       default:

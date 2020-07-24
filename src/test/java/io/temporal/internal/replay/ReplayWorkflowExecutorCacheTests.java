@@ -302,11 +302,6 @@ public class ReplayWorkflowExecutorCacheTests {
           public void close() {}
 
           @Override
-          public long getNextWakeUpTime() {
-            return 0;
-          }
-
-          @Override
           public Optional<Payloads> query(WorkflowQuery query) {
             return Optional.empty();
           }

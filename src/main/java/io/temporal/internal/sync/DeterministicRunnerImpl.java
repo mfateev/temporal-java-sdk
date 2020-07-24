@@ -111,7 +111,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   private final List<WorkflowThread> threadsToAdd = Collections.synchronizedList(new ArrayList<>());
   private int addedThreads;
   private final List<NamedRunnable> toExecuteInWorkflowThread = new ArrayList<>();
-  private final Supplier<Long> clock;
   private WorkflowExecutorCache cache;
   private boolean inRunUntilAllBlocked;
   private boolean closeRequested;
@@ -149,11 +148,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   }
 
   /**
-   * Time at which any thread that runs under sync can make progress. For example when {@link
-   * io.temporal.workflow.Workflow#sleep(long)} expires. 0 means no blocked threads.
-   */
-  private long nextWakeUpTime;
-  /**
    * Used to check for failedPromises that contain an error, but never where accessed. It is to
    * avoid failure swallowing by failedPromises which is very hard to troubleshoot.
    */
@@ -169,13 +163,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   }
 
   DeterministicRunnerImpl(Supplier<Long> clock, Runnable root) {
-    this(
-        getDefaultThreadPool(),
-        newDummySyncWorkflowContext(),
-        clock,
-        WORKFLOW_ROOT_THREAD_NAME,
-        root,
-        null);
+    this(getDefaultThreadPool(), newDummySyncWorkflowContext(), root, null);
   }
 
   private static ThreadPoolExecutor getDefaultThreadPool() {
@@ -186,25 +174,19 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   }
 
   DeterministicRunnerImpl(
-      ExecutorService threadPool,
-      SyncWorkflowContext workflowContext,
-      Supplier<Long> clock,
-      Runnable root) {
-    this(threadPool, workflowContext, clock, WORKFLOW_ROOT_THREAD_NAME, root, null);
+      ExecutorService threadPool, SyncWorkflowContext workflowContext, Runnable root) {
+    this(threadPool, workflowContext, root, null);
   }
 
   DeterministicRunnerImpl(
       ExecutorService threadPool,
       SyncWorkflowContext workflowContext,
-      Supplier<Long> clock,
-      String rootName,
       Runnable root,
       WorkflowExecutorCache cache) {
     this.threadPool = threadPool;
     this.workflowContext =
         workflowContext != null ? workflowContext : newDummySyncWorkflowContext();
     this.workflowContext.setRunner(this);
-    this.clock = clock;
     this.cache = cache;
     runnerCancellationScope = new CancellationScopeImpl(true, null, null);
     this.rootRunnable = root;
@@ -290,7 +272,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
         toExecuteInWorkflowThread.clear();
         progress = false;
         Iterator<WorkflowThread> ci = threads.iterator();
-        nextWakeUpTime = Long.MAX_VALUE;
         while (ci.hasNext()) {
           WorkflowThread c = ci.next();
           progress = c.runUntilBlocked() || progress;
@@ -304,11 +285,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
               unhandledException = c.getUnhandledException();
               break;
             }
-          } else {
-            long t = c.getBlockedUntil();
-            if (t > currentTimeMillis() && t < nextWakeUpTime) {
-              nextWakeUpTime = t;
-            }
           }
         }
         if (unhandledException != null) {
@@ -319,10 +295,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
           threads.add(c);
         }
       } while (progress && !threads.isEmpty());
-
-      if (nextWakeUpTime < currentTimeMillis() || nextWakeUpTime == Long.MAX_VALUE) {
-        nextWakeUpTime = 0;
-      }
     } finally {
       inRunUntilAllBlocked = false;
       // Close was requested while running
@@ -445,32 +417,6 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   private void checkClosed() {
     if (closed) {
       throw new Error("closed");
-    }
-  }
-
-  @Override
-  public long currentTimeMillis() {
-    return clock.get();
-  }
-
-  @Override
-  public long getNextWakeUpTime() {
-    lock.lock();
-    try {
-      checkClosed();
-      if (workflowContext != null) {
-        long nextFireTime = workflowContext.getNextFireTime();
-        if (nextWakeUpTime == 0) {
-          return nextFireTime;
-        }
-        if (nextFireTime == 0) {
-          return nextWakeUpTime;
-        }
-        return Math.min(nextWakeUpTime, nextFireTime);
-      }
-      return nextWakeUpTime;
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -722,19 +668,22 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public boolean isReplaying() {
+    public Functions.Proc1<RuntimeException> newTimer(
+        Duration delay, Functions.Proc1<RuntimeException> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Consumer<Exception> createTimer(long delaySeconds, Consumer<Exception> callback) {
+    public boolean isReplaying() {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
     public void sideEffect(
         Func<Optional<Payloads>> func,
-        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {}
+        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      throw new UnsupportedOperationException("not implemented");
+    }
 
     @Override
     public Optional<Payloads> mutableSideEffect(

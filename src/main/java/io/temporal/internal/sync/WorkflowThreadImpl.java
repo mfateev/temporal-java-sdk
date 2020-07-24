@@ -160,14 +160,6 @@ class WorkflowThreadImpl implements WorkflowThread {
   private Future<?> taskFuture;
   private final Map<WorkflowThreadLocalInternal<?>, Object> threadLocalMap = new HashMap<>();
 
-  /**
-   * If not 0 then thread is blocked on a sleep (or on an operation with a timeout). The value is
-   * the time in milliseconds (as in currentTimeMillis()) when thread will continue. Note that
-   * thread still has to be called for evaluation as other threads might interrupt the blocking
-   * call.
-   */
-  private long blockedUntil;
-
   WorkflowThreadImpl(
       ExecutorService threadPool,
       DeterministicRunnerImpl runner,
@@ -315,15 +307,6 @@ class WorkflowThreadImpl implements WorkflowThread {
     return priority;
   }
 
-  @Override
-  public long getBlockedUntil() {
-    return blockedUntil;
-  }
-
-  private void setBlockedUntil(long blockedUntil) {
-    this.blockedUntil = blockedUntil;
-  }
-
   /** @return true if coroutine made some progress. */
   @Override
   public boolean runUntilBlocked() {
@@ -416,20 +399,6 @@ class WorkflowThreadImpl implements WorkflowThread {
   @Override
   public void yield(String reason, Supplier<Boolean> unblockCondition) {
     context.yield(reason, unblockCondition);
-  }
-
-  @Override
-  public boolean yield(long timeoutMillis, String reason, Supplier<Boolean> unblockCondition)
-      throws DestroyWorkflowThreadError {
-    if (timeoutMillis == 0) {
-      return unblockCondition.get();
-    }
-    long blockedUntil = WorkflowInternal.currentTimeMillis() + timeoutMillis;
-    setBlockedUntil(blockedUntil);
-    YieldWithTimeoutCondition condition =
-        new YieldWithTimeoutCondition(unblockCondition, blockedUntil);
-    WorkflowThread.await(reason, condition);
-    return !condition.isTimedOut();
   }
 
   @Override

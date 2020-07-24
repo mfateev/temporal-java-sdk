@@ -181,4 +181,9 @@ public class SignalWorkflowOutboundCallsInterceptor implements WorkflowOutboundC
   public Object newThread(Runnable runnable, boolean detached, String name) {
     return next.newThread(runnable, detached, name);
   }
+
+  @Override
+  public long currentTimeMillis() {
+    return next.currentTimeMillis();
+  }
 }

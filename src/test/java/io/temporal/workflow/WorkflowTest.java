@@ -4619,6 +4619,7 @@ public class WorkflowTest {
 
       long workflowTime = Workflow.currentTimeMillis();
       long time = Workflow.sideEffect(long.class, () -> workflowTime);
+      System.out.println("workflowTime=" + workflowTime + ", time=" + time);
       Workflow.sleep(Duration.ofSeconds(1));
       String result;
       if (workflowTime == time) {
@@ -4641,6 +4642,7 @@ public class WorkflowTest {
     tracer.setExpected(
         "interceptExecuteWorkflow " + UUID_REGEXP,
         "newThread workflow-method",
+        "currentTimeMillis",
         "sideEffect",
         "sleep PT1S",
         "executeActivity customActivity1",
@@ -5268,7 +5270,9 @@ public class WorkflowTest {
 
     @Override
     public WorkflowInboundCallsInterceptor interceptWorkflow(WorkflowInboundCallsInterceptor next) {
-      trace.add("interceptExecuteWorkflow " + Workflow.getInfo().getWorkflowId());
+      if (!Workflow.isReplaying()) {
+        trace.add("interceptExecuteWorkflow " + Workflow.getInfo().getWorkflowId());
+      }
       return new WorkflowInboundCallsInterceptorBase(next) {
         @Override
         public void init(WorkflowOutboundCallsInterceptor outboundCalls) {
@@ -6394,7 +6398,9 @@ public class WorkflowTest {
         Type resultType,
         Object[] args,
         ActivityOptions options) {
-      trace.add("executeActivity " + activityName);
+      if (!Workflow.isReplaying()) {
+        trace.add("executeActivity " + activityName);
+      }
       return next.executeActivity(activityName, resultClass, resultType, args, options);
     }
 
@@ -6405,7 +6411,9 @@ public class WorkflowTest {
         Type resultType,
         Object[] args,
         LocalActivityOptions options) {
-      trace.add("executeLocalActivity " + activityName);
+      if (!Workflow.isReplaying()) {
+        trace.add("executeLocalActivity " + activityName);
+      }
       return next.executeLocalActivity(activityName, resultClass, resultType, args, options);
     }
 
@@ -6416,76 +6424,100 @@ public class WorkflowTest {
         Type resultType,
         Object[] args,
         ChildWorkflowOptions options) {
-      trace.add("executeChildWorkflow " + workflowType);
+      if (!Workflow.isReplaying()) {
+        trace.add("executeChildWorkflow " + workflowType);
+      }
       return next.executeChildWorkflow(workflowType, resultClass, resultType, args, options);
     }
 
     @Override
     public Random newRandom() {
-      trace.add("newRandom");
+      if (!Workflow.isReplaying()) {
+        trace.add("newRandom");
+      }
       return next.newRandom();
     }
 
     @Override
     public Promise<Void> signalExternalWorkflow(
         WorkflowExecution execution, String signalName, Object[] args) {
-      trace.add("signalExternalWorkflow " + execution.getWorkflowId() + " " + signalName);
+      if (!Workflow.isReplaying()) {
+        trace.add("signalExternalWorkflow " + execution.getWorkflowId() + " " + signalName);
+      }
       return next.signalExternalWorkflow(execution, signalName, args);
     }
 
     @Override
     public Promise<Void> cancelWorkflow(WorkflowExecution execution) {
-      trace.add("cancelWorkflow " + execution.getWorkflowId());
+      if (!Workflow.isReplaying()) {
+        trace.add("cancelWorkflow " + execution.getWorkflowId());
+      }
       return next.cancelWorkflow(execution);
     }
 
     @Override
     public void sleep(Duration duration) {
-      trace.add("sleep " + duration);
+      if (!Workflow.isReplaying()) {
+        trace.add("sleep " + duration);
+      }
       next.sleep(duration);
     }
 
     @Override
     public boolean await(Duration timeout, String reason, Supplier<Boolean> unblockCondition) {
-      trace.add("await " + timeout + " " + reason);
+      if (!Workflow.isReplaying()) {
+        trace.add("await " + timeout + " " + reason);
+      }
       return next.await(timeout, reason, unblockCondition);
     }
 
     @Override
     public void await(String reason, Supplier<Boolean> unblockCondition) {
-      trace.add("await " + reason);
+      if (!Workflow.isReplaying()) {
+        trace.add("await " + reason);
+      }
       next.await(reason, unblockCondition);
     }
 
     @Override
     public Promise<Void> newTimer(Duration duration) {
-      trace.add("newTimer " + duration);
+      if (!Workflow.isReplaying()) {
+        trace.add("newTimer " + duration);
+      }
       return next.newTimer(duration);
     }
 
     @Override
     public <R> R sideEffect(Class<R> resultClass, Type resultType, Func<R> func) {
-      trace.add("sideEffect");
+      if (!Workflow.isReplaying()) {
+        trace.add("sideEffect");
+      }
       return next.sideEffect(resultClass, resultType, func);
     }
 
     @Override
     public <R> R mutableSideEffect(
         String id, Class<R> resultClass, Type resultType, BiPredicate<R, R> updated, Func<R> func) {
-      trace.add("mutableSideEffect");
+      if (!Workflow.isReplaying()) {
+        trace.add("mutableSideEffect");
+      }
       return next.mutableSideEffect(id, resultClass, resultType, updated, func);
     }
 
     @Override
     public int getVersion(String changeId, int minSupported, int maxSupported) {
-      trace.add("getVersion");
+      if (!Workflow.isReplaying()) {
+        trace.add("getVersion");
+      }
       return next.getVersion(changeId, minSupported, maxSupported);
     }
 
     @Override
     public void continueAsNew(
         Optional<String> workflowType, Optional<ContinueAsNewOptions> options, Object[] args) {
-      trace.add("continueAsNew");
+      if (!Workflow.isReplaying()) {
+        trace.add("continueAsNew");
+      }
       next.continueAsNew(workflowType, options, args);
     }
 
@@ -6495,7 +6527,9 @@ public class WorkflowTest {
         Class<?>[] argTypes,
         Type[] genericArgTypes,
         Func1<Object[], Object> callback) {
-      trace.add("registerQuery " + queryType);
+      if (!Workflow.isReplaying()) {
+        trace.add("registerQuery " + queryType);
+      }
       next.registerQuery(queryType, argTypes, genericArgTypes, callback);
     }
 
@@ -6505,26 +6539,42 @@ public class WorkflowTest {
         Class<?>[] argTypes,
         Type[] genericArgTypes,
         Functions.Proc1<Object[]> callback) {
-      trace.add("registerSignal " + signalType);
+      if (!Workflow.isReplaying()) {
+        trace.add("registerSignal " + signalType);
+      }
       next.registerSignal(signalType, argTypes, genericArgTypes, callback);
     }
 
     @Override
     public UUID randomUUID() {
-      trace.add("randomUUID");
+      if (!Workflow.isReplaying()) {
+        trace.add("randomUUID");
+      }
       return next.randomUUID();
     }
 
     @Override
     public void upsertSearchAttributes(Map<String, Object> searchAttributes) {
-      trace.add("upsertSearchAttributes");
+      if (!Workflow.isReplaying()) {
+        trace.add("upsertSearchAttributes");
+      }
       next.upsertSearchAttributes(searchAttributes);
     }
 
     @Override
     public Object newThread(Runnable runnable, boolean detached, String name) {
-      trace.add("newThread " + name);
+      if (!Workflow.isReplaying()) {
+        trace.add("newThread " + name);
+      }
       return next.newThread(runnable, detached, name);
+    }
+
+    @Override
+    public long currentTimeMillis() {
+      if (!Workflow.isReplaying()) {
+        trace.add("currentTimeMillis");
+      }
+      return next.currentTimeMillis();
     }
   }
 

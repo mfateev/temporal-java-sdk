@@ -23,6 +23,7 @@ import io.temporal.workflow.CancellationScope;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.QueueConsumer;
 import io.temporal.workflow.WorkflowQueue;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.TimeUnit;
@@ -74,7 +75,8 @@ final class WorkflowQueueImpl<E> implements WorkflowQueue<E> {
 
   @Override
   public E poll(long timeout, TimeUnit unit) {
-    WorkflowThread.await(unit.toMillis(timeout), "WorkflowQueue.poll", () -> !queue.isEmpty());
+    WorkflowInternal.await(
+        Duration.ofMillis(timeout), "WorkflowQueue.poll", () -> !queue.isEmpty());
 
     if (queue.isEmpty()) {
       return null;
@@ -84,8 +86,8 @@ final class WorkflowQueueImpl<E> implements WorkflowQueue<E> {
 
   @Override
   public E cancellablePoll(long timeout, TimeUnit unit) {
-    WorkflowThread.await(
-        unit.toMillis(timeout),
+    WorkflowInternal.await(
+        Duration.ofMillis(timeout),
         "WorkflowQueue.cancellablePoll",
         () -> {
           CancellationScope.throwCancelled();
@@ -126,8 +128,8 @@ final class WorkflowQueueImpl<E> implements WorkflowQueue<E> {
 
   @Override
   public boolean offer(E e, long timeout, TimeUnit unit) {
-    WorkflowThread.await(
-        unit.toMillis(timeout), "WorkflowQueue.offer", () -> queue.size() < capacity);
+    WorkflowInternal.await(
+        Duration.ofMillis(timeout), "WorkflowQueue.offer", () -> queue.size() < capacity);
     if (queue.size() >= capacity) {
       return false;
     }
@@ -137,8 +139,10 @@ final class WorkflowQueueImpl<E> implements WorkflowQueue<E> {
 
   @Override
   public boolean cancellableOffer(E e, long timeout, TimeUnit unit) {
-    WorkflowThread.await(
-        unit.toMillis(timeout), "WorkflowQueue.cancellableOffer", () -> queue.size() < capacity);
+    WorkflowInternal.await(
+        Duration.ofMillis(timeout),
+        "WorkflowQueue.cancellableOffer",
+        () -> queue.size() < capacity);
     if (queue.size() >= capacity) {
       return false;
     }

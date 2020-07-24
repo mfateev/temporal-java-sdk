@@ -45,7 +45,6 @@ import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder
 import io.temporal.common.converter.DataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
-import io.temporal.internal.common.OptionsUtils;
 import io.temporal.internal.common.RpcRetryOptions;
 import io.temporal.internal.csm.CommandsManager;
 import io.temporal.internal.csm.CommandsManagerListener;
@@ -210,6 +209,9 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       failure = workflow.mapUnexpectedException(e);
       completed = true;
     }
+    if (completed) {
+      completeWorkflow();
+    }
   }
 
   private void mayBeCompleteWorkflow() {
@@ -326,7 +328,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       //                taskEvents,
       //                workflowTask.hasQuery());
 
-      mayBeCompleteWorkflow();
       //      }
       return false; // forceCreateNewWorkflowTask;
     } catch (Error e) {

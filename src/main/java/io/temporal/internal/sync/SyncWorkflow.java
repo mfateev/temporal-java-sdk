@@ -111,8 +111,6 @@ class SyncWorkflow implements ReplayWorkflow {
         DeterministicRunner.newRunner(
             threadPool,
             syncContext,
-            context::currentTimeMillis,
-            "interceptor-init",
             () -> {
               workflow.initialize();
               WorkflowInternal.newThread(
@@ -156,14 +154,6 @@ class SyncWorkflow implements ReplayWorkflow {
     if (runner != null) {
       runner.close();
     }
-  }
-
-  @Override
-  public long getNextWakeUpTime() {
-    if (runner == null) {
-      throw new IllegalStateException("Start not called");
-    }
-    return runner.getNextWakeUpTime();
   }
 
   @Override

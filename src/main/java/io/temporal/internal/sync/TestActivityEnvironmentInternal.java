@@ -370,6 +370,11 @@ public final class TestActivityEnvironmentInternal implements TestActivityEnviro
       throw new UnsupportedOperationException("not implemented");
     }
 
+    @Override
+    public long currentTimeMillis() {
+      throw new UnsupportedOperationException("not implemented");
+    }
+
     private <T> T getReply(
         PollActivityTaskQueueResponse task,
         ActivityTaskHandler.Result response,

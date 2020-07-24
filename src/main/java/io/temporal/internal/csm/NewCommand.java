@@ -58,13 +58,17 @@ public class NewCommand {
 
   public void setInitialCommandEventId(long initialCommandEventId) {
     this.initialCommandEventId = Optional.of(initialCommandEventId);
-    if (this.matchingEventCallback != null) {
-      this.matchingEventCallback.apply(null);
-    }
   }
 
+  /**
+   * Called with matching command event. During non replay phase is called with null event to
+   * indicate that all other events were already processed. This is used to unblock side effect and
+   * similar marker based commands.
+   */
   public void setMatchingEvent(HistoryEvent event) {
-    setInitialCommandEventId(event.getEventId());
+    if (event != null) {
+      setInitialCommandEventId(event.getEventId());
+    }
     if (this.matchingEventCallback != null) {
       this.matchingEventCallback.apply(event);
     }
