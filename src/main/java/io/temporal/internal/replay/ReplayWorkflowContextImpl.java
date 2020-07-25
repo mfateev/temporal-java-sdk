@@ -560,8 +560,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public void sideEffect(
-      Func<Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
     commandsManager.sideEffect(func, callback);
   }
 
@@ -569,7 +568,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   public Optional<Payloads> mutableSideEffect(
       String id,
       Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      Functions.Proc1<Optional<Payloads>> callback) {
     commandsManager.mutableSideEffect(id, func, callback);
     throw new UnsupportedOperationException("not implemented");
   }

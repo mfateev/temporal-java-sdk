@@ -572,13 +572,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
             R r = func.apply();
             return dataConverter.toPayloads(r);
           },
-          (p, e) -> {
-            if (e == null) {
-              result.complete(Objects.requireNonNull(p));
-            } else {
-              result.completeExceptionally(e);
-            }
-          });
+          (p) -> result.complete(Objects.requireNonNull(p)));
       return dataConverter.fromPayloads(result.get(), resultClass, resultType);
     } catch (Error e) {
       throw e;

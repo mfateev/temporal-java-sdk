@@ -411,13 +411,12 @@ public final class CommandsManager {
   }
 
   public void sideEffect(
-      Functions.Func<Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      Functions.Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
     SideEffectMarkerCommands.newInstance(
         this::isReplaying,
         func,
-        (payloads, exception) -> {
-          callback.apply(payloads, exception);
+        (payloads) -> {
+          callback.apply(payloads);
           // callback unblocked sideEffect call. Give workflow code chance to make progress.
           callbacks.eventLoop();
         },
@@ -433,7 +432,7 @@ public final class CommandsManager {
   public void mutableSideEffect(
       String id,
       Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+      Functions.Proc1<Optional<Payloads>> callback) {
     //    Optional<Payloads> result;
     //    RecordMarkerCommandAttributes markerAttributes;
     //    // Call func only the first time

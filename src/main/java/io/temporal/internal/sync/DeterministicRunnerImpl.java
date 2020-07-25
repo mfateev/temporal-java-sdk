@@ -674,14 +674,8 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public boolean isReplaying() {
-      throw new UnsupportedOperationException("not implemented");
-    }
-
-    @Override
     public void sideEffect(
-        Func<Optional<Payloads>> func,
-        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+        Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -689,8 +683,13 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     public Optional<Payloads> mutableSideEffect(
         String id,
         Func1<Optional<Payloads>, Optional<Payloads>> func,
-        Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
-      return Optional.empty();
+        Functions.Proc1<Optional<Payloads>> callback) {
+      throw new UnsupportedOperationException("not implemented");
+    }
+
+    @Override
+    public boolean isReplaying() {
+      throw new UnsupportedOperationException("not implemented");
     }
 
     @Override

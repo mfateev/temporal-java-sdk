@@ -38,7 +38,7 @@ public final class SideEffectMarkerCommands
   private static final String MARKER_DATA_KEY = "data";
   private static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
 
-  private final Functions.Proc2<Optional<Payloads>, RuntimeException> callback;
+  private final Functions.Proc1<Optional<Payloads>> callback;
   private final Functions.Func<Optional<Payloads>> func;
   private final Functions.Func<Boolean> replaying;
 
@@ -55,7 +55,7 @@ public final class SideEffectMarkerCommands
   public static void newInstance(
       Functions.Func<Boolean> replaying,
       Functions.Func<Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback,
+      Functions.Proc1<Optional<Payloads>> callback,
       Functions.Proc1<NewCommand> commandSink) {
     new SideEffectMarkerCommands(replaying, func, callback, commandSink);
   }
@@ -63,7 +63,7 @@ public final class SideEffectMarkerCommands
   private SideEffectMarkerCommands(
       Functions.Func<Boolean> replaying,
       Functions.Func<Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback,
+      Functions.Proc1<Optional<Payloads>> callback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.replaying = replaying;
@@ -106,15 +106,9 @@ public final class SideEffectMarkerCommands
     RecordMarkerCommandAttributes markerAttributes;
     if (replaying.apply()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
-      result = null;
     } else {
       // executing first time
-      try {
-        result = func.apply();
-      } catch (RuntimeException e) {
-        callback.apply(Optional.empty(), e);
-        return;
-      }
+      result = func.apply();
       Map<String, Payloads> details = new HashMap<>();
       if (result.isPresent()) {
         details.put(MARKER_DATA_KEY, result.get());
@@ -140,11 +134,11 @@ public final class SideEffectMarkerCommands
     }
     Map<String, Payloads> map = attributes.getDetailsMap();
     Optional<Payloads> fromMaker = Optional.ofNullable(map.get(MARKER_DATA_KEY));
-    callback.apply(fromMaker, null);
+    callback.apply(fromMaker);
   }
 
   private void markerResultFromFunc() {
-    callback.apply(result, null);
+    callback.apply(result);
   }
 
   public static String asPlantUMLStateDiagram() {
