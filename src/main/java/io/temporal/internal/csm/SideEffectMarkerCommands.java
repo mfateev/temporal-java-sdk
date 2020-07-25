@@ -27,7 +27,6 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.workflow.Functions;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +41,9 @@ public final class SideEffectMarkerCommands
 
   private final Functions.Proc2<Optional<Payloads>, RuntimeException> callback;
   private final Functions.Func<Optional<Payloads>> func;
+
+  private Optional<Payloads> result;
+  private int accessCount;
 
   /**
    * Creates new SideEffect Marker
@@ -95,9 +97,11 @@ public final class SideEffectMarkerCommands
     RecordMarkerCommandAttributes markerAttributes;
     Optional<Payloads> result;
     if (func == null) {
+      // replaying
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
       result = null;
     } else {
+      // executing first time
       try {
         result = func.apply();
       } catch (RuntimeException e) {

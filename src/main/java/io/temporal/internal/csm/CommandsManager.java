@@ -253,8 +253,8 @@ public final class CommandsManager {
       Optional<Command> command = newCommand.getCommand();
       if (command.isPresent()) {
         preparedCommands.add(newCommand);
-        newCommand.setMatchingEvent(null);
       }
+      newCommand.setMatchingEvent(null);
     }
   }
 
