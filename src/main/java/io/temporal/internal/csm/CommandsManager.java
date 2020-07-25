@@ -414,7 +414,8 @@ public final class CommandsManager {
       Functions.Func<Optional<Payloads>> func,
       Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
     SideEffectMarkerCommands.newInstance(
-        isReplaying() ? null : func,
+        this::isReplaying,
+        func,
         (payloads, exception) -> {
           callback.apply(payloads, exception);
           // callback unblocked sideEffect call. Give workflow code chance to make progress.

@@ -40,6 +40,7 @@ public final class SideEffectMarkerCommands
 
   private final Functions.Proc2<Optional<Payloads>, RuntimeException> callback;
   private final Functions.Func<Optional<Payloads>> func;
+  private final Functions.Func<Boolean> replaying;
 
   private Optional<Payloads> result;
   private int accessCount;
@@ -52,17 +53,20 @@ public final class SideEffectMarkerCommands
    * @param commandSink callback to send commands to
    */
   public static void newInstance(
+      Functions.Func<Boolean> replaying,
       Functions.Func<Optional<Payloads>> func,
       Functions.Proc2<Optional<Payloads>, RuntimeException> callback,
       Functions.Proc1<NewCommand> commandSink) {
-    new SideEffectMarkerCommands(func, callback, commandSink);
+    new SideEffectMarkerCommands(replaying, func, callback, commandSink);
   }
 
   private SideEffectMarkerCommands(
+      Functions.Func<Boolean> replaying,
       Functions.Func<Optional<Payloads>> func,
       Functions.Proc2<Optional<Payloads>, RuntimeException> callback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
+    this.replaying = replaying;
     this.func = func;
     this.callback = callback;
     action(Action.SCHEDULE);
@@ -100,9 +104,7 @@ public final class SideEffectMarkerCommands
 
   private void createMarkerCommand() {
     RecordMarkerCommandAttributes markerAttributes;
-    if (func == null) {
-      // replaying
-      // TODO(maxim): May be notify all commands about replaying status?
+    if (replaying.apply()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
       result = null;
     } else {
