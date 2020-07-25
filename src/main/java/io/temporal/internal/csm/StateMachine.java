@@ -111,9 +111,14 @@ final class StateMachine<State, Action, Data> {
 
   StateMachine<State, Action, Data> add(
       State from, CommandType commandType, State to, Functions.Proc1<Data> callback) {
-    transitions.put(
-        new Transition<>(from, new ActionOrEventType<>(commandType)),
-        new FixedTransitionTarget<>(to, callback));
+    TransitionTarget<State, Data> registered =
+        transitions.put(
+            new Transition<>(from, new ActionOrEventType<>(commandType)),
+            new FixedTransitionTarget<>(to, callback));
+    if (registered != null) {
+      throw new IllegalArgumentException(
+          "Duplicated action " + commandType + " from " + from + " state");
+    }
     return this;
   }
 
@@ -159,9 +164,19 @@ final class StateMachine<State, Action, Data> {
     TransitionTarget<State, Data> destination = transitions.get(transition);
     if (destination == null) {
       throw new IllegalArgumentException(
-          name + ": invalid " + transition + ", transition hisotry is " + transitionHistory);
+          name + ": invalid " + transition + ", transition history is " + transitionHistory);
     }
-    state = destination.apply(data);
+    try {
+      state = destination.apply(data);
+    } catch (RuntimeException e) {
+      throw new RuntimeException(
+          name
+              + ": failure executing "
+              + transition
+              + ", transition history is "
+              + transitionHistory,
+          e);
+    }
     transitionHistory.add(transition);
   }
 

@@ -510,7 +510,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public void continueAsNewOnCompletion(
       ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
-    commandsManager.newContinueAsNewWorkflow(attributes);
+    workflowContext.setContinueAsNewOnCompletion(attributes);
   }
 
   long getReplayCurrentTimeMilliseconds() {
@@ -525,6 +525,10 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public Functions.Proc1<RuntimeException> newTimer(
       Duration delay, Functions.Proc1<RuntimeException> callback) {
+    if (delay == Duration.ZERO) {
+      callback.apply(null);
+      return (e) -> {};
+    }
     int delaySeconds = roundUpToSeconds(delay);
     StartTimerCommandAttributes attributes =
         StartTimerCommandAttributes.newBuilder()

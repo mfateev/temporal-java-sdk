@@ -118,7 +118,6 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
   private final DataConverter converter;
   private final List<ContextPropagator> contextPropagators;
   private WorkflowOutboundCallsInterceptor headInterceptor;
-  private final WorkflowTimers timers = new WorkflowTimers();
   private final Map<String, Functions.Func1<Optional<Payloads>, Optional<Payloads>>>
       queryCallbacks = new HashMap<>();
   private final Map<String, Functions.Proc2<Optional<Payloads>, Long>> signalCallbacks =
@@ -647,18 +646,6 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
     return context.getVersion(changeId, converter, minSupported, maxSupported);
   }
 
-  void fireTimers() {
-    timers.fireTimers(context.currentTimeMillis());
-  }
-
-  boolean hasTimersToFire() {
-    return timers.hasTimersToFire(context.currentTimeMillis());
-  }
-
-  long getNextFireTime() {
-    return timers.getNextFireTime();
-  }
-
   public Optional<Payloads> query(String type, Optional<Payloads> args) {
     Functions.Func1<Optional<Payloads>, Optional<Payloads>> callback = queryCallbacks.get(type);
     if (callback == null) {
@@ -805,7 +792,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
   public boolean await(Duration timeout, String reason, Supplier<Boolean> unblockCondition) {
     Promise<Void> timer = newTimer(timeout);
     WorkflowThread.await(reason, () -> (timer.isCompleted() || unblockCondition.get()));
-    return timer.isCompleted();
+    return !timer.isCompleted();
   }
 
   @Override

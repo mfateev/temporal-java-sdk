@@ -110,6 +110,10 @@ public final class ActivityCommands
             State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED)
         .add(
             State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK,
+            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED)
+        .add(
+            State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
             State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED)
         .add(

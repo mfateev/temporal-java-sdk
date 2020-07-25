@@ -21,6 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.CommandType;
+import io.temporal.api.history.v1.HistoryEvent;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -37,11 +38,15 @@ public class NewCommand {
     this.initialCommandEventId = Optional.empty();
   }
 
-  public Optional<Command> getCommand() {
+  public Command getCommand() {
     if (canceled) {
-      return Optional.empty();
+      throw new IllegalStateException("canceled");
     }
-    return Optional.of(command);
+    return command;
+  }
+
+  public boolean isCanceled() {
+    return canceled;
   }
 
   public void cancel() {
@@ -63,5 +68,15 @@ public class NewCommand {
 
   public CommandType getCommandType() {
     return command.getCommandType();
+  }
+
+  public void handleEvent(HistoryEvent event) {
+    if (canceled) {
+      return;
+    }
+    commands.handleEvent(event);
+    if (!canceled) {
+      initialCommandEventId = Optional.of(event.getEventId());
+    }
   }
 }

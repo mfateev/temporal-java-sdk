@@ -181,8 +181,10 @@ public final class CommandsManager {
       if (newCommand == null) {
         throw new IllegalStateException("No command scheduled that corresponds to " + event);
       }
-      Optional<Command> optionalCommand = newCommand.getCommand();
-      if (optionalCommand.isPresent()) {
+      // Note that event handling can cause a command cancellation in case
+      // of some markers
+      newCommand.handleEvent(event);
+      if (!newCommand.isCanceled()) {
         break;
       }
     }
@@ -190,15 +192,10 @@ public final class CommandsManager {
       throw new IllegalStateException(
           "Command eventId " + curentCommandId + " doesn't match eventId: " + event.getEventId());
     }
-    Command command = newCommand.getCommand().get();
+    Command command = newCommand.getCommand();
     validateCommand(command, event);
-    newCommand.getCommands().handleEvent(event);
     commands.put(curentCommandId, newCommand.getCommands());
-    System.out.println(
-        "TAKE COMMAND put " + curentCommandId + ": " + newCommand.getCommand().get());
-
     System.out.println(" takeCommand commands.put " + curentCommandId + ", command=" + command);
-
     curentCommandId++;
   }
 
@@ -224,13 +221,12 @@ public final class CommandsManager {
     // Account for workflow task completed
     long commandEventId = startedEventId + 2;
     for (NewCommand newCommand : preparedCommands) {
-      Optional<Command> command = newCommand.getCommand();
-      if (!command.isPresent()) {
-        throw new IllegalStateException("non present command");
+      if (newCommand.isCanceled()) {
+        throw new IllegalStateException("Canceled command: " + newCommand.getCommand());
       }
-      result.add(command.get());
-      System.out.println(
-          "TAKE COMMANDS put " + commandEventId + ": " + newCommand.getCommand().get());
+      Command command = newCommand.getCommand();
+      result.add(command);
+      System.out.println("TAKE COMMANDS put " + commandEventId + ": " + command);
       commands.put(commandEventId, newCommand.getCommands());
       commandEventId++;
       newCommand.setInitialCommandEventId(commandEventId);
@@ -249,8 +245,7 @@ public final class CommandsManager {
       if (newCommand == null) {
         break;
       }
-      Optional<Command> command = newCommand.getCommand();
-      if (command.isPresent()) {
+      if (!newCommand.isCanceled()) {
         preparedCommands.add(newCommand);
       }
       newCommand.getCommands().handleCommand(newCommand.getCommandType());
@@ -303,6 +298,8 @@ public final class CommandsManager {
     ChildWorkflowCommands child =
         ChildWorkflowCommands.newInstance(attributes, startedCallback, completionCallback, sink);
     return (cancellationType) -> {
+      // The only time child can be cancelled directly is before its start command
+      // was sent out to the service. After that RequestCancelExternal should be used.
       if (child.isCancellable()) {
         if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
           notifyChildCancelled(attributes, completionCallback);

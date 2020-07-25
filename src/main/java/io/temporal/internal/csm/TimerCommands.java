@@ -112,6 +112,10 @@ public final class TimerCommands
             TimerCommands::notifyCompletion)
         .add(
             State.CANCEL_TIMER_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_CANCEL_TIMER,
+            State.CANCEL_TIMER_COMMAND_CREATED)
+        .add(
+            State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_FIRED,
             State.FIRED,
             TimerCommands::cancelTimerCommandFireTimer)

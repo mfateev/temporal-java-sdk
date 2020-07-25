@@ -134,7 +134,6 @@ class SyncWorkflow implements ReplayWorkflow {
     if (runner == null) {
       return false;
     }
-    workflowProc.fireTimers();
     runner.runUntilAllBlocked();
     return runner.isDone() || workflowProc.isDone(); // Do not wait for all other threads.
   }
