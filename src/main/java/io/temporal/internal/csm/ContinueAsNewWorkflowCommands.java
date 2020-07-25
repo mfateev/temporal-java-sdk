@@ -67,6 +67,10 @@ public final class ContinueAsNewWorkflowCommands
             ContinueAsNewWorkflowCommands::createContinueAsNewWorkflowCommand)
         .add(
             State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_CONTINUE_AS_NEW_WORKFLOW_EXECUTION,
+            State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_CREATED)
+        .add(
+            State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_CREATED,
             EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW,
             State.CONTINUE_AS_NEW_WORKFLOW_COMMAND_RECORDED);
   }

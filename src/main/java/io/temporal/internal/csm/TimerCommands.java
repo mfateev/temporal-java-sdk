@@ -84,6 +84,10 @@ public final class TimerCommands
             TimerCommands::createStartTimerCommand)
         .add(
             State.START_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_START_TIMER,
+            State.START_COMMAND_CREATED)
+        .add(
+            State.START_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_STARTED,
             State.START_COMMAND_RECORDED)
         .add(

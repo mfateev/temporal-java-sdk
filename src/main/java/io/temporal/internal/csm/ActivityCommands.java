@@ -69,6 +69,10 @@ public final class ActivityCommands
             ActivityCommands::createScheduleActivityTaskCommand)
         .add(
             State.SCHEDULE_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK,
+            State.SCHEDULE_COMMAND_CREATED)
+        .add(
+            State.SCHEDULE_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
             State.SCHEDULED_EVENT_RECORDED)
         .add(

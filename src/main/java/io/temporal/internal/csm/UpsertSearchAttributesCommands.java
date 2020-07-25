@@ -67,6 +67,10 @@ public final class UpsertSearchAttributesCommands
             UpsertSearchAttributesCommands::createUpsertCommand)
         .add(
             State.UPSERT_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES,
+            State.UPSERT_COMMAND_CREATED)
+        .add(
+            State.UPSERT_COMMAND_CREATED,
             EventType.EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES,
             State.UPSERT_COMMAND_RECORDED);
   }

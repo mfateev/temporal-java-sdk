@@ -92,6 +92,10 @@ public final class SignalExternalCommands
             SignalExternalCommands::cancelSignalExternalCommand)
         .add(
             State.SIGNAL_EXTERNAL_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION,
+            State.SIGNAL_EXTERNAL_COMMAND_CREATED)
+        .add(
+            State.SIGNAL_EXTERNAL_COMMAND_CREATED,
             EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED)
         .add(

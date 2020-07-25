@@ -71,6 +71,10 @@ public final class CompleteWorkflowCommands
             CompleteWorkflowCommands::createCompleteWorkflowCommand)
         .add(
             State.COMPLETE_WORKFLOW_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION,
+            State.COMPLETE_WORKFLOW_COMMAND_CREATED)
+        .add(
+            State.COMPLETE_WORKFLOW_COMMAND_CREATED,
             EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
             State.COMPLETE_WORKFLOW_COMMAND_RECORDED);
   }

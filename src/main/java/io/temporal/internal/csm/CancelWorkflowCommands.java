@@ -65,6 +65,10 @@ public final class CancelWorkflowCommands
             CancelWorkflowCommands::createCancelWorkflowCommand)
         .add(
             State.CANCEL_WORKFLOW_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_CANCEL_WORKFLOW_EXECUTION,
+            State.CANCEL_WORKFLOW_COMMAND_CREATED)
+        .add(
+            State.CANCEL_WORKFLOW_COMMAND_CREATED,
             EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED,
             State.CANCEL_WORKFLOW_COMMAND_RECORDED);
   }

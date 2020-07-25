@@ -20,8 +20,7 @@
 package io.temporal.internal.csm;
 
 import io.temporal.api.command.v1.Command;
-import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.workflow.Functions;
+import io.temporal.api.enums.v1.CommandType;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -29,16 +28,13 @@ public class NewCommand {
 
   private final Command command;
   private final CommandsBase commands;
-  private final Functions.Proc1<HistoryEvent> matchingEventCallback;
   private boolean canceled;
   private Optional<Long> initialCommandEventId;
 
-  public NewCommand(
-      Command command, CommandsBase commands, Functions.Proc1<HistoryEvent> matchingEventCallback) {
+  public NewCommand(Command command, CommandsBase commands) {
     this.command = Objects.requireNonNull(command);
     this.commands = Objects.requireNonNull(commands);
     this.initialCommandEventId = Optional.empty();
-    this.matchingEventCallback = matchingEventCallback;
   }
 
   public Optional<Command> getCommand() {
@@ -56,25 +52,16 @@ public class NewCommand {
     return initialCommandEventId;
   }
 
+  /** Notifies about eventId that command event will have. */
   public void setInitialCommandEventId(long initialCommandEventId) {
     this.initialCommandEventId = Optional.of(initialCommandEventId);
   }
 
-  /**
-   * Called with matching command event. During non replay phase is called with null event to
-   * indicate that all other events were already processed. This is used to unblock side effect and
-   * similar marker based commands.
-   */
-  public void setMatchingEvent(HistoryEvent event) {
-    if (event != null) {
-      setInitialCommandEventId(event.getEventId());
-    }
-    if (this.matchingEventCallback != null) {
-      this.matchingEventCallback.apply(event);
-    }
-  }
-
   public CommandsBase getCommands() {
     return commands;
+  }
+
+  public CommandType getCommandType() {
+    return command.getCommandType();
   }
 }

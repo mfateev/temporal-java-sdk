@@ -66,6 +66,10 @@ public final class FailWorkflowCommands
             FailWorkflowCommands::createFailWorkflowCommand)
         .add(
             State.FAIL_WORKFLOW_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION,
+            State.FAIL_WORKFLOW_COMMAND_CREATED)
+        .add(
+            State.FAIL_WORKFLOW_COMMAND_CREATED,
             EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED,
             State.FAIL_WORKFLOW_COMMAND_RECORDED);
   }

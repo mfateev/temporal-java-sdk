@@ -192,7 +192,6 @@ public final class CommandsManager {
     }
     Command command = newCommand.getCommand().get();
     validateCommand(command, event);
-    newCommand.setMatchingEvent(event);
     newCommand.getCommands().handleEvent(event);
     commands.put(curentCommandId, newCommand.getCommands());
     System.out.println(
@@ -254,7 +253,7 @@ public final class CommandsManager {
       if (command.isPresent()) {
         preparedCommands.add(newCommand);
       }
-      newCommand.setMatchingEvent(null);
+      newCommand.getCommands().handleCommand(newCommand.getCommandType());
     }
   }
 

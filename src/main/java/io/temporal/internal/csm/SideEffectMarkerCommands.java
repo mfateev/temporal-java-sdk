@@ -24,7 +24,6 @@ import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.workflow.Functions;
 import java.util.HashMap;
@@ -89,15 +88,21 @@ public final class SideEffectMarkerCommands
             SideEffectMarkerCommands::createMarkerCommand)
         .add(
             State.MARKER_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.MARKER_COMMAND_CREATED,
+            SideEffectMarkerCommands::markerResultFromFunc)
+        .add(
+            State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED);
+            State.MARKER_COMMAND_RECORDED,
+            SideEffectMarkerCommands::markerResultFromEvent);
   }
 
   private void createMarkerCommand() {
     RecordMarkerCommandAttributes markerAttributes;
-    Optional<Payloads> result;
     if (func == null) {
       // replaying
+      // TODO(maxim): May be notify all commands about replaying status?
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
       result = null;
     } else {
@@ -122,17 +127,11 @@ public final class SideEffectMarkerCommands
         Command.newBuilder()
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes)
-            .build(),
-        (event -> handleMakerEvent(event, result)));
+            .build());
   }
 
-  private void handleMakerEvent(HistoryEvent event, Optional<Payloads> result) {
-    // Event is null when callback is called during initial execution (non replay).
-    if (event == null) {
-      callback.apply(result, null);
-      return;
-    }
-    MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
+  private void markerResultFromEvent() {
+    MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
     if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
       throw new IllegalStateException(
           "Expected " + SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
@@ -140,6 +139,10 @@ public final class SideEffectMarkerCommands
     Map<String, Payloads> map = attributes.getDetailsMap();
     Optional<Payloads> fromMaker = Optional.ofNullable(map.get(MARKER_DATA_KEY));
     callback.apply(fromMaker, null);
+  }
+
+  private void markerResultFromFunc() {
+    callback.apply(result, null);
   }
 
   public static String asPlantUMLStateDiagram() {

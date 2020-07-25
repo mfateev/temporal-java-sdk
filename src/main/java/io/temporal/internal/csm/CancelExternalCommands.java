@@ -79,6 +79,10 @@ public final class CancelExternalCommands
             CancelExternalCommands::createCancelExternalCommand)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION,
+            State.REQUEST_CANCEL_EXTERNAL_COMMAND_CREATED)
+        .add(
+            State.REQUEST_CANCEL_EXTERNAL_COMMAND_CREATED,
             EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED)
         .add(

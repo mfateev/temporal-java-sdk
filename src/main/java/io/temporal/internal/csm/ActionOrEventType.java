@@ -19,22 +19,34 @@
 
 package io.temporal.internal.csm;
 
+import com.google.common.base.Objects;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 
 class ActionOrEventType<Action> {
 
   public static final int EVENT_TYPE_PREFIX_LENGTH = "EVENT_TYPE_".length();
+  public static final int COMMAND_TYPE_PREFIX_LENGTH = "COMMAND_TYPE_".length();
 
   final Action action;
   final EventType eventType;
+  final CommandType commandType;
 
   public ActionOrEventType(Action action) {
     this.action = action;
     this.eventType = null;
+    this.commandType = null;
   }
 
   public ActionOrEventType(EventType eventType) {
     this.eventType = eventType;
+    this.action = null;
+    this.commandType = null;
+  }
+
+  public ActionOrEventType(CommandType commandType) {
+    this.commandType = commandType;
+    this.eventType = null;
     this.action = null;
   }
 
@@ -43,19 +55,23 @@ class ActionOrEventType<Action> {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     ActionOrEventType<?> that = (ActionOrEventType<?>) o;
-    return com.google.common.base.Objects.equal(action, that.action) && eventType == that.eventType;
+    return Objects.equal(action, that.action)
+        && eventType == that.eventType
+        && commandType == that.commandType;
   }
 
   @Override
   public int hashCode() {
-    return com.google.common.base.Objects.hashCode(action, eventType);
+    return Objects.hashCode(action, eventType, commandType);
   }
 
   @Override
   public String toString() {
-    if (action == null) {
+    if (action != null) {
+      return action.toString();
+    } else if (eventType != null) {
       return eventType.toString().substring(EVENT_TYPE_PREFIX_LENGTH);
     }
-    return action.toString();
+    return commandType.toString().substring(COMMAND_TYPE_PREFIX_LENGTH);
   }
 }

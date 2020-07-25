@@ -69,8 +69,13 @@ public final class MarkerCommands
             MarkerCommands::createMarkerCommand)
         .add(
             State.MARKER_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.MARKER_COMMAND_CREATED)
+        .add(
+            State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED);
+            State.MARKER_COMMAND_RECORDED,
+            MarkerCommands::notifyRecorded);
   }
 
   private void createMarkerCommand() {
@@ -78,8 +83,11 @@ public final class MarkerCommands
         Command.newBuilder()
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes)
-            .build(),
-        callback);
+            .build());
+  }
+
+  private void notifyRecorded() {
+    callback.apply(currentEvent);
   }
 
   public static String asPlantUMLStateDiagram() {

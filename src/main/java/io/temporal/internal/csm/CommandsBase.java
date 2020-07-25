@@ -41,6 +41,15 @@ public class CommandsBase<State, Action, Data> {
     this.commandSink = commandSink;
   }
 
+  /**
+   * Notifies that command is included into the workflow task completion result.
+   *
+   * <p>Is not called for commands generated during replay.
+   */
+  public void handleCommand(CommandType commandType) {
+    stateMachine.handleCommand(commandType, (Data) this);
+  }
+
   public void handleEvent(HistoryEvent event) {
     this.currentEvent = event;
     try {
@@ -50,24 +59,15 @@ public class CommandsBase<State, Action, Data> {
     }
   }
 
-  public final String toPlantUML() {
-    return stateMachine.asPlantUMLStateDiagram();
-  }
-
   protected final void action(Action action) {
     stateMachine.action(action, (Data) this);
   }
 
   protected final void addCommand(Command command) {
-    addCommand(command, null);
-  }
-
-  protected final void addCommand(
-      Command command, Functions.Proc1<HistoryEvent> matchingEventCallback) {
     if (command.getCommandType() == CommandType.COMMAND_TYPE_UNSPECIFIED) {
       throw new IllegalArgumentException("unspecified command type");
     }
-    initialCommand = new NewCommand(command, this, matchingEventCallback);
+    initialCommand = new NewCommand(command, this);
     commandSink.apply(initialCommand);
   }
 

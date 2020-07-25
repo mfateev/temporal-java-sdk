@@ -19,6 +19,7 @@
 
 package io.temporal.internal.csm;
 
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.ArrayList;
@@ -108,6 +109,21 @@ final class StateMachine<State, Action, Data> {
     return this;
   }
 
+  StateMachine<State, Action, Data> add(
+      State from, CommandType commandType, State to, Functions.Proc1<Data> callback) {
+    transitions.put(
+        new Transition<>(from, new ActionOrEventType<>(commandType)),
+        new FixedTransitionTarget<>(to, callback));
+    return this;
+  }
+
+  StateMachine<State, Action, Data> add(State from, CommandType commandType, State to) {
+    transitions.put(
+        new Transition<>(from, new ActionOrEventType<>(commandType)),
+        new FixedTransitionTarget<>(to, (data -> {})));
+    return this;
+  }
+
   /**
    * Registers a dynamic transition between states. Used when the same action can transition to more
    * than one state depending on data.
@@ -131,6 +147,10 @@ final class StateMachine<State, Action, Data> {
 
   void handleEvent(EventType eventType, Data data) {
     action(new ActionOrEventType<>(eventType), data);
+  }
+
+  public void handleCommand(CommandType commandType, Data data) {
+    action(new ActionOrEventType<>(commandType), data);
   }
 
   private void action(ActionOrEventType<Action> actionOrEventType, Data data) {
