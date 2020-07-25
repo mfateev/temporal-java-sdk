@@ -25,7 +25,6 @@ import static io.temporal.internal.common.WorkflowExecutionUtils.isCommandEvent;
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
-import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
@@ -39,7 +38,6 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 import java.nio.charset.StandardCharsets;
@@ -56,10 +54,6 @@ import java.util.UUID;
 
 public final class CommandsManager {
 
-  private static final String MARKER_HEADER_KEY = "header";
-  private static final String MARKER_DATA_KEY = "data";
-  private static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
-
   /**
    * The eventId of the last event in the history which is expected to be startedEventId unless it
    * is replay from a JSON file.
@@ -71,6 +65,7 @@ public final class CommandsManager {
 
   private final CommandsManagerListener callbacks;
 
+  /** Callback to send new commands to. */
   private Functions.Proc1<NewCommand> sink;
 
   /**
@@ -117,7 +112,7 @@ public final class CommandsManager {
 
   public final void handleEvent(HistoryEvent event) {
     if (isCommandEvent(event)) {
-      takeCommand(event);
+      handleCommand(event);
       return;
     }
     Long initialCommandEventId = getInitialCommandEventId(event);
@@ -152,26 +147,10 @@ public final class CommandsManager {
       case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
         callbacks.cancel(event);
         break;
-      case EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
-      case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
-      case EVENT_TYPE_MARKER_RECORDED:
-      case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
-      case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
-      case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED:
-      case EVENT_TYPE_TIMER_STARTED:
-      case EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES:
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
-      case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW:
-      case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
-      case EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
-        throw new IllegalArgumentException("Unexpected :" + event);
-        //        takeCommand(event);
-        //        break;
       case UNRECOGNIZED:
         break;
       default:
-        System.out.println("Skipping processing of " + event);
+        throw new IllegalArgumentException("Unexpected event:" + event);
         // TODO(maxim)
     }
   }
@@ -187,10 +166,16 @@ public final class CommandsManager {
     return startedEventId;
   }
 
-  public void takeCommand(HistoryEvent event) {
-    System.out.println("TAKE COMMAND " + event.getEventType());
+  /**
+   * Handles command event
+   *
+   * @param event
+   */
+  public void handleCommand(HistoryEvent event) {
+    System.out.println("HANDLE COMMAND " + event.getEventType());
 
     NewCommand newCommand;
+    // skips cancelled commands
     while (true) {
       newCommand = newCommands.poll();
       if (newCommand == null) {
@@ -218,12 +203,18 @@ public final class CommandsManager {
     curentCommandId++;
   }
 
+  /** Validates that command matches the event during replay. */
   private void validateCommand(Command command, HistoryEvent event) {
     if (!equals(command.getCommandType(), event.getEventType())) {
       throw new IllegalStateException(command + " doesn't match " + event);
     }
   }
 
+  /**
+   * Compares command to its correpsonding event.
+   *
+   * @return true if matches
+   */
   private boolean equals(CommandType commandType, EventType eventType) {
     return getEventTypeForCommand(commandType) == eventType;
   }
@@ -401,6 +392,118 @@ public final class CommandsManager {
     ContinueAsNewWorkflowCommands.newInstance(attributes, sink);
   }
 
+  public boolean isReplaying() {
+    return previousStartedEventId >= startedEventId;
+  }
+
+  public long currentTimeMillis() {
+    return currentTimeMillis;
+  }
+
+  public UUID randomUUID() {
+    String runId = currentRunId;
+    if (runId == null) {
+      throw new Error("null currentRunId");
+    }
+    String id = runId + ":" + idCounter++;
+    byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
+    return UUID.nameUUIDFromBytes(bytes);
+  }
+
+  public Random newRandom() {
+    return new Random(randomUUID().getLeastSignificantBits());
+  }
+
+  public void sideEffect(
+      Functions.Func<Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+    SideEffectMarkerCommands.newInstance(
+        isReplaying() ? null : func,
+        (payloads, exception) -> {
+          callback.apply(payloads, exception);
+          // callback unblocked sideEffect call. Give workflow code chance to make progress.
+          callbacks.eventLoop();
+        },
+        sink);
+  }
+
+  /**
+   * @param id mutable side effect id
+   * @param func given the value from the last marker returns value to store. If result is empty
+   *     nothing is recorded into the history.
+   * @param callback used to report result or failure
+   */
+  public void mutableSideEffect(
+      String id,
+      Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
+      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
+    //    Optional<Payloads> result;
+    //    RecordMarkerCommandAttributes markerAttributes;
+    //    // Call func only the first time
+    //    if (isReplaying()) {
+    //      markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
+    //      result = null;
+    //    } else {
+    //      try {
+    //        Optional<Payloads> toStore = func.apply(stored);
+    //        if (toStore.isPresent()) {}
+    //      } catch (RuntimeException e) {
+    //        callback.apply(Optional.empty(), e);
+    //        return;
+    //      }
+    //      Map<String, Payloads> details = new HashMap<>();
+    //      if (result.isPresent()) {
+    //        details.put(MARKER_DATA_KEY, result.get());
+    //      }
+    //      markerAttributes =
+    //          RecordMarkerCommandAttributes.newBuilder()
+    //              .setMarkerName(SIDE_EFFECT_MARKER_NAME)
+    //              .putAllDetails(details)
+    //              .build();
+    //    }
+    //    final Optional<Payloads> finalResult = result; // cannot reference result directly from
+    // lambda
+    //    System.out.println("SideEffect called");
+    //    MarkerCommands.newInstance(
+    //        markerAttributes,
+    //        (event -> {
+    //          // Event is null when callback is called during initial execution (non replay).
+    //          if (event == null) {
+    //            callback.apply(finalResult, null);
+    //          } else {
+    //            MarkerRecordedEventAttributes attributes =
+    // event.getMarkerRecordedEventAttributes();
+    //            if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
+    //              throw new IllegalStateException(
+    //                  "Expected " + SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
+    //            }
+    //            Map<String, Payloads> map = attributes.getDetailsMap();
+    //            Optional<Payloads> fromMaker = Optional.ofNullable(map.get(MARKER_DATA_KEY));
+    //            callback.apply(fromMaker, null);
+    //          }
+    //          // callback unblocked sideEffect call. Give workflow code chance to make progress.
+    //          callbacks.eventLoop();
+    //        }),
+    //        sink);
+  }
+
+  private class WorkflowTaskCommandsListener implements WorkflowTaskCommands.Listener {
+    @Override
+    public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
+      setStartedEventId(startedEventId);
+      setCurrentTimeMillis(currentTimeMillis);
+      CommandsManager.this.callbacks.eventLoop();
+      if (CommandsManager.this.workflowTaskStartedEventId == startedEventId) {
+        prepareCommands();
+      }
+    }
+
+    @Override
+    public void updateRunId(String currentRunId) {
+      CommandsManager.this.currentRunId = currentRunId;
+    }
+  }
+
   private long getInitialCommandEventId(HistoryEvent event) {
     switch (event.getEventType()) {
       case EVENT_TYPE_ACTIVITY_TASK_STARTED:
@@ -482,123 +585,5 @@ public final class CommandsManager {
         throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
     throw new IllegalStateException("unreachable");
-  }
-
-  public boolean isReplaying() {
-    boolean result = previousStartedEventId >= startedEventId;
-    System.out.println(
-        "isReplaying="
-            + result
-            + ", previousStartedEventId="
-            + previousStartedEventId
-            + ", startedEventId="
-            + startedEventId);
-    return result;
-  }
-
-  public long currentTimeMillis() {
-    return currentTimeMillis;
-  }
-
-  public UUID randomUUID() {
-    String runId = currentRunId;
-    if (runId == null) {
-      throw new Error("null currentRunId");
-    }
-    String id = runId + ":" + idCounter++;
-    byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
-    return UUID.nameUUIDFromBytes(bytes);
-  }
-
-  public Random newRandom() {
-    return new Random(randomUUID().getLeastSignificantBits());
-  }
-
-  public void sideEffect(
-      Functions.Func<Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
-    Optional<Payloads> result;
-    RecordMarkerCommandAttributes markerAttributes;
-    if (isReplaying()) {
-      markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
-      result = null;
-    } else {
-      try {
-        result = func.apply();
-      } catch (RuntimeException e) {
-        callback.apply(Optional.empty(), e);
-        return;
-      }
-      Map<String, Payloads> details = new HashMap<>();
-      if (result.isPresent()) {
-        details.put(MARKER_DATA_KEY, result.get());
-      }
-      markerAttributes =
-          RecordMarkerCommandAttributes.newBuilder()
-              .setMarkerName(SIDE_EFFECT_MARKER_NAME)
-              .putAllDetails(details)
-              .build();
-    }
-    final Optional<Payloads> finalResult = result; // cannot reference result directly from lambda
-    System.out.println("SideEffect called");
-    MarkerCommands.newInstance(
-        markerAttributes,
-        (event -> {
-          if (event == null) {
-            callback.apply(finalResult, null);
-          } else {
-            MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
-            if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
-              throw new IllegalStateException(
-                  "Expected " + SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
-            }
-            Map<String, Payloads> map = attributes.getDetailsMap();
-            Optional<Payloads> fromMaker = Optional.ofNullable(map.get(MARKER_DATA_KEY));
-            callback.apply(fromMaker, null);
-          }
-        }),
-        callbacks::eventLoop,
-        sink);
-  }
-
-  /**
-   * @param id mutable side effect id
-   * @param func given the value from the last marker returns value to store. If result is empty
-   *     nothing is recorded into the history.
-   * @param callback used to report result or failure
-   */
-  public void mutableSideEffect(
-      String id,
-      Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc2<Optional<Payloads>, RuntimeException> callback) {
-    //    Optional<Payloads> result = mutableSideEffectResults.get(id);
-    //    if (isReplaying()) {
-    //      if (result == null || func.apply(Optional.empty()).isPresent()) {
-    //
-    //      }
-    //
-    //      MarkerCommands.newInstance(
-    //              RecordMarkerCommandAttributes.getDefaultInstance(),
-    //
-    //    } else {
-    //
-    //    }
-  }
-
-  private class WorkflowTaskCommandsListener implements WorkflowTaskCommands.Listener {
-    @Override
-    public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
-      setStartedEventId(startedEventId);
-      CommandsManager.this.currentTimeMillis = currentTimeMillis;
-      CommandsManager.this.callbacks.eventLoop();
-      if (CommandsManager.this.workflowTaskStartedEventId == startedEventId) {
-        prepareCommands();
-      }
-    }
-
-    @Override
-    public void updateRunId(String currentRunId) {
-      CommandsManager.this.currentRunId = currentRunId;
-    }
   }
 }
