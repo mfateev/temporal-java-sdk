@@ -547,11 +547,15 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
         context.newTimer(
             delay,
             (e) -> {
-              if (e == null) {
-                p.complete(null);
-              } else {
-                p.completeExceptionally(e);
-              }
+              runner.executeInWorkflowThread(
+                  "timer-callback",
+                  () -> {
+                    if (e == null) {
+                      p.complete(null);
+                    } else {
+                      p.completeExceptionally(e);
+                    }
+                  });
             });
     CancellationScope.current()
         .getCancellationRequest()

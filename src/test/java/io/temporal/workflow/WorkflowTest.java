@@ -177,7 +177,7 @@ public class WorkflowTest {
 
   @Rule public TestName testName = new TestName();
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 5);
+  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 10);
 
   @Rule
   public TestWatcher watchman =
@@ -2431,7 +2431,11 @@ public class WorkflowTest {
           "newThread workflow-method",
           "newTimer PT0.7S",
           "newTimer PT1.3S",
-          "newTimer PT10S");
+          "currentTimeMillis",
+          "newTimer PT10S",
+          "currentTimeMillis",
+          "currentTimeMillis",
+          "currentTimeMillis");
     } else {
       tracer.setExpected(
           "interceptExecuteWorkflow " + UUID_REGEXP,
@@ -2439,7 +2443,11 @@ public class WorkflowTest {
           "newThread workflow-method",
           "newTimer PT11M40S",
           "newTimer PT21M40S",
-          "newTimer PT10H");
+          "currentTimeMillis",
+          "newTimer PT10H",
+          "currentTimeMillis",
+          "currentTimeMillis",
+          "currentTimeMillis");
     }
   }
 
@@ -3794,7 +3802,7 @@ public class WorkflowTest {
         workflowClient.newWorkflowStub(
             TestWorkflow1.class, newWorkflowOptionsBuilder(taskQueue).build());
     String result = workflowStub.execute(taskQueue);
-    assertEquals(" awoken i=1 loop i=1 awoken i=2 loop i=2", result);
+    assertEquals(" awoken i=1 loop i=1 awoken i=2 loop i=2 awoken i=3", result);
   }
 
   private static Map<String, AtomicInteger> retryCount = new ConcurrentHashMap<>();
