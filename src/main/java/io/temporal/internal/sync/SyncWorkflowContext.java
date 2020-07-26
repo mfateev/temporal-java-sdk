@@ -577,7 +577,9 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
             R r = func.apply();
             return dataConverter.toPayloads(r);
           },
-          (p) -> result.complete(Objects.requireNonNull(p)));
+          (p) ->
+              runner.executeInWorkflowThread(
+                  "side-effect-callback", () -> result.complete(Objects.requireNonNull(p))));
       return dataConverter.fromPayloads(result.get(), resultClass, resultType);
     } catch (Error e) {
       throw e;
@@ -623,10 +625,9 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
           }
           return Optional.empty(); // returned only when value doesn't need to be updated
         },
-        (p) -> {
-          System.out.println("Competing mutable side effect with " + p);
-          result.complete(Objects.requireNonNull(p));
-        });
+        (p) ->
+            runner.executeInWorkflowThread(
+                "mutable-side-effect-callback", () -> result.complete(Objects.requireNonNull(p))));
 
     System.out.println("Blocking waiting for mutable side effect result");
     if (!result.get().isPresent()) {
