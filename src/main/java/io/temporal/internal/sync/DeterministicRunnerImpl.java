@@ -680,7 +680,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Optional<Payloads> mutableSideEffect(
+    public void mutableSideEffect(
         String id,
         Func1<Optional<Payloads>, Optional<Payloads>> func,
         Functions.Proc1<Optional<Payloads>> callback) {

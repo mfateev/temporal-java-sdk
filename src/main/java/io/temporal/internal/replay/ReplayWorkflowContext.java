@@ -166,7 +166,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
    */
   void sideEffect(Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback);
 
-  Optional<Payloads> mutableSideEffect(
+  void mutableSideEffect(
       String id,
       Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc1<Optional<Payloads>> callback);

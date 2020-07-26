@@ -159,6 +159,8 @@ final class StateMachine<State, Action, Data> {
   }
 
   private void action(ActionOrEventType<Action> actionOrEventType, Data data) {
+    System.out.println(
+        name + " state machine state=" + getState() + " action=" + actionOrEventType);
     Transition<State, ActionOrEventType<Action>> transition =
         new Transition<>(state, actionOrEventType);
     TransitionTarget<State, Data> destination = transitions.get(transition);

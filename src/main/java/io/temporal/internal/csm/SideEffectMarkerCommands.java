@@ -84,7 +84,7 @@ public final class SideEffectMarkerCommands
 
   private static StateMachine<State, Action, SideEffectMarkerCommands> newStateMachine() {
     return StateMachine.<State, Action, SideEffectMarkerCommands>newInstance(
-            "Marker", State.CREATED, State.MARKER_COMMAND_RECORDED)
+            "SideEffect", State.CREATED, State.MARKER_COMMAND_RECORDED)
         .add(
             State.CREATED,
             Action.SCHEDULE,
