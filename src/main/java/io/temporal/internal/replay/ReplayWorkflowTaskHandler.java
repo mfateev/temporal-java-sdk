@@ -197,7 +197,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       if (!laRequests.isEmpty()) {
         while (true) {
           long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
-          System.out.println("LAREQUESTS: " + laRequests);
+          System.out.println("LOCAL ACTIVITY REQUESTS: " + laRequests);
           for (ExecuteLocalActivityParameters laRequest : laRequests) {
             // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
             // much sense. I believe we should add SchedueToStart timeout for the local activities
@@ -224,7 +224,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           if (laCompletion != null) {
             WorkflowExecutor.WorkflowTaskResult additionalResult =
                 workflowExecutor.handleLocalActivityCompletion(laCompletion);
-            laRequests = result.getLocalActivityRequests();
+            laRequests = additionalResult.getLocalActivityRequests();
             result = appendResult(result, additionalResult);
             if (result.isFinalCommand()) {
               break;

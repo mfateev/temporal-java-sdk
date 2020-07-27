@@ -114,7 +114,7 @@ public final class Worker implements Suspendable {
             service,
             namespace,
             taskQueue,
-            this.options.getTaskQueueActivitiesPerSecond(),
+            this.options.getMaxTaskQueueActivitiesPerSecond(),
             factoryOptions.getActivityInterceptors(),
             activityOptions);
 
@@ -160,7 +160,7 @@ public final class Worker implements Suspendable {
         .setIdentity(clientOptions.getIdentity())
         .setPollerOptions(
             PollerOptions.newBuilder()
-                .setMaximumPollRatePerSecond(options.getMaxActivitiesPerSecond())
+                .setMaximumPollRatePerSecond(options.getMaxWorkerActivitiesPerSecond())
                 .setPollThreadCount(options.getActivityPollThreadCount())
                 .build())
         .setTaskExecutorThreadPoolSize(options.getMaxConcurrentActivityExecutionSize())

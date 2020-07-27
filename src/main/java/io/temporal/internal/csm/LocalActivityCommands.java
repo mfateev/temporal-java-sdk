@@ -24,9 +24,12 @@ import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.enums.v1.RetryState;
+import io.temporal.api.failure.v1.ActivityFailureInfo;
 import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
+import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
 import io.temporal.common.converter.DataConverter;
@@ -38,11 +41,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public final class LocalActivityMarkerCommands
+public final class LocalActivityCommands
     extends CommandsBase<
-        LocalActivityMarkerCommands.State,
-        LocalActivityMarkerCommands.Action,
-        LocalActivityMarkerCommands> {
+        LocalActivityCommands.State, LocalActivityCommands.Action, LocalActivityCommands> {
 
   private static final String MARKER_DATA_KEY = "data";
   private static final String MARKER_TIME_KEY = "time";
@@ -68,23 +69,24 @@ public final class LocalActivityMarkerCommands
    * @param commandSink callback to send commands to
    * @return
    */
-  public static LocalActivityMarkerCommands newInstance(
+  public static LocalActivityCommands newInstance(
       Functions.Func<Boolean> replaying,
       Functions.Func1<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new LocalActivityMarkerCommands(
+    return new LocalActivityCommands(
         replaying, setCurrentTimeCallback, localActivityParameters, callback, commandSink);
   }
 
-  private LocalActivityMarkerCommands(
+  private LocalActivityCommands(
       Functions.Func<Boolean> replaying,
       Functions.Func1<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
+    System.out.println("NEW LocalActivityCommands: " + this);
     this.replaying = replaying;
     this.setCurrentTimeCallback = setCurrentTimeCallback;
     this.localActivityParameters = localActivityParameters;
@@ -106,8 +108,8 @@ public final class LocalActivityMarkerCommands
     MARKER_COMMAND_RECORDED,
   }
 
-  private static StateMachine<State, Action, LocalActivityMarkerCommands> newStateMachine() {
-    return StateMachine.<State, Action, LocalActivityMarkerCommands>newInstance(
+  private static StateMachine<State, Action, LocalActivityCommands> newStateMachine() {
+    return StateMachine.<State, Action, LocalActivityCommands>newInstance(
             "LocalActivity", State.CREATED, State.MARKER_COMMAND_RECORDED)
         .add(State.CREATED, Action.SCHEDULE, State.REQUEST_PREPARED)
         .add(State.REQUEST_PREPARED, Action.GET_REQUEST, State.REQUEST_SENT)
@@ -115,17 +117,17 @@ public final class LocalActivityMarkerCommands
             State.REQUEST_SENT,
             Action.HANDLE_RESPONSE,
             State.MARKER_COMMAND_CREATED,
-            LocalActivityMarkerCommands::addMarkerCommand)
+            LocalActivityCommands::addMarkerCommand)
         .add(
             State.MARKER_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_RECORD_MARKER,
             State.MARKER_COMMAND_CREATED,
-            LocalActivityMarkerCommands::notifyResultFromResponse)
+            LocalActivityCommands::notifyResultFromResponse)
         .add(
             State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED,
-            LocalActivityMarkerCommands::notifyResultFromEvent);
+            LocalActivityCommands::notifyResultFromEvent);
   }
 
   public void cancel() {
@@ -163,9 +165,23 @@ public final class LocalActivityMarkerCommands
           laResult = Optional.empty();
         }
       } else if (result.getTaskFailed() != null) {
-        ActivityTaskHandler.Result.TaskFailedResult failed = result.getTaskFailed();
         // TODO(maxim): Result should contain Failure, not an exception
-        failure = FailureConverter.exceptionToFailure(failed.getFailure());
+        ActivityTaskHandler.Result.TaskFailedResult failed = result.getTaskFailed();
+        // TODO(maxim): Return RetryState in the result
+        PollActivityTaskQueueResponse.Builder task = localActivityParameters.getActivityTask();
+        RetryState retryState =
+            task.hasRetryPolicy()
+                ? RetryState.RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED
+                : RetryState.RETRY_STATE_RETRY_POLICY_NOT_SET;
+        failure =
+            Failure.newBuilder()
+                .setActivityFailureInfo(
+                    ActivityFailureInfo.newBuilder()
+                        .setRetryState(retryState)
+                        .setActivityId(task.getActivityId())
+                        .setActivityType(task.getActivityType()))
+                .setCause(FailureConverter.exceptionToFailure(failed.getFailure()))
+                .build();
         markerAttributes.setFailure(failure);
       } else if (result.getTaskCancelled() != null) {
         RespondActivityTaskCanceledRequest failed = result.getTaskCancelled();

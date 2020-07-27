@@ -163,7 +163,7 @@ public class WorkflowTest {
    * When set to true increases test, activity and workflow timeouts to large values to support
    * stepping through code in a debugger without timing out.
    */
-  private static final boolean DEBUGGER_TIMEOUTS = true;
+  private static final boolean DEBUGGER_TIMEOUTS = false;
 
   private static final String ANNOTATION_TASK_QUEUE = "WorkflowTest-testExecute[Docker]";
 
@@ -312,7 +312,8 @@ public class WorkflowTest {
                 })
             .setNamespace(NAMESPACE)
             .build();
-    boolean versionTest = testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+    boolean versionTest =
+        false; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)
@@ -5676,24 +5677,25 @@ public class WorkflowTest {
     public String execute(String taskQueue) {
       TestActivities localActivities =
           Workflow.newLocalActivityStub(TestActivities.class, newLocalActivityOptions1());
-      try {
-        localActivities.throwIO();
-      } catch (ActivityFailure e) {
-        e.printStackTrace();
-        try {
-          assertTrue(e.getMessage().contains("ThrowIO"));
-          assertTrue(e.getCause() instanceof ApplicationFailure);
-          assertEquals(IOException.class.getName(), ((ApplicationFailure) e.getCause()).getType());
-          assertEquals(
-              "message='simulated IO problem', type='java.io.IOException', nonRetryable=false",
-              e.getCause().getMessage());
-        } catch (AssertionError ae) {
-          // Errors cause workflow task to fail. But we want workflow to fail in this case.
-          throw new RuntimeException(ae);
-        }
-      }
-
+      //      try {
+      //        localActivities.throwIO();
+      //      } catch (ActivityFailure e) {
+      //        try {
+      //          assertTrue(e.getMessage().contains("ThrowIO"));
+      //          assertTrue(e.getCause() instanceof ApplicationFailure);
+      //          assertEquals(IOException.class.getName(), ((ApplicationFailure)
+      // e.getCause()).getType());
+      //          assertEquals(
+      //              "message='simulated IO problem', type='java.io.IOException',
+      // nonRetryable=false",
+      //              e.getCause().getMessage());
+      //        } catch (AssertionError ae) {
+      //          // Errors cause workflow task to fail. But we want workflow to fail in this case.
+      //          throw new RuntimeException(ae);
+      //        }
+      //      }
       String laResult = localActivities.activity2("test", 123);
+      laResult = localActivities.activity2("test", 12345);
       TestActivities normalActivities =
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
       laResult = normalActivities.activity2(laResult, 123);

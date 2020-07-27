@@ -102,9 +102,10 @@ public final class CommandsManager {
   private final Map<String, MutableSideEffectResult> mutableSideEffectResults = new HashMap<>();
 
   /** Map of local activities by their id. */
-  private Map<String, LocalActivityMarkerCommands> localActivityMap = new HashMap<>();
+  private Map<String, LocalActivityCommands> localActivityMap = new HashMap<>();
 
   private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
+  private long nextCommandEventId;
 
   public CommandsManager(CommandsManagerListener callbacks) {
     System.out.println("NEW " + this);
@@ -116,6 +117,7 @@ public final class CommandsManager {
     this.startedEventId = startedEventId;
     // Skip WorkflowTaskCompleted
     this.curentCommandId = startedEventId + 2;
+    this.nextCommandEventId = startedEventId + 2;
   }
 
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
@@ -232,18 +234,16 @@ public final class CommandsManager {
   public List<Command> takeCommands() {
     System.out.println("TAKE COMMANDS");
     List<Command> result = new ArrayList<>(preparedCommands.size());
-    // Account for workflow task completed
-    long commandEventId = startedEventId + 2;
     for (NewCommand newCommand : preparedCommands) {
       if (newCommand.isCanceled()) {
         throw new IllegalStateException("Canceled command: " + newCommand.getCommand());
       }
       Command command = newCommand.getCommand();
       result.add(command);
-      System.out.println("TAKE COMMANDS put " + commandEventId + ": " + command);
-      commands.put(commandEventId, newCommand.getCommands());
-      commandEventId++;
-      newCommand.setInitialCommandEventId(commandEventId);
+      System.out.println("TAKE COMMANDS put " + nextCommandEventId + ": " + command);
+      commands.put(nextCommandEventId, newCommand.getCommands());
+      nextCommandEventId++;
+      newCommand.setInitialCommandEventId(nextCommandEventId);
     }
     preparedCommands.clear();
     return result;
@@ -414,7 +414,7 @@ public final class CommandsManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId >= startedEventId;
+    return previousStartedEventId > startedEventId;
   }
 
   public long currentTimeMillis() {
@@ -483,7 +483,7 @@ public final class CommandsManager {
   }
 
   public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
-    LocalActivityMarkerCommands commands = localActivityMap.get(laCompletion.getActivityId());
+    LocalActivityCommands commands = localActivityMap.get(laCompletion.getActivityId());
     if (commands == null) {
       throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
     }
@@ -502,9 +502,17 @@ public final class CommandsManager {
     if (localActivityMap.containsKey(activityId)) {
       throw new IllegalArgumentException("Duplicated local activity id: " + activityId);
     }
-    LocalActivityMarkerCommands commands =
-        LocalActivityMarkerCommands.newInstance(
-            this::isReplaying, this::setCurrentTimeMillis, parameters, callback, sink);
+    LocalActivityCommands commands =
+        LocalActivityCommands.newInstance(
+            this::isReplaying,
+            this::setCurrentTimeMillis,
+            parameters,
+            (r, e) -> {
+              callback.apply(r, e);
+              // callback unblocked local activity call. Give workflow code chance to make progress.
+              callbacks.eventLoop();
+            },
+            sink);
     localActivityMap.put(activityId, commands);
     localActivityRequests.add(commands.getRequest());
     return () -> commands.cancel();
