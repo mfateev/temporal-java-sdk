@@ -100,7 +100,7 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
   }
 
   private ActivityTaskHandler.Result mapToActivityFailure(
-      Throwable exception, Scope metricsScope, boolean isLocalActivity) {
+      Throwable exception, String activityId, Scope metricsScope, boolean isLocalActivity) {
     exception = CheckedExceptionWrapper.unwrap(exception);
     if (exception instanceof ActivityCancelledException) {
       if (isLocalActivity) {
@@ -137,7 +137,7 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
     RespondActivityTaskFailedRequest.Builder result =
         RespondActivityTaskFailedRequest.newBuilder().setFailure(failure);
     return new ActivityTaskHandler.Result(
-        null, new Result.TaskFailedResult(result.build(), exception), null, null);
+        activityId, null, new Result.TaskFailedResult(result.build(), exception), null, null);
   }
 
   @Override
@@ -179,6 +179,7 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
                   + activityType
                   + "\" is not registered with a worker. Known types are: "
                   + knownTypes),
+          pollResponse.getActivityId(),
           metricsScope,
           localActivity);
     }
@@ -216,7 +217,7 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
                 input, method.getParameterTypes(), method.getGenericParameterTypes());
         Object result = inboundCallsInterceptor.execute(args);
         if (context.isDoNotCompleteOnReturn()) {
-          return new ActivityTaskHandler.Result(null, null, null, null);
+          return new ActivityTaskHandler.Result(info.getActivityId(), null, null, null, null);
         }
         RespondActivityTaskCompletedRequest.Builder request =
             RespondActivityTaskCompletedRequest.newBuilder();
@@ -226,9 +227,10 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
             request.setResult(serialized.get());
           }
         }
-        return new ActivityTaskHandler.Result(request.build(), null, null, null);
+        return new ActivityTaskHandler.Result(
+            info.getActivityId(), request.build(), null, null, null);
       } catch (Throwable e) {
-        return mapToActivityFailure(e, metricsScope, false);
+        return mapToActivityFailure(e, info.getActivityId(), metricsScope, false);
       }
     }
   }
@@ -298,9 +300,10 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
             request.setResult(serialized.get());
           }
         }
-        return new ActivityTaskHandler.Result(request.build(), null, null, null);
+        return new ActivityTaskHandler.Result(
+            info.getActivityId(), request.build(), null, null, null);
       } catch (Throwable e) {
-        return mapToActivityFailure(e, metricsScope, false);
+        return mapToActivityFailure(e, info.getActivityId(), metricsScope, false);
       }
     }
   }

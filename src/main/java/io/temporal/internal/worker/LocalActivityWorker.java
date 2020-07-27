@@ -23,22 +23,18 @@ import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.Stopwatch;
 import com.uber.m3.util.ImmutableMap;
 import io.temporal.api.common.v1.RetryPolicy;
-import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
-import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
 import io.temporal.common.RetryOptions;
-import io.temporal.internal.common.LocalActivityMarkerData;
 import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.ExecuteLocalActivityParameters;
+import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.LongSupplier;
 
 public final class LocalActivityWorker implements SuspendableWorker {
 
@@ -163,23 +159,17 @@ public final class LocalActivityWorker implements SuspendableWorker {
 
   public static class Task {
     private final ExecuteLocalActivityParameters params;
-    private final Consumer<HistoryEvent> eventConsumer;
-    private final LongSupplier currentTimeMillis;
-    private final LongSupplier replayTimeUpdatedAtMillis;
+    private final Functions.Proc1<ActivityTaskHandler.Result> eventConsumer;
     long taskStartTime;
-    private final int workflowTaskTimeoutSeconds;
+    private final int localRetryThreshold;
 
     public Task(
         ExecuteLocalActivityParameters params,
-        Consumer<HistoryEvent> eventConsumer,
-        int workflowTaskTimeoutSeconds,
-        LongSupplier currentTimeMillis,
-        LongSupplier replayTimeUpdatedAtMillis) {
+        Functions.Proc1<ActivityTaskHandler.Result> eventConsumer,
+        int localRetryThresholdMillis) {
       this.params = params;
       this.eventConsumer = eventConsumer;
-      this.currentTimeMillis = currentTimeMillis;
-      this.replayTimeUpdatedAtMillis = replayTimeUpdatedAtMillis;
-      this.workflowTaskTimeoutSeconds = workflowTaskTimeoutSeconds;
+      this.localRetryThreshold = localRetryThresholdMillis;
     }
   }
 
@@ -199,31 +189,7 @@ public final class LocalActivityWorker implements SuspendableWorker {
     public void handle(Task task) throws Exception {
       task.taskStartTime = System.currentTimeMillis();
       ActivityTaskHandler.Result result = handleLocalActivity(task);
-
-      LocalActivityMarkerData.Builder markerBuilder = new LocalActivityMarkerData.Builder();
-      PollActivityTaskQueueResponse.Builder activityTask = task.params.getActivityTask();
-      markerBuilder.setActivityId(activityTask.getActivityId());
-      markerBuilder.setActivityType(activityTask.getActivityType());
-      long replayTimeMillis =
-          task.currentTimeMillis.getAsLong()
-              + (System.currentTimeMillis() - task.replayTimeUpdatedAtMillis.getAsLong());
-      markerBuilder.setReplayTimeMillis(replayTimeMillis);
-
-      RespondActivityTaskCompletedRequest taskCompleted = result.getTaskCompleted();
-      if (taskCompleted != null) {
-        if (taskCompleted.hasResult()) {
-          markerBuilder.setResult(taskCompleted.getResult());
-        }
-      } else if (result.getTaskFailed() != null) {
-        markerBuilder.setTaskFailedRequest(result.getTaskFailed().getTaskFailedRequest());
-        markerBuilder.setAttempt(result.getAttempt());
-        markerBuilder.setBackoff(result.getBackoff());
-      } else {
-        markerBuilder.setTaskCancelledRequest(result.getTaskCancelled());
-      }
-      LocalActivityMarkerData marker = markerBuilder.build();
-      HistoryEvent event = marker.toEvent(options.getDataConverter());
-      task.eventConsumer.accept(event);
+      task.eventConsumer.apply(result);
     }
 
     @Override
@@ -268,7 +234,10 @@ public final class LocalActivityWorker implements SuspendableWorker {
               .build();
       long sleepMillis = retryOptions.calculateSleepTime(attempt);
       long elapsedTask = System.currentTimeMillis() - task.taskStartTime;
-      long elapsedTotal = elapsedTask + params.getElapsedTime();
+      long sinceScheduled =
+          System.currentTimeMillis()
+              - TimeUnit.NANOSECONDS.toMillis(activityTask.getScheduledTimestamp());
+      long elapsedTotal = elapsedTask + sinceScheduled;
       int timeoutSeconds = activityTask.getScheduleToCloseTimeoutSeconds();
       Optional<Duration> expiration =
           timeoutSeconds > 0 ? Optional.of(Duration.ofSeconds(timeoutSeconds)) : Optional.empty();
@@ -280,7 +249,8 @@ public final class LocalActivityWorker implements SuspendableWorker {
       }
 
       // For small backoff we do local retry. Otherwise we will schedule timer on server side.
-      if (elapsedTask + sleepMillis < task.workflowTaskTimeoutSeconds * 1000) {
+      // TODO(maxim): Use timer queue for retries to avoid tying up a thread.
+      if (elapsedTask + sleepMillis < task.localRetryThreshold * 1000) {
         Thread.sleep(sleepMillis);
         activityTask.setAttempt(attempt + 1);
         return handleLocalActivity(task);

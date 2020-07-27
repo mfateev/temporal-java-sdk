@@ -24,6 +24,7 @@ import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.query.v1.WorkflowQueryResult;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
+import io.temporal.internal.worker.ActivityTaskHandler;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,20 +39,22 @@ public interface WorkflowExecutor {
 
   void close();
 
+  WorkflowTaskResult handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
+
   class WorkflowTaskResult {
     private final List<Command> commands;
-    private final boolean forceCreateNewWorkflowTask;
+    private final List<ExecuteLocalActivityParameters> localActivityRequests;
     private final boolean finalCommand;
     private final Map<String, WorkflowQueryResult> queryResults;
 
     public WorkflowTaskResult(
         List<Command> commands,
         Map<String, WorkflowQueryResult> queryResults,
-        boolean forceCreateNewWorkflowTask,
+        List<ExecuteLocalActivityParameters> localActivityRequests,
         boolean finalCommand) {
       this.commands = commands;
       this.queryResults = queryResults;
-      this.forceCreateNewWorkflowTask = forceCreateNewWorkflowTask;
+      this.localActivityRequests = localActivityRequests;
       this.finalCommand = finalCommand;
     }
 
@@ -59,8 +62,8 @@ public interface WorkflowExecutor {
       return commands;
     }
 
-    public boolean getForceCreateNewWorkflowTask() {
-      return forceCreateNewWorkflowTask;
+    public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
+      return localActivityRequests;
     }
 
     public Map<String, WorkflowQueryResult> getQueryResults() {

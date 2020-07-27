@@ -163,7 +163,7 @@ public class WorkflowTest {
    * When set to true increases test, activity and workflow timeouts to large values to support
    * stepping through code in a debugger without timing out.
    */
-  private static final boolean DEBUGGER_TIMEOUTS = false;
+  private static final boolean DEBUGGER_TIMEOUTS = true;
 
   private static final String ANNOTATION_TASK_QUEUE = "WorkflowTest-testExecute[Docker]";
 
@@ -312,8 +312,7 @@ public class WorkflowTest {
                 })
             .setNamespace(NAMESPACE)
             .build();
-    boolean versionTest =
-        true; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+    boolean versionTest = testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)

@@ -28,10 +28,12 @@ import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.interceptors.WorkflowOutboundCallsInterceptor;
 import io.temporal.common.interceptors.WorkflowOutboundCallsInterceptorBase;
+import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.CheckedExceptionWrapper;
 import io.temporal.internal.context.ContextThreadLocal;
 import io.temporal.internal.replay.ExecuteActivityParameters;
@@ -55,6 +57,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -527,6 +531,8 @@ class DeterministicRunnerImpl implements DeterministicRunner {
 
   private static final class DummyReplayWorkflowContext implements ReplayWorkflowContext {
 
+    private final Timer timer = new Timer();
+
     @Override
     public WorkflowExecution getWorkflowExecution() {
       throw new UnsupportedOperationException("not implemented");
@@ -625,22 +631,22 @@ class DeterministicRunnerImpl implements DeterministicRunner {
 
     @Override
     public Consumer<Exception> scheduleActivityTask(
-        ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Exception> callback) {
+        ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Consumer<Exception> scheduleLocalActivityTask(
+    public Functions.Proc scheduleLocalActivityTask(
         ExecuteLocalActivityParameters parameters,
-        BiConsumer<Optional<Payloads>, Exception> callback) {
+        Functions.Proc2<Optional<Payloads>, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Consumer<Exception> startChildWorkflow(
+    public Functions.Proc1<Exception> startChildWorkflow(
         StartChildWorkflowExecutionParameters parameters,
         Functions.Proc1<WorkflowExecution> executionCallback,
-        BiConsumer<Optional<Payloads>, Exception> callback) {
+        Functions.Proc2<Optional<Payloads>, Exception> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -664,19 +670,29 @@ class DeterministicRunnerImpl implements DeterministicRunner {
 
     @Override
     public long currentTimeMillis() {
-      throw new UnsupportedOperationException("not implemented");
+      return System.currentTimeMillis();
     }
 
     @Override
     public Functions.Proc1<RuntimeException> newTimer(
         Duration delay, Functions.Proc1<RuntimeException> callback) {
-      throw new UnsupportedOperationException("not implemented");
+      timer.schedule(
+          new TimerTask() {
+            @Override
+            public void run() {
+              callback.apply(null);
+            }
+          },
+          delay.toMillis());
+      return (e) -> {
+        callback.apply(new CanceledFailure(null));
+      };
     }
 
     @Override
     public void sideEffect(
         Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
-      throw new UnsupportedOperationException("not implemented");
+      callback.apply(func.apply());
     }
 
     @Override
@@ -684,7 +700,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
         String id,
         Func1<Optional<Payloads>, Optional<Payloads>> func,
         Functions.Proc1<Optional<Payloads>> callback) {
-      throw new UnsupportedOperationException("not implemented");
+      callback.apply(func.apply(Optional.empty()));
     }
 
     @Override

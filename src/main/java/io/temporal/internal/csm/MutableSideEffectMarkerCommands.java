@@ -45,7 +45,7 @@ public final class MutableSideEffectMarkerCommands
   private static final String MARKER_ID_KEY = "id";
   private static final String MUTABLE_SIDE_EFFECT_MARKER_NAME = "MutableSideEffect";
 
-  private DataConverter dataConverter = DataConverter.getDefaultInstance();
+  private final DataConverter dataConverter = DataConverter.getDefaultInstance();
   private final String id;
   private Functions.Proc1<MutableSideEffectResult> callback;
   private Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;

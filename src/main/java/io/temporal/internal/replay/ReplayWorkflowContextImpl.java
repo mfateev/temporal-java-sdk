@@ -37,6 +37,7 @@ import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.RetryState;
 import io.temporal.api.enums.v1.TimeoutType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
+import io.temporal.api.failure.v1.ActivityFailureInfo;
 import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
@@ -65,7 +66,6 @@ import io.temporal.failure.TimeoutFailure;
 import io.temporal.internal.csm.ActivityCommands;
 import io.temporal.internal.csm.CommandsManager;
 import io.temporal.internal.metrics.ReplayAwareScope;
-import io.temporal.internal.worker.LocalActivityWorker;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.workflow.CancelExternalWorkflowException;
 import io.temporal.workflow.ChildWorkflowCancellationType;
@@ -83,7 +83,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,9 +107,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       WorkflowExecution workflowExecution,
       long runStartedTimestampMillis,
       SingleWorkerOptions options,
-      Scope metricsScope,
-      BiFunction<LocalActivityWorker.Task, Duration, Boolean> laTaskPoller,
-      ReplayWorkflowExecutor workflowExecutor) {
+      Scope metricsScope) {
     this.commandsManager = commandsManager;
     this.workflowContext =
         new WorkflowContext(
@@ -250,7 +247,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public Consumer<Exception> scheduleActivityTask(
-      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Exception> callback) {
+      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
     ScheduleActivityTaskCommandAttributes.Builder attributes = parameters.getAttributes();
     if (attributes.getActivityId().isEmpty()) {
       attributes.setActivityId(commandsManager.randomUUID().toString());
@@ -263,7 +260,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   private void handleActivityCallback(
-      BiConsumer<Optional<Payloads>, Exception> callback,
+      BiConsumer<Optional<Payloads>, Failure> callback,
       ScheduleActivityTaskCommandAttributesOrBuilder scheduleAttr,
       HistoryEvent event) {
     switch (event.getEventType()) {
@@ -275,30 +272,47 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
         callback.accept(result, null);
         break;
       case EVENT_TYPE_ACTIVITY_TASK_FAILED:
-        ActivityTaskFailedEventAttributes failed = event.getActivityTaskFailedEventAttributes();
-        ActivityTaskFailedException failure =
-            new ActivityTaskFailedException(
-                event.getEventId(),
-                failed.getScheduledEventId(),
-                failed.getStartedEventId(),
-                scheduleAttr.getActivityType(),
-                scheduleAttr.getActivityId(),
-                failed.getFailure());
-        callback.accept(Optional.empty(), failure);
+        {
+          ActivityTaskFailedEventAttributes failed = event.getActivityTaskFailedEventAttributes();
+          ActivityFailureInfo failureInfo =
+              ActivityFailureInfo.newBuilder()
+                  .setActivityId(scheduleAttr.getActivityId())
+                  .setActivityType(scheduleAttr.getActivityType())
+                  .setIdentity(failed.getIdentity())
+                  .setRetryState(failed.getRetryState())
+                  .setScheduledEventId(failed.getScheduledEventId())
+                  .setStartedEventId(failed.getStartedEventId())
+                  .build();
+          Failure failure =
+              Failure.newBuilder()
+                  .setActivityFailureInfo(failureInfo)
+                  .setCause(failed.getFailure())
+                  .setMessage("Activity task failed")
+                  .build();
+          callback.accept(Optional.empty(), failure);
+        }
         break;
       case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
-        ActivityTaskTimedOutEventAttributes timedOutAttr =
-            event.getActivityTaskTimedOutEventAttributes();
-        ActivityTaskTimeoutException timeoutException =
-            new ActivityTaskTimeoutException(
-                event.getEventId(),
-                timedOutAttr.getScheduledEventId(),
-                timedOutAttr.getStartedEventId(),
-                scheduleAttr.getActivityType(),
-                scheduleAttr.getActivityId(),
-                timedOutAttr.getRetryState(),
-                timedOutAttr.getFailure());
-        callback.accept(Optional.empty(), timeoutException);
+        {
+          ActivityTaskTimedOutEventAttributes timedOut =
+              event.getActivityTaskTimedOutEventAttributes();
+
+          ActivityFailureInfo failureInfo =
+              ActivityFailureInfo.newBuilder()
+                  .setActivityId(scheduleAttr.getActivityId())
+                  .setActivityType(scheduleAttr.getActivityType())
+                  .setRetryState(timedOut.getRetryState())
+                  .setScheduledEventId(timedOut.getScheduledEventId())
+                  .setStartedEventId(timedOut.getStartedEventId())
+                  .build();
+          Failure failure =
+              Failure.newBuilder()
+                  .setActivityFailureInfo(failureInfo)
+                  .setCause(timedOut.getFailure())
+                  .setMessage("Activity task timedOut")
+                  .build();
+          callback.accept(Optional.empty(), failure);
+        }
         break;
       case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
         ActivityTaskCanceledEventAttributes canceledAttr =
@@ -309,7 +323,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                 .setCanceledFailureInfo(
                     CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
                 .build();
-        callback.accept(Optional.empty(), new CanceledFailure("Canceled"));
+        callback.accept(Optional.empty(), canceledFailure);
         break;
       default:
         throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
@@ -317,19 +331,17 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Consumer<Exception> scheduleLocalActivityTask(
+  public Functions.Proc scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
-      BiConsumer<Optional<Payloads>, Exception> callback) {
-    // TODO: scheduleLocalActivityTask
-    //    return workflowClock.scheduleLocalActivityTask(parameters, callback);
-    throw new UnsupportedOperationException("todo");
+      Functions.Proc2<Optional<Payloads>, Failure> callback) {
+    return commandsManager.scheduleLocalActivityTask(parameters, callback);
   }
 
   @Override
-  public Consumer<Exception> startChildWorkflow(
+  public Functions.Proc1<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
       Functions.Proc1<WorkflowExecution> executionCallback,
-      BiConsumer<Optional<Payloads>, Exception> callback) {
+      Functions.Proc2<Optional<Payloads>, Exception> callback) {
     StartChildWorkflowExecutionCommandAttributes startAttributes = parameters.getRequest().build();
     Functions.Proc1<ChildWorkflowCancellationType> cancellationHandler =
         commandsManager.newChildWorkflow(
@@ -340,7 +352,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   private void handleChildWorkflowCallback(
-      BiConsumer<Optional<Payloads>, Exception> callback,
+      Functions.Proc2<Optional<Payloads>, Exception> callback,
       StartChildWorkflowExecutionCommandAttributes startAttributes,
       HistoryEvent event) {
     switch (event.getEventType()) {
@@ -360,7 +372,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                   WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId()).build(),
                   attributes.getWorkflowType().getName(),
                   null));
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
           return;
         }
       case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED:
@@ -369,7 +381,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
               event.getChildWorkflowExecutionCompletedEventAttributes();
           Optional<Payloads> result =
               attributes.hasResult() ? Optional.of(attributes.getResult()) : Optional.empty();
-          callback.accept(result, null);
+          callback.apply(result, null);
           return;
         }
       case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED:
@@ -383,7 +395,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                   attributes.getWorkflowType(),
                   attributes.getRetryState(),
                   attributes.getFailure());
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
           return;
         }
       case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT:
@@ -402,7 +414,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                   attributes.getNamespace(),
                   attributes.getRetryState(),
                   timeoutFailure);
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
           return;
         }
       case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED:
@@ -412,7 +424,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
           CanceledFailure failure =
               new CanceledFailure(
                   "Child canceled", new EncodedValue(attributes.getDetails()), null);
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
           return;
         }
       case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED:
@@ -428,7 +440,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                   attributes.getNamespace(),
                   RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
                   new TerminatedFailure(null, null));
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
           return;
         }
       default:

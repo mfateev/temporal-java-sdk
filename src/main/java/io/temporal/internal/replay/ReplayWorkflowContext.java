@@ -26,6 +26,7 @@ import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
@@ -108,11 +109,11 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel activity task.
    */
   Consumer<Exception> scheduleActivityTask(
-      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Exception> callback);
+      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback);
 
-  Consumer<Exception> scheduleLocalActivityTask(
+  Functions.Proc scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
-      BiConsumer<Optional<Payloads>, Exception> callback);
+      Functions.Proc2<Optional<Payloads>, Failure> callback);
 
   /**
    * Start child workflow.
@@ -122,10 +123,10 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param callback Callback that is called upon child workflow completion or failure.
    * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel activity task.
    */
-  Consumer<Exception> startChildWorkflow(
+  Functions.Proc1<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
       Functions.Proc1<WorkflowExecution> executionCallback,
-      BiConsumer<Optional<Payloads>, Exception> callback);
+      Functions.Proc2<Optional<Payloads>, Exception> callback);
 
   Consumer<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,

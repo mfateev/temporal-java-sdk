@@ -95,9 +95,7 @@ public final class WorkflowExecutorCache {
     }
   }
 
-  void markProcessingDone(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
-    String runId = workflowTask.getWorkflowExecution().getRunId();
-
+  void markProcessingDone(String runId) {
     cacheLock.lock();
     try {
       inProcessing.remove(runId);
@@ -106,9 +104,7 @@ public final class WorkflowExecutorCache {
     }
   }
 
-  public void addToCache(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowExecutor workflowExecutor) {
-    String runId = workflowTask.getWorkflowExecution().getRunId();
+  public void addToCache(String runId, WorkflowExecutor workflowExecutor) {
     cache.put(runId, workflowExecutor);
   }
 

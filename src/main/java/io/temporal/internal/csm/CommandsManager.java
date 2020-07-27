@@ -22,6 +22,7 @@ package io.temporal.internal.csm;
 import static io.temporal.internal.common.WorkflowExecutionUtils.getEventTypeForCommand;
 import static io.temporal.internal.common.WorkflowExecutionUtils.isCommandEvent;
 
+import com.google.common.base.Strings;
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
@@ -38,6 +39,8 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.internal.replay.ExecuteLocalActivityParameters;
+import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
 import java.nio.charset.StandardCharsets;
@@ -58,10 +61,10 @@ public final class CommandsManager {
    * The eventId of the last event in the history which is expected to be startedEventId unless it
    * is replay from a JSON file.
    */
-  private final long workflowTaskStartedEventId;
+  private long workflowTaskStartedEventId;
 
   /** The eventId of the started event of the last successfully executed workflow task. */
-  private final long previousStartedEventId;
+  private long previousStartedEventId;
 
   private final CommandsManagerListener callbacks;
 
@@ -98,14 +101,14 @@ public final class CommandsManager {
 
   private final Map<String, MutableSideEffectResult> mutableSideEffectResults = new HashMap<>();
 
-  public CommandsManager(
-      long previousStartedEventId,
-      long workflowTaskStartedEventId,
-      CommandsManagerListener callbacks) {
+  /** Map of local activities by their id. */
+  private Map<String, LocalActivityMarkerCommands> localActivityMap = new HashMap<>();
+
+  private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
+
+  public CommandsManager(CommandsManagerListener callbacks) {
     System.out.println("NEW " + this);
     this.callbacks = Objects.requireNonNull(callbacks);
-    this.previousStartedEventId = previousStartedEventId;
-    this.workflowTaskStartedEventId = workflowTaskStartedEventId;
     sink = (command) -> newCommands.add(command);
   }
 
@@ -115,8 +118,13 @@ public final class CommandsManager {
     this.curentCommandId = startedEventId + 2;
   }
 
+  public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
+    this.previousStartedEventId = previousStartedEventId;
+    this.workflowTaskStartedEventId = workflowTaskStartedEventId;
+  }
+
   public final void handleEvent(HistoryEvent event) {
-    if (isCommandEvent(event)) {
+    if (isReplaying() && isCommandEvent(event)) {
       handleCommand(event);
       return;
     }
@@ -131,44 +139,6 @@ public final class CommandsManager {
     } else {
       handleNonStatefulEvent(event);
     }
-  }
-
-  private void handleNonStatefulEvent(HistoryEvent event) {
-    switch (event.getEventType()) {
-      case EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
-        this.currentRunId =
-            event.getWorkflowExecutionStartedEventAttributes().getOriginalExecutionRunId();
-        callbacks.start(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
-        WorkflowTaskCommands c =
-            WorkflowTaskCommands.newInstance(
-                workflowTaskStartedEventId, new WorkflowTaskCommandsListener());
-        commands.put(event.getEventId(), c);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
-        callbacks.signal(event);
-        break;
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-        callbacks.cancel(event);
-        break;
-      case UNRECOGNIZED:
-        break;
-      default:
-        throw new IllegalArgumentException("Unexpected event:" + event);
-        // TODO(maxim)
-    }
-  }
-
-  void setCurrentTimeMillis(long currentTimeMillis) {
-    if (this.currentTimeMillis < currentTimeMillis) {
-      this.currentTimeMillis = currentTimeMillis;
-      this.replayTimeUpdatedAtMillis = System.currentTimeMillis();
-    }
-  }
-
-  public long getLastStartedEventId() {
-    return startedEventId;
   }
 
   /**
@@ -202,6 +172,45 @@ public final class CommandsManager {
     commands.put(curentCommandId, newCommand.getCommands());
     System.out.println(" takeCommand commands.put " + curentCommandId + ", command=" + command);
     curentCommandId++;
+  }
+
+  private void handleNonStatefulEvent(HistoryEvent event) {
+    switch (event.getEventType()) {
+      case EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
+        this.currentRunId =
+            event.getWorkflowExecutionStartedEventAttributes().getOriginalExecutionRunId();
+        callbacks.start(event);
+        break;
+      case EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
+        WorkflowTaskCommands c =
+            WorkflowTaskCommands.newInstance(
+                workflowTaskStartedEventId, new WorkflowTaskCommandsListener());
+        commands.put(event.getEventId(), c);
+        break;
+      case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
+        callbacks.signal(event);
+        break;
+      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
+        callbacks.cancel(event);
+        break;
+      case UNRECOGNIZED:
+        break;
+      default:
+        throw new IllegalArgumentException("Unexpected event:" + event);
+        // TODO(maxim)
+    }
+  }
+
+  long setCurrentTimeMillis(long currentTimeMillis) {
+    if (this.currentTimeMillis < currentTimeMillis) {
+      this.currentTimeMillis = currentTimeMillis;
+      this.replayTimeUpdatedAtMillis = System.currentTimeMillis();
+    }
+    return this.currentTimeMillis;
+  }
+
+  public long getLastStartedEventId() {
+    return startedEventId;
   }
 
   /** Validates that command matches the event during replay. */
@@ -465,6 +474,40 @@ public final class CommandsManager {
           callbacks.eventLoop();
         },
         sink);
+  }
+
+  public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
+    List<ExecuteLocalActivityParameters> result = localActivityRequests;
+    localActivityRequests = new ArrayList<>();
+    return result;
+  }
+
+  public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
+    LocalActivityMarkerCommands commands = localActivityMap.get(laCompletion.getActivityId());
+    if (commands == null) {
+      throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
+    }
+    commands.handleCompletion(laCompletion);
+    callbacks.eventLoop();
+    prepareCommands();
+  }
+
+  public Functions.Proc scheduleLocalActivityTask(
+      ExecuteLocalActivityParameters parameters,
+      Functions.Proc2<Optional<Payloads>, Failure> callback) {
+    String activityId = parameters.getActivityTask().getActivityId();
+    if (Strings.isNullOrEmpty(activityId)) {
+      throw new IllegalArgumentException("Missing activityId: " + activityId);
+    }
+    if (localActivityMap.containsKey(activityId)) {
+      throw new IllegalArgumentException("Duplicated local activity id: " + activityId);
+    }
+    LocalActivityMarkerCommands commands =
+        LocalActivityMarkerCommands.newInstance(
+            this::isReplaying, this::setCurrentTimeMillis, parameters, callback, sink);
+    localActivityMap.put(activityId, commands);
+    localActivityRequests.add(commands.getRequest());
+    return () -> commands.cancel();
   }
 
   private class WorkflowTaskCommandsListener implements WorkflowTaskCommands.Listener {

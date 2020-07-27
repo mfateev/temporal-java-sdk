@@ -42,6 +42,7 @@ import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowExecutor;
 import io.temporal.internal.replay.WorkflowExecutorCache;
+import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.testUtils.HistoryUtils;
 import io.temporal.workflow.Async;
 import io.temporal.workflow.CancellationScope;
@@ -63,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -127,6 +129,7 @@ public class DeterministicRunnerTest {
    * @see WorkflowTest#testAsyncRetry()
    */
   @Test
+  @Ignore // timer removed from dispatcher
   public void testRetry() throws Throwable {
     RetryOptions retryOptions =
         RetryOptions.newBuilder()
@@ -660,7 +663,7 @@ public class DeterministicRunnerTest {
     PollWorkflowTaskQueueResponse response = HistoryUtils.generateWorkflowTaskWithInitialHistory();
 
     cache.getOrCreate(response, new com.uber.m3.tally.NoopScope(), () -> workflowExecutor);
-    cache.addToCache(response, workflowExecutor);
+    cache.addToCache(response.getWorkflowExecution().getRunId(), workflowExecutor);
     d.runUntilAllBlocked();
     assertEquals(2, threadPool.getActiveCount());
     assertEquals(1, cache.size());
@@ -721,7 +724,7 @@ public class DeterministicRunnerTest {
     PollWorkflowTaskQueueResponse response = HistoryUtils.generateWorkflowTaskWithInitialHistory();
 
     cache.getOrCreate(response, new com.uber.m3.tally.NoopScope(), () -> workflowExecutor);
-    cache.addToCache(response, workflowExecutor);
+    cache.addToCache(response.getWorkflowExecution().getRunId(), workflowExecutor);
     d.runUntilAllBlocked();
     assertEquals(2, threadPool.getActiveCount());
     assertEquals(1, cache.size());
@@ -760,7 +763,7 @@ public class DeterministicRunnerTest {
     @Override
     public WorkflowTaskResult handleWorkflowTask(
         PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
-      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), false, false);
+      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), new ArrayList<>(), false);
     }
 
     @Override
@@ -772,6 +775,12 @@ public class DeterministicRunnerTest {
     @Override
     public void close() {
       runner.close();
+    }
+
+    @Override
+    public WorkflowTaskResult handleLocalActivityCompletion(
+        ActivityTaskHandler.Result laCompletion) {
+      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), new ArrayList<>(), false);
     }
   }
 

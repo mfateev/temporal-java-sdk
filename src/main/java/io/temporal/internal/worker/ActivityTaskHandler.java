@@ -36,6 +36,7 @@ public interface ActivityTaskHandler {
 
   final class Result {
 
+    private final String activityId;
     private final RespondActivityTaskCompletedRequest taskCompleted;
     private final TaskFailedResult taskFailed;
     private final RespondActivityTaskCanceledRequest taskCancelled;
@@ -68,14 +69,20 @@ public interface ActivityTaskHandler {
      * default ones set on the activity worker.
      */
     public Result(
+        String activityId,
         RespondActivityTaskCompletedRequest taskCompleted,
         TaskFailedResult taskFailed,
         RespondActivityTaskCanceledRequest taskCancelled,
         RpcRetryOptions requestRetryOptions) {
+      this.activityId = activityId;
       this.taskCompleted = taskCompleted;
       this.taskFailed = taskFailed;
       this.taskCancelled = taskCancelled;
       this.requestRetryOptions = requestRetryOptions;
+    }
+
+    public String getActivityId() {
+      return activityId;
     }
 
     public RespondActivityTaskCompletedRequest getTaskCompleted() {
