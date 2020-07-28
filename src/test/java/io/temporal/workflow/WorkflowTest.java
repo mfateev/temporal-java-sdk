@@ -313,7 +313,7 @@ public class WorkflowTest {
             .setNamespace(NAMESPACE)
             .build();
     boolean versionTest =
-        false; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+        true; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)
@@ -5273,7 +5273,14 @@ public class WorkflowTest {
             expectedRegExp = expected.get(i);
           }
           assertTrue(
-              t + " doesn't match " + expectedRegExp + ": \n" + String.join("\n", traceElements),
+              t
+                  + " doesn't match "
+                  + expectedRegExp
+                  + ": \n expected=\n"
+                  + String.join("\n", expected)
+                  + "\n actual=\n"
+                  + String.join("\n", traceElements)
+                  + "\n",
               t.matches(expectedRegExp));
         }
       }

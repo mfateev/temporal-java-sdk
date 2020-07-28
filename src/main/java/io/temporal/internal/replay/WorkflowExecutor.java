@@ -42,8 +42,9 @@ public interface WorkflowExecutor {
   WorkflowTaskResult handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
 
   class WorkflowTaskResult {
-    private final List<Command> commands;
+
     private final List<ExecuteLocalActivityParameters> localActivityRequests;
+    private final List<Command> commands;
     private final boolean finalCommand;
     private final Map<String, WorkflowQueryResult> queryResults;
 
