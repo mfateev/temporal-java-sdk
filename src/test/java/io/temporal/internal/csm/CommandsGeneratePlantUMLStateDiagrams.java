@@ -74,8 +74,13 @@ public class CommandsGeneratePlantUMLStateDiagrams {
         content.append("`" + licenseLine + "\n");
       }
       content.append("\n");
+      content.append("` PlantUML <plantuml.com> State Diagram.\n");
       content.append(
-          "` Generated from " + fullRelativePath + ".java\n` by " + this.getClass().getName());
+          "` Generated from "
+              + fullRelativePath
+              + ".java\n` by "
+              + this.getClass().getName()
+              + ".\n");
       content.append("\n\n");
       content.append(generator.invoke(null));
       sink.write(content);

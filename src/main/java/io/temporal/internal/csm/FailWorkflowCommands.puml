@@ -15,8 +15,10 @@
 ` express or implied. See the License for the specific language governing
 ` permissions and limitations under the License.
 
+` PlantUML <plantuml.com> State Diagram.
 ` Generated from src/main/java/io/temporal/internal/csm/FailWorkflowCommands.java
-` by io.temporal.internal.csm.CommandsGeneratePlantUMLStateDiagrams
+` by io.temporal.internal.csm.CommandsGeneratePlantUMLStateDiagrams.
+
 
 @startuml
 scale 350 width
