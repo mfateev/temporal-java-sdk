@@ -1,0 +1,32 @@
+` Copyright (C) 2020 Temporal Technologies, Inc. All Rights Reserved.
+`
+` Copyright 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+`
+` Modifications copyright (C) 2017 Uber Technologies, Inc.
+`
+` Licensed under the Apache License, Version 2.0 (the "License"). You may not
+` use this file except in compliance with the License. A copy of the License is
+` located at
+`
+` http://aws.amazon.com/apache2.0
+`
+` or in the "license" file accompanying this file. This file is distributed on
+` an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+` express or implied. See the License for the specific language governing
+` permissions and limitations under the License.
+
+` Generated from src/main/java/io/temporal/internal/csm/MutableSideEffectMarkerCommands.java
+` by io.temporal.internal.csm.CommandsGeneratePlantUMLStateDiagrams
+
+@startuml
+scale 350 width
+[*] --> CREATED
+CREATED --> MARKER_COMMAND_CREATED: SCHEDULE
+CREATED --> CANCELLED_MARKER_COMMAND_CREATED: SCHEDULE
+MARKER_COMMAND_CREATED --> MARKER_COMMAND_CREATED: RECORD_MARKER
+CANCELLED_MARKER_COMMAND_CREATED --> MARKER_CANCELLED: RECORD_MARKER
+MARKER_COMMAND_CREATED --> MARKER_CANCELLED: NO_MARKER_EVENT
+MARKER_COMMAND_CREATED --> MARKER_COMMAND_RECORDED: MARKER_RECORDED
+MARKER_COMMAND_RECORDED --> [*]
+MARKER_CANCELLED --> [*]
+@enduml

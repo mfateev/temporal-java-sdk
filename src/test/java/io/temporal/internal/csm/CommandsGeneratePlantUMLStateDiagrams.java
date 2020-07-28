@@ -48,6 +48,9 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(CancelWorkflowCommands.class);
     generate(ContinueAsNewWorkflowCommands.class);
     generate(WorkflowTaskCommands.class);
+    generate(SideEffectMarkerCommands.class);
+    generate(MutableSideEffectMarkerCommands.class);
+    generate(LocalActivityCommands.class);
   }
 
   private void generate(Class<? extends CommandsBase> commandClass) {
