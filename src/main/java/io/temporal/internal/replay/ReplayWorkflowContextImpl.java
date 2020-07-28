@@ -63,8 +63,8 @@ import io.temporal.failure.CanceledFailure;
 import io.temporal.failure.ChildWorkflowFailure;
 import io.temporal.failure.TerminatedFailure;
 import io.temporal.failure.TimeoutFailure;
-import io.temporal.internal.csm.ActivityCommands;
-import io.temporal.internal.csm.CommandsManager;
+import io.temporal.internal.csm.ActivityStateMachine;
+import io.temporal.internal.csm.EntityManager;
 import io.temporal.internal.metrics.ReplayAwareScope;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.workflow.CancelExternalWorkflowException;
@@ -98,17 +98,17 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   private final WorkflowContext workflowContext;
   private final Scope metricsScope;
   private final boolean enableLoggingInReplay;
-  private final CommandsManager commandsManager;
+  private final EntityManager entityManager;
 
   ReplayWorkflowContextImpl(
-      CommandsManager commandsManager,
+      EntityManager entityManager,
       String namespace,
       WorkflowExecutionStartedEventAttributes startedAttributes,
       WorkflowExecution workflowExecution,
       long runStartedTimestampMillis,
       SingleWorkerOptions options,
       Scope metricsScope) {
-    this.commandsManager = commandsManager;
+    this.entityManager = entityManager;
     this.workflowContext =
         new WorkflowContext(
             namespace,
@@ -117,8 +117,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
             runStartedTimestampMillis,
             options.getContextPropagators());
     this.enableLoggingInReplay = options.getEnableLoggingInReplay();
-    this.metricsScope =
-        new ReplayAwareScope(metricsScope, this, commandsManager::currentTimeMillis);
+    this.metricsScope = new ReplayAwareScope(metricsScope, this, entityManager::currentTimeMillis);
   }
 
   @Override
@@ -128,12 +127,12 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public UUID randomUUID() {
-    return commandsManager.randomUUID();
+    return entityManager.randomUUID();
   }
 
   @Override
   public Random newRandom() {
-    return commandsManager.newRandom();
+    return entityManager.newRandom();
   }
 
   @Override
@@ -250,10 +249,10 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
     ScheduleActivityTaskCommandAttributes.Builder attributes = parameters.getAttributes();
     if (attributes.getActivityId().isEmpty()) {
-      attributes.setActivityId(commandsManager.randomUUID().toString());
+      attributes.setActivityId(entityManager.randomUUID().toString());
     }
-    ActivityCommands activity =
-        commandsManager.newActivity(
+    ActivityStateMachine activity =
+        entityManager.newActivity(
             attributes.build(), (event) -> handleActivityCallback(callback, attributes, event));
 
     return (exception) -> activity.cancel();
@@ -334,7 +333,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   public Functions.Proc scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback) {
-    return commandsManager.scheduleLocalActivityTask(parameters, callback);
+    return entityManager.scheduleLocalActivityTask(parameters, callback);
   }
 
   @Override
@@ -344,7 +343,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       Functions.Proc2<Optional<Payloads>, Exception> callback) {
     StartChildWorkflowExecutionCommandAttributes startAttributes = parameters.getRequest().build();
     Functions.Proc1<ChildWorkflowCancellationType> cancellationHandler =
-        commandsManager.newChildWorkflow(
+        entityManager.newChildWorkflow(
             startAttributes,
             executionCallback,
             event -> handleChildWorkflowCallback(callback, startAttributes, event));
@@ -453,7 +452,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
       BiConsumer<Void, Exception> callback) {
     Functions.Proc cancellationHandler =
-        commandsManager.newSignalExternal(
+        entityManager.newSignalExternal(
             attributes.build(),
             (event, canceled) -> handleSignalExternalCallback(callback, event, canceled));
     return (e) -> cancellationHandler.apply();
@@ -496,7 +495,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
             .setRunId(execution.getRunId())
             .build();
     CompletablePromise<Void> result = Workflow.newPromise();
-    commandsManager.newCancelExternal(
+    entityManager.newCancelExternal(
         attributes, event -> handleCancelExternalCallback(result, event));
     return result;
   }
@@ -526,12 +525,12 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   long getReplayCurrentTimeMilliseconds() {
-    return commandsManager.currentTimeMillis();
+    return entityManager.currentTimeMillis();
   }
 
   @Override
   public boolean isReplaying() {
-    return commandsManager.isReplaying();
+    return entityManager.isReplaying();
   }
 
   @Override
@@ -545,10 +544,10 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     StartTimerCommandAttributes attributes =
         StartTimerCommandAttributes.newBuilder()
             .setStartToFireTimeoutSeconds(delaySeconds)
-            .setTimerId(commandsManager.randomUUID().toString())
+            .setTimerId(entityManager.randomUUID().toString())
             .build();
     Functions.Proc cancellationHandler =
-        commandsManager.newTimer(attributes, (event) -> handleTimerCallback(callback, event));
+        entityManager.newTimer(attributes, (event) -> handleTimerCallback(callback, event));
     return (e) -> cancellationHandler.apply();
   }
 
@@ -573,7 +572,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public void sideEffect(
       Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
-    commandsManager.sideEffect(func, callback);
+    entityManager.sideEffect(func, callback);
   }
 
   @Override
@@ -581,7 +580,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       String id,
       Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc1<Optional<Payloads>> callback) {
-    commandsManager.mutableSideEffect(id, func, callback);
+    entityManager.mutableSideEffect(id, func, callback);
   }
 
   @Override
@@ -593,7 +592,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public long currentTimeMillis() {
-    return commandsManager.currentTimeMillis();
+    return entityManager.currentTimeMillis();
   }
 
   public void handleWorkflowTaskFailed(HistoryEvent event) {

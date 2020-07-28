@@ -36,24 +36,23 @@ public class CommandsGeneratePlantUMLStateDiagrams {
 
   @Test
   public void plantUML() {
-    generate(ActivityCommands.class);
-    generate(TimerCommands.class);
-    generate(SignalExternalCommands.class);
-    generate(CancelExternalCommands.class);
-    generate(UpsertSearchAttributesCommands.class);
-    generate(ChildWorkflowCommands.class);
-    generate(MarkerCommands.class);
-    generate(CompleteWorkflowCommands.class);
-    generate(FailWorkflowCommands.class);
-    generate(CancelWorkflowCommands.class);
-    generate(ContinueAsNewWorkflowCommands.class);
-    generate(WorkflowTaskCommands.class);
-    generate(SideEffectMarkerCommands.class);
-    generate(MutableSideEffectMarkerCommands.class);
-    generate(LocalActivityCommands.class);
+    generate(ActivityStateMachine.class);
+    generate(TimerStateMachine.class);
+    generate(SignalExternalStateMachine.class);
+    generate(CancelExternalStateMachine.class);
+    generate(UpsertSearchAttributesStateMachine.class);
+    generate(ChildWorkflowStateMachine.class);
+    generate(CompleteWorkflowStateMachine.class);
+    generate(FailWorkflowStateMachine.class);
+    generate(CancelWorkflowStateMachine.class);
+    generate(ContinueAsNewWorkflowStateMachine.class);
+    generate(WorkflowTaskStateMachine.class);
+    generate(SideEffectStateMachine.class);
+    generate(MutableSideEffectStateMachine.class);
+    generate(LocalActivityStateMachine.class);
   }
 
-  private void generate(Class<? extends CommandsBase> commandClass) {
+  private void generate(Class<? extends EntityStateMachine> commandClass) {
     Method generator;
     try {
       generator = commandClass.getDeclaredMethod("asPlantUMLStateDiagram");

@@ -46,8 +46,8 @@ import io.temporal.common.converter.DataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
 import io.temporal.internal.common.RpcRetryOptions;
-import io.temporal.internal.csm.CommandsManager;
 import io.temporal.internal.csm.CommandsManagerListener;
+import io.temporal.internal.csm.EntityManager;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.HistoryHelper.WorkflowTaskEvents;
 import io.temporal.internal.worker.ActivityTaskHandler;
@@ -106,7 +106,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private final DataConverter converter;
 
-  private final CommandsManager commandsManager;
+  private final EntityManager entityManager;
 
   private final HistoryEvent firstEvent;
 
@@ -126,7 +126,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           "First event in the history is not WorkflowExecutionStarted");
     }
     startedEvent = firstEvent.getWorkflowExecutionStartedEventAttributes();
-    this.commandsManager = new CommandsManager(new CommandsManagerListenerImpl());
+    this.entityManager = new EntityManager(new CommandsManagerListenerImpl());
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
@@ -134,7 +134,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
     context =
         new ReplayWorkflowContextImpl(
-            commandsManager,
+            entityManager,
             namespace,
             startedEvent,
             workflowTask.getWorkflowExecution(),
@@ -153,7 +153,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private void handleEvent(HistoryEvent event) {
     System.out.println("handleEvent " + event.getEventId() + ": " + event.getEventType());
-    commandsManager.handleEvent(event);
+    entityManager.handleEvent(event);
   }
 
   private void eventLoop() {
@@ -192,20 +192,20 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private void completeWorkflow() {
     if (failure != null) {
-      commandsManager.newFailWorkflow(failure.getFailure());
+      entityManager.newFailWorkflow(failure.getFailure());
       metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
     } else if (cancelRequested) {
-      commandsManager.newCancelWorkflow();
+      entityManager.newCancelWorkflow();
       metricsScope.counter(MetricsType.WORKFLOW_CANCELLED_COUNTER).inc(1);
     } else {
       ContinueAsNewWorkflowExecutionCommandAttributes attributes =
           context.getContinueAsNewOnCompletion();
       if (attributes != null) {
-        commandsManager.newContinueAsNewWorkflow(attributes);
+        entityManager.newContinueAsNewWorkflow(attributes);
         metricsScope.counter(MetricsType.WORKFLOW_CONTINUE_AS_NEW_COUNTER).inc(1);
       } else {
         Optional<Payloads> workflowOutput = workflow.getOutput();
-        commandsManager.newCompleteWorkflow(workflowOutput);
+        entityManager.newCompleteWorkflow(workflowOutput);
         metricsScope.counter(MetricsType.WORKFLOW_COMPLETED_COUNTER).inc(1);
       }
     }
@@ -242,11 +242,11 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     try {
       queryResults.clear();
       handleWorkflowTaskImpl(workflowTask, null);
-      List<Command> commands = commandsManager.takeCommands();
+      List<Command> commands = entityManager.takeCommands();
       System.out.println("Completed workflow task with commands: " + commands);
 
       List<ExecuteLocalActivityParameters> localActivityRequests =
-          commandsManager.takeLocalActivityRequests();
+          entityManager.takeLocalActivityRequests();
       return new WorkflowTaskResult(commands, queryResults, localActivityRequests, completed);
     } finally {
       lock.unlock();
@@ -263,7 +263,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
     boolean timerStopped = false;
     try {
-      commandsManager.setStartedIds(
+      entityManager.setStartedIds(
           workflowTask.getPreviousStartedEventId(), workflowTask.getStartedEventId());
       WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
           new WorkflowTaskWithHistoryIteratorImpl(
@@ -307,12 +307,12 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     lock.lock();
     try {
       queryResults.clear();
-      commandsManager.handleLocalActivityCompletion(laCompletion);
-      List<Command> commands = commandsManager.takeCommands();
+      entityManager.handleLocalActivityCompletion(laCompletion);
+      List<Command> commands = entityManager.takeCommands();
       System.out.println("Completed workflow task with commands: " + commands);
 
       List<ExecuteLocalActivityParameters> localActivityRequests =
-          commandsManager.takeLocalActivityRequests();
+          entityManager.takeLocalActivityRequests();
       return new WorkflowTaskResult(commands, queryResults, localActivityRequests, completed);
     } finally {
       lock.unlock();
@@ -348,13 +348,13 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
     HistoryHelper historyHelper = newHistoryHelper(workflowTask);
     Iterator<WorkflowTaskEvents> iterator = historyHelper.getIterator();
-    if (commandsManager.getLastStartedEventId() > 0
-        && commandsManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
+    if (entityManager.getLastStartedEventId() > 0
+        && entityManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
         && workflowTask.getHistory().getEventsCount() > 0) {
       throw new IllegalStateException(
           String.format(
               "ReplayWorkflowExecutor processed up to event id %d. History's previous started event id is %d",
-              commandsManager.getLastStartedEventId(), historyHelper.getPreviousStartedEventId()));
+              entityManager.getLastStartedEventId(), historyHelper.getPreviousStartedEventId()));
     }
     return iterator;
   }

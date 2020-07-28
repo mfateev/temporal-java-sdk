@@ -28,11 +28,11 @@ import java.util.Optional;
 public class NewCommand {
 
   private final Command command;
-  private final CommandsBase commands;
+  private final EntityStateMachine commands;
   private boolean canceled;
   private Optional<Long> initialCommandEventId;
 
-  public NewCommand(Command command, CommandsBase commands) {
+  public NewCommand(Command command, EntityStateMachine commands) {
     this.command = Objects.requireNonNull(command);
     this.commands = Objects.requireNonNull(commands);
     this.initialCommandEventId = Optional.empty();
@@ -62,7 +62,7 @@ public class NewCommand {
     this.initialCommandEventId = Optional.of(initialCommandEventId);
   }
 
-  public CommandsBase getCommands() {
+  public EntityStateMachine getCommands() {
     return commands;
   }
 
