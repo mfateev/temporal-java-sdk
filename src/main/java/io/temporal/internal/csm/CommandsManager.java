@@ -21,6 +21,8 @@ package io.temporal.internal.csm;
 
 import static io.temporal.internal.common.WorkflowExecutionUtils.getEventTypeForCommand;
 import static io.temporal.internal.common.WorkflowExecutionUtils.isCommandEvent;
+import static io.temporal.internal.csm.LocalActivityCommands.LOCAL_ACTIVITY_MARKER_NAME;
+import static io.temporal.internal.csm.LocalActivityCommands.MARKER_ACTIVITY_ID_KEY;
 
 import com.google.common.base.Strings;
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
@@ -39,6 +41,8 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
+import io.temporal.common.converter.DataConverter;
 import io.temporal.internal.replay.ExecuteLocalActivityParameters;
 import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.workflow.ChildWorkflowCancellationType;
@@ -56,6 +60,8 @@ import java.util.Random;
 import java.util.UUID;
 
 public final class CommandsManager {
+
+  private final DataConverter dataConverter = DataConverter.getDefaultInstance();
 
   /**
    * The eventId of the last event in the history which is expected to be startedEventId unless it
@@ -99,6 +105,7 @@ public final class CommandsManager {
 
   private long curentCommandId;
 
+  /** Key is mutable side effect id */
   private final Map<String, MutableSideEffectResult> mutableSideEffectResults = new HashMap<>();
 
   /** Map of local activities by their id. */
@@ -151,6 +158,13 @@ public final class CommandsManager {
   public void handleCommand(HistoryEvent event) {
     System.out.println("HANDLE COMMAND " + event.getEventType());
 
+    if (event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
+      MarkerRecordedEventAttributes attr = event.getMarkerRecordedEventAttributes();
+      if (attr.getMarkerName().equals(LOCAL_ACTIVITY_MARKER_NAME)) {
+        handleLocalActivityMarker(event, attr);
+        return;
+      }
+    }
     NewCommand newCommand;
     // skips cancelled commands
     while (true) {
@@ -174,6 +188,19 @@ public final class CommandsManager {
     commands.put(curentCommandId, newCommand.getCommands());
     System.out.println(" takeCommand commands.put " + curentCommandId + ", command=" + command);
     curentCommandId++;
+  }
+
+  private void handleLocalActivityMarker(HistoryEvent event, MarkerRecordedEventAttributes attr) {
+    Map<String, Payloads> detailsMap = attr.getDetailsMap();
+    Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ACTIVITY_ID_KEY));
+    String id = dataConverter.fromPayloads(idPayloads, String.class, String.class);
+    LocalActivityCommands commands = localActivityMap.remove(id);
+    if (commands == null) {
+      throw new IllegalStateException("Unexpected local activity id: " + id);
+    }
+    commands.handleEvent(event);
+    curentCommandId++;
+    callbacks.eventLoop();
   }
 
   private void handleNonStatefulEvent(HistoryEvent event) {
@@ -286,6 +313,7 @@ public final class CommandsManager {
   public ActivityCommands newActivity(
       ScheduleActivityTaskCommandAttributes attributes,
       Functions.Proc1<HistoryEvent> completionCallback) {
+    System.out.println("newActivity");
     return ActivityCommands.newInstance(attributes, completionCallback, sink);
   }
 
@@ -414,7 +442,7 @@ public final class CommandsManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId > startedEventId;
+    return previousStartedEventId >= startedEventId;
   }
 
   public long currentTimeMillis() {
@@ -514,7 +542,9 @@ public final class CommandsManager {
             },
             sink);
     localActivityMap.put(activityId, commands);
-    localActivityRequests.add(commands.getRequest());
+    if (!isReplaying()) {
+      localActivityRequests.add(commands.getRequest());
+    }
     return () -> commands.cancel();
   }
 

@@ -4626,11 +4626,13 @@ public class WorkflowTest {
           Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
 
       long workflowTime = Workflow.currentTimeMillis();
-      long time = Workflow.sideEffect(long.class, () -> workflowTime);
-      System.out.println("workflowTime=" + workflowTime + ", time=" + time);
+      long time1 = Workflow.sideEffect(long.class, () -> workflowTime);
+      long time2 = Workflow.sideEffect(long.class, () -> workflowTime);
+      assertEquals(time1, time2);
+      System.out.println("workflowTime=" + workflowTime + ", time=" + time1);
       Workflow.sleep(Duration.ofSeconds(1));
       String result;
-      if (workflowTime == time) {
+      if (workflowTime == time1) {
         result = "activity" + testActivities.activity1(1);
       } else {
         result = testActivities.activity2("activity2", 2);
@@ -4651,6 +4653,7 @@ public class WorkflowTest {
         "interceptExecuteWorkflow " + UUID_REGEXP,
         "newThread workflow-method",
         "currentTimeMillis",
+        "sideEffect",
         "sideEffect",
         "sleep PT1S",
         "executeActivity customActivity1",
@@ -5695,10 +5698,12 @@ public class WorkflowTest {
       //        }
       //      }
       String laResult = localActivities.activity2("test", 123);
-      laResult = localActivities.activity2("test", 12345);
-      TestActivities normalActivities =
-          Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
-      laResult = normalActivities.activity2(laResult, 123);
+      for (int i = 0; i < 3; i++) {
+        laResult = localActivities.activity2("test", 12345);
+        TestActivities normalActivities =
+            Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
+        laResult = normalActivities.activity2(laResult, 123);
+      }
       return laResult;
     }
   }

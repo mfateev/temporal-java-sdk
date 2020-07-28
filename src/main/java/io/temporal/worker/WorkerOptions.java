@@ -78,8 +78,9 @@ public final class WorkerOptions {
      * unlimited. If worker is not fully loaded while tasks are backing up on the service consider
      * increasing {@link #setActivityPollThreadCount(int)}.
      *
-     * <p>Note that this is a per worker limit. Use {@link #setMaxTaskQueueActivitiesPerSecond(double)}
-     * to set per task queue limit across multiple workers.
+     * <p>Note that this is a per worker limit. Use {@link
+     * #setMaxTaskQueueActivitiesPerSecond(double)} to set per task queue limit across multiple
+     * workers.
      */
     public Builder setMaxWorkerActivitiesPerSecond(double maxWorkerActivitiesPerSecond) {
       if (maxWorkerActivitiesPerSecond <= 0) {
@@ -178,7 +179,7 @@ public final class WorkerOptions {
           maxConcurrentActivityExecutionSize,
           DEFAULT_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE,
           DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE,
-              maxTaskQueueActivitiesPerSecond,
+          maxTaskQueueActivitiesPerSecond,
           workflowPollThreadCount,
           activityPollThreadCount);
     }
@@ -209,7 +210,7 @@ public final class WorkerOptions {
           maxConcurrentLocalActivityExecutionSize == 0
               ? DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE
               : maxConcurrentLocalActivityExecutionSize,
-              maxTaskQueueActivitiesPerSecond,
+          maxTaskQueueActivitiesPerSecond,
           workflowPollThreadCount == 0
               ? DEFAULT_WORKFLOW_POLL_THREAD_COUNT
               : workflowPollThreadCount,

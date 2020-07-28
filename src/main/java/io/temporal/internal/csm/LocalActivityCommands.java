@@ -45,9 +45,10 @@ public final class LocalActivityCommands
     extends CommandsBase<
         LocalActivityCommands.State, LocalActivityCommands.Action, LocalActivityCommands> {
 
-  private static final String MARKER_DATA_KEY = "data";
+  static final String LOCAL_ACTIVITY_MARKER_NAME = "LocalActivity";
+  static final String MARKER_ACTIVITY_ID_KEY = "activityId";
   private static final String MARKER_TIME_KEY = "time";
-  private static final String LOCAL_ACTIVITY_MARKER_NAME = "LocalActivity";
+  private static final String MARKER_DATA_KEY = "data";
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
 
@@ -127,7 +128,16 @@ public final class LocalActivityCommands
             State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED,
+            LocalActivityCommands::empty)
+        .add(
+            State.REQUEST_PREPARED,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+            State.MARKER_COMMAND_RECORDED,
             LocalActivityCommands::notifyResultFromEvent);
+  }
+
+  private void empty() {
+    System.out.println("Marke recorded no completion");
   }
 
   public void cancel() {
@@ -151,6 +161,11 @@ public final class LocalActivityCommands
     Map<String, Payloads> details = new HashMap<>();
     if (!replaying.apply()) {
       markerAttributes.setMarkerName(LOCAL_ACTIVITY_MARKER_NAME);
+      Payloads id =
+          dataConverter
+              .toPayloads(this.localActivityParameters.getActivityTask().getActivityId())
+              .get();
+      details.put(MARKER_ACTIVITY_ID_KEY, id);
       // TODO(maxim): Consider using elapsed since start instead of Sytem.currentTimeMillis
       long currentTime = setCurrentTimeCallback.apply(System.currentTimeMillis());
       Payloads t = dataConverter.toPayloads(currentTime).get();
