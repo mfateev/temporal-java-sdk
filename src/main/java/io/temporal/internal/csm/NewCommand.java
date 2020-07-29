@@ -79,4 +79,16 @@ public class NewCommand {
       initialCommandEventId = Optional.of(event.getEventId());
     }
   }
+
+  @Override
+  public String toString() {
+    return "NewCommand{"
+        + "command="
+        + command
+        + ", canceled="
+        + canceled
+        + ", initialCommandEventId="
+        + initialCommandEventId
+        + '}';
+  }
 }

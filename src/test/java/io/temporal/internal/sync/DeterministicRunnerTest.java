@@ -39,6 +39,7 @@ import io.temporal.common.converter.DataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.metrics.MetricsType;
+import io.temporal.internal.replay.ExecuteLocalActivityParameters;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowExecutor;
 import io.temporal.internal.replay.WorkflowExecutorCache;
@@ -761,15 +762,22 @@ public class DeterministicRunnerTest {
     }
 
     @Override
-    public WorkflowTaskResult handleWorkflowTask(
-        PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
-      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), new ArrayList<>(), false);
+    public void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {}
+
+    @Override
+    public WorkflowTaskResult getResult() {
+      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), false);
     }
 
     @Override
     public Optional<Payloads> handleQueryWorkflowTask(
-        PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query) throws Throwable {
+        PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query) {
       return Optional.empty();
+    }
+
+    @Override
+    public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
+      return new ArrayList<>();
     }
 
     @Override
@@ -778,10 +786,7 @@ public class DeterministicRunnerTest {
     }
 
     @Override
-    public WorkflowTaskResult handleLocalActivityCompletion(
-        ActivityTaskHandler.Result laCompletion) {
-      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), new ArrayList<>(), false);
-    }
+    public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {}
   }
 
   @Test

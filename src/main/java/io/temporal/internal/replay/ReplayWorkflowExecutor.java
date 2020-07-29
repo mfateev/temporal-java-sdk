@@ -236,18 +236,23 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   @Override
-  public WorkflowTaskResult handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask)
-      throws Throwable {
+  public void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
     lock.lock();
     try {
       queryResults.clear();
       handleWorkflowTaskImpl(workflowTask, null);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public WorkflowTaskResult getResult() {
+    lock.lock();
+    try {
       List<Command> commands = entityManager.takeCommands();
       System.out.println("Completed workflow task with commands: " + commands);
-
-      List<ExecuteLocalActivityParameters> localActivityRequests =
-          entityManager.takeLocalActivityRequests();
-      return new WorkflowTaskResult(commands, queryResults, localActivityRequests, completed);
+      return new WorkflowTaskResult(commands, queryResults, completed);
     } finally {
       lock.unlock();
     }
@@ -256,8 +261,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   // Returns boolean to indicate whether we need to force create new workflow task for local
   // activity heartbeating.
   private void handleWorkflowTaskImpl(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, Functions.Proc legacyQueryCallback)
-      throws Throwable {
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask, Functions.Proc legacyQueryCallback) {
     System.out.println(
         "handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
@@ -303,17 +307,11 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   @Override
-  public WorkflowTaskResult handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
+  public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
     lock.lock();
     try {
       queryResults.clear();
       entityManager.handleLocalActivityCompletion(laCompletion);
-      List<Command> commands = entityManager.takeCommands();
-      System.out.println("Completed workflow task with commands: " + commands);
-
-      List<ExecuteLocalActivityParameters> localActivityRequests =
-          entityManager.takeLocalActivityRequests();
-      return new WorkflowTaskResult(commands, queryResults, localActivityRequests, completed);
     } finally {
       lock.unlock();
     }
@@ -379,12 +377,22 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   @Override
   public Optional<Payloads> handleQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder response, WorkflowQuery query) throws Throwable {
+      PollWorkflowTaskQueueResponseOrBuilder response, WorkflowQuery query) {
     lock.lock();
     try {
       AtomicReference<Optional<Payloads>> result = new AtomicReference<>();
       handleWorkflowTaskImpl(response, () -> result.set(workflow.query(query)));
       return result.get();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
+    lock.lock();
+    try {
+      return entityManager.takeLocalActivityRequests();
     } finally {
       lock.unlock();
     }

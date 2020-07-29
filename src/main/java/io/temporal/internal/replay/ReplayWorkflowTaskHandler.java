@@ -25,14 +25,12 @@ import static io.temporal.internal.metrics.MetricsTag.METRICS_TAGS_CALL_OPTIONS_
 
 import com.uber.m3.tally.Scope;
 import com.uber.m3.util.ImmutableMap;
-import io.temporal.api.command.v1.Command;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.QueryResultType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.query.v1.WorkflowQueryResult;
 import io.temporal.api.taskqueue.v1.StickyExecutionAttributes;
 import io.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest;
 import io.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse;
@@ -54,10 +52,7 @@ import io.temporal.workflow.Functions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -191,49 +186,9 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       }
 
       long startTime = System.currentTimeMillis();
-      WorkflowExecutor.WorkflowTaskResult result =
-          workflowExecutor.handleWorkflowTask(workflowTask);
-      List<ExecuteLocalActivityParameters> laRequests = result.getLocalActivityRequests();
-      if (!laRequests.isEmpty()) {
-        while (true) {
-          long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
-          System.out.println("LOCAL ACTIVITY REQUESTS: " + laRequests);
-          for (ExecuteLocalActivityParameters laRequest : laRequests) {
-            // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
-            // much sense. I believe we should add SchedueToStart timeout for the local activities
-            // as well.
-            long processingTime = Math.min(System.currentTimeMillis() - startTime, timeoutInterval);
-            laTaskCount.incrementAndGet();
-            boolean accepted =
-                laTaskPoller.apply(
-                    new LocalActivityWorker.Task(
-                        laRequest, laActivityCompletionSink, 10000 /* TODO: Configurable */),
-                    Duration.ofMillis(processingTime));
-            if (!accepted) {
-              laTaskCount.decrementAndGet();
-              throw new Error("Unable to schedule local activity for execution");
-            }
-          }
-          if (System.currentTimeMillis() - startTime <= timeoutInterval) {
-            break;
-          }
-          Duration processingTime =
-              Duration.ofMillis(Math.min(System.currentTimeMillis() - startTime, timeoutInterval));
-          ActivityTaskHandler.Result laCompletion =
-              laCompletions.poll(processingTime.toMillis(), TimeUnit.MILLISECONDS);
-          if (laCompletion != null) {
-            WorkflowExecutor.WorkflowTaskResult additionalResult =
-                workflowExecutor.handleLocalActivityCompletion(laCompletion);
-            laRequests = additionalResult.getLocalActivityRequests();
-            result = appendResult(result, additionalResult);
-            if (result.isFinalCommand()) {
-              break;
-            }
-          } else {
-            break;
-          }
-        }
-      }
+      workflowExecutor.handleWorkflowTask(workflowTask);
+      processLocalActivityRequests(workflowExecutor, startTime);
+      WorkflowExecutor.WorkflowTaskResult result = workflowExecutor.getResult();
       if (result.isFinalCommand()) {
         cache.invalidate(runId, metricsScope);
       } else if (stickyTaskQueueName != null && createdNew.get()) {
@@ -285,17 +240,54 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
     }
   }
 
-  private WorkflowExecutor.WorkflowTaskResult appendResult(
-      WorkflowExecutor.WorkflowTaskResult result,
-      WorkflowExecutor.WorkflowTaskResult additionalResult) {
-    List<Command> commands = new ArrayList<>();
-    commands.addAll(result.getCommands());
-    commands.addAll(additionalResult.getCommands());
-    Map<String, WorkflowQueryResult> queryResults = new HashMap<>();
-    queryResults.putAll(result.getQueryResults());
-    queryResults.putAll(additionalResult.getQueryResults());
-    return new WorkflowExecutor.WorkflowTaskResult(
-        commands, queryResults, new ArrayList<>(), additionalResult.isFinalCommand());
+  private void processLocalActivityRequests(WorkflowExecutor workflowExecutor, long startTime)
+      throws InterruptedException {
+    while (true) {
+      List<ExecuteLocalActivityParameters> laRequests = workflowExecutor.getLocalActivityRequests();
+      long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
+      System.out.println("LOCAL ACTIVITY REQUESTS: " + laRequests);
+      for (ExecuteLocalActivityParameters laRequest : laRequests) {
+        // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
+        // much sense. I believe we should add ScheduleToStart timeout for the local activities
+        // as well.
+        long processingTime = Math.min(System.currentTimeMillis() - startTime, timeoutInterval);
+        laTaskCount.incrementAndGet();
+        boolean accepted =
+            laTaskPoller.apply(
+                new LocalActivityWorker.Task(
+                    laRequest, laActivityCompletionSink, 10000 /* TODO: Configurable */),
+                Duration.ofMillis(processingTime));
+        if (!accepted) {
+          laTaskCount.decrementAndGet();
+          throw new Error("Unable to schedule local activity for execution");
+        }
+      }
+      if (System.currentTimeMillis() - startTime <= timeoutInterval) {
+        return;
+      }
+      Duration processingTime =
+          Duration.ofMillis(Math.min(System.currentTimeMillis() - startTime, timeoutInterval));
+      if (laTaskCount.get() == 0) {
+        System.out.println("processLocalActivityRequests EXITING 0 REQUESTS");
+        return;
+      }
+      System.out.println(
+          "processLocalActivityRequests WAITING FOR LA COMPLETION "
+              + laTaskCount.get()
+              + " REQUESTS");
+      ActivityTaskHandler.Result laCompletion =
+          laCompletions.poll(processingTime.toMillis(), TimeUnit.MILLISECONDS);
+      if (laCompletion != null) {
+        long count = laTaskCount.get(); // decrementAndGet();
+        System.out.println(
+            "processLocalActivityRequests HANDLE LA COMPLETION REQUESTS LEFT: "
+                + count
+                + " REQUESTS");
+        workflowExecutor.handleLocalActivityCompletion(laCompletion);
+      } else {
+        break;
+      }
+    }
   }
 
   private Result handleQueryOnlyWorkflowTask(

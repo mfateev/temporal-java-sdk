@@ -31,19 +31,21 @@ import java.util.Optional;
 
 public interface WorkflowExecutor {
 
-  WorkflowTaskResult handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask)
-      throws Throwable;
+  void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask);
+
+  WorkflowTaskResult getResult();
 
   Optional<Payloads> handleQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query) throws Throwable;
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query);
+
+  List<ExecuteLocalActivityParameters> getLocalActivityRequests();
 
   void close();
 
-  WorkflowTaskResult handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
+  void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
 
   class WorkflowTaskResult {
 
-    private final List<ExecuteLocalActivityParameters> localActivityRequests;
     private final List<Command> commands;
     private final boolean finalCommand;
     private final Map<String, WorkflowQueryResult> queryResults;
@@ -51,20 +53,14 @@ public interface WorkflowExecutor {
     public WorkflowTaskResult(
         List<Command> commands,
         Map<String, WorkflowQueryResult> queryResults,
-        List<ExecuteLocalActivityParameters> localActivityRequests,
         boolean finalCommand) {
       this.commands = commands;
       this.queryResults = queryResults;
-      this.localActivityRequests = localActivityRequests;
       this.finalCommand = finalCommand;
     }
 
     public List<Command> getCommands() {
       return commands;
-    }
-
-    public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
-      return localActivityRequests;
     }
 
     public Map<String, WorkflowQueryResult> getQueryResults() {

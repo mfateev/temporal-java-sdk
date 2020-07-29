@@ -103,12 +103,16 @@ public final class SideEffectStateMachine
   }
 
   private void createMarkerCommand() {
+    System.out.println("createMarkerCommand isReplaying=" + replaying.apply());
     RecordMarkerCommandAttributes markerAttributes;
     if (replaying.apply()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
     } else {
       // executing first time
       result = func.apply();
+      if (result == null) {
+        throw new IllegalStateException("marker function returned null");
+      }
       Map<String, Payloads> details = new HashMap<>();
       if (result.isPresent()) {
         details.put(MARKER_DATA_KEY, result.get());
@@ -138,7 +142,9 @@ public final class SideEffectStateMachine
   }
 
   private void markerResultFromFunc() {
-    callback.apply(result);
+    if (!replaying.apply()) {
+      callback.apply(result);
+    }
   }
 
   public static String asPlantUMLStateDiagram() {

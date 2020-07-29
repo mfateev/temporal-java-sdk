@@ -178,6 +178,7 @@ public final class MutableSideEffectStateMachine
     State transitionsTo;
     RecordMarkerCommandAttributes markerAttributes;
     result.incrementAccessCount();
+    System.out.println("createMarkerCommand id=" + id + ", accessCount=" + result.getAccessCount());
     if (replaying.apply()) {
       // replaying
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
@@ -191,6 +192,12 @@ public final class MutableSideEffectStateMachine
         transitionsTo = State.CANCELLED_MARKER_COMMAND_CREATED;
       } else {
         int accessCount = result.getAccessCount();
+        System.out.println(
+            "createMarkerCommand record marker id="
+                + id
+                + ", accessCount="
+                + result.getAccessCount());
+
         result = new MutableSideEffectResult(updated);
         DataConverter dataConverter = DataConverter.getDefaultInstance();
         Map<String, Payloads> details = new HashMap<>();
