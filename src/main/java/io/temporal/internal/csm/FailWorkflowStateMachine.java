@@ -27,7 +27,7 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.workflow.Functions;
 
 public final class FailWorkflowStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         FailWorkflowStateMachine.State, FailWorkflowStateMachine.Action, FailWorkflowStateMachine> {
 
   private final FailWorkflowExecutionCommandAttributes failWorkflowAttributes;

@@ -152,13 +152,10 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   private void handleEvent(HistoryEvent event) {
-    System.out.println("handleEvent " + event.getEventId() + ": " + event.getEventType());
     entityManager.handleEvent(event);
   }
 
   private void eventLoop() {
-    System.out.println("EVENT LOOP");
-
     if (completed) {
       return;
     }
@@ -251,7 +248,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     lock.lock();
     try {
       List<Command> commands = entityManager.takeCommands();
-      System.out.println("Completed workflow task with commands: " + commands);
       return new WorkflowTaskResult(commands, queryResults, completed);
     } finally {
       lock.unlock();
@@ -262,8 +258,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   // activity heartbeating.
   private void handleWorkflowTaskImpl(
       PollWorkflowTaskQueueResponseOrBuilder workflowTask, Functions.Proc legacyQueryCallback) {
-    System.out.println(
-        "handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
     boolean timerStopped = false;
     try {
@@ -301,8 +295,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       if (completed) {
         close();
       }
-      System.out.println(
-          "done handleWorkflowTaskImpl workflowType=" + workflowTask.getWorkflowType().getName());
     }
   }
 
@@ -489,7 +481,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private class CommandsManagerListenerImpl implements CommandsManagerListener {
     @Override
     public void start(HistoryEvent startWorkflowEvent) {
-      System.out.println("WORKFLOW START");
       workflow.start(startWorkflowEvent, context);
     }
 

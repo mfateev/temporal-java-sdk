@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public final class WorkflowTaskStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         WorkflowTaskStateMachine.State, WorkflowTaskStateMachine.Action, WorkflowTaskStateMachine> {
 
   public interface Listener {

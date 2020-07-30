@@ -27,7 +27,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class CancelExternalStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         CancelExternalStateMachine.State,
         CancelExternalStateMachine.Action,
         CancelExternalStateMachine> {

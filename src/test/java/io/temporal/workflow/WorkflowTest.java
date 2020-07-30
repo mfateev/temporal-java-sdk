@@ -312,8 +312,7 @@ public class WorkflowTest {
                 })
             .setNamespace(NAMESPACE)
             .build();
-    boolean versionTest =
-        false; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+    boolean versionTest = testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)
@@ -1637,6 +1636,7 @@ public class WorkflowTest {
       uuids.add(Workflow.randomUUID());
       List<UUID> uuidsResult = Async.function(testActivities::activityUUIDList, uuids).get();
       assertEquals(uuids, uuidsResult);
+      Workflow.sleep(Duration.ofSeconds(1));
       return "workflow";
     }
   }
@@ -4668,20 +4668,22 @@ public class WorkflowTest {
     @Override
     public String execute(String taskQueue) {
       StringBuilder result = new StringBuilder();
-      for (int i = 0; i < 4; i++) {
-        long value =
-            Workflow.mutableSideEffect(
-                "id1",
-                Long.class,
-                (o, n) -> n > o,
-                () -> mutableSideEffectValue.get(taskQueue).poll());
-        if (result.length() > 0) {
-          result.append(", ");
-        }
-        result.append(value);
-        // Sleep is here to ensure that mutableSideEffect works when replaying a history.
-        if (i >= 3) {
-          Workflow.sleep(Duration.ofSeconds(1));
+      for (int j = 0; j < 1; j++) {
+        for (int i = 0; i < 8; i++) {
+          long value =
+              Workflow.mutableSideEffect(
+                  "id1",
+                  Long.class,
+                  (o, n) -> n > o,
+                  () -> mutableSideEffectValue.get(taskQueue).poll());
+          if (result.length() > 0) {
+            result.append(", ");
+          }
+          result.append(value);
+          // Sleep is here to ensure that mutableSideEffect works when replaying a history.
+          if (i >= 8) {
+            Workflow.sleep(Duration.ofSeconds(1));
+          }
         }
       }
       return result.toString();
@@ -4699,9 +4701,13 @@ public class WorkflowTest {
     values.add(1234L);
     values.add(123L); // expected to be ignored as it is smaller than 1234.
     values.add(3456L);
+    values.add(1234L); // expected to be ignored as it is smaller than 3456L.
+    values.add(4234L);
+    values.add(4234L);
+    values.add(3456L); // expected to be ignored as it is smaller than 4234L.
     mutableSideEffectValue.put(taskQueue, values);
     String result = workflowStub.execute(taskQueue);
-    assertEquals("1234, 1234, 1234, 3456", result);
+    assertEquals("1234, 1234, 1234, 3456, 3456, 4234, 4234, 4234", result);
   }
 
   public static class TestGetVersionWorkflowImpl implements TestWorkflow1 {
@@ -5185,7 +5191,7 @@ public class WorkflowTest {
     startWorkerFor(DeterminismFailingWorkflowImpl.class);
     WorkflowOptions options =
         WorkflowOptions.newBuilder()
-            .setWorkflowRunTimeout(Duration.ofSeconds(10))
+            .setWorkflowRunTimeout(Duration.ofSeconds(5))
             .setWorkflowTaskTimeout(Duration.ofSeconds(1))
             .setTaskQueue(taskQueue)
             .build();
@@ -5194,8 +5200,9 @@ public class WorkflowTest {
     try {
       workflowStub.execute(taskQueue);
       fail("unreachable");
-    } catch (WorkflowException e) {
+    } catch (WorkflowFailedException e) {
       // expected to timeout as workflow is going get blocked.
+      assertTrue(e.getCause() instanceof TimeoutFailure);
     }
 
     int workflowRootThreads = 0;

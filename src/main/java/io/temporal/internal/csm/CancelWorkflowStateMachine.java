@@ -26,7 +26,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
 public final class CancelWorkflowStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         CancelWorkflowStateMachine.State,
         CancelWorkflowStateMachine.Action,
         CancelWorkflowStateMachine> {

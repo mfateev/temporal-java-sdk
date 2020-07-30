@@ -29,7 +29,7 @@ import io.temporal.api.history.v1.TimerCanceledEventAttributes;
 import io.temporal.workflow.Functions;
 
 public final class TimerStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         TimerStateMachine.State, TimerStateMachine.Action, TimerStateMachine> {
 
   private final StartTimerCommandAttributes startAttributes;

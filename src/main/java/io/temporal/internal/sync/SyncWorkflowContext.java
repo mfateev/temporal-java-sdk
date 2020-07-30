@@ -583,10 +583,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
     System.out.println("Blocking waiting for mutable side effect result");
     if (!result.get().isPresent()) {
-      throw new IllegalArgumentException(
-          "No value found for mutableSideEffectId="
-              + id
-              + ", during replay it usually indicates a different workflow runId than the original one");
+      throw new IllegalArgumentException("No value found for mutableSideEffectId=" + id);
     }
     // An optimization that avoids unnecessary deserialization of the result.
     R unserialized = unserializedResult.get();
@@ -594,7 +591,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
       System.out.println("Returning  mutable side effect result (unserialized)");
       return unserialized;
     }
-    System.out.println("Returning  mutable side effect result");
+    System.out.println("Returning  mutable side effect result: " + result.get());
     return converter.fromPayloads(result.get(), resultClass, resultType);
   }
 

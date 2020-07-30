@@ -29,7 +29,7 @@ import io.temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttribute
 import io.temporal.workflow.Functions;
 
 public final class WorkflowStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         WorkflowStateMachine.State, WorkflowStateMachine.Action, WorkflowStateMachine> {
 
   enum Action {

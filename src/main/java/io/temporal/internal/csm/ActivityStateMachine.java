@@ -29,7 +29,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class ActivityStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         ActivityStateMachine.State, ActivityStateMachine.Action, ActivityStateMachine> {
 
   enum Action {

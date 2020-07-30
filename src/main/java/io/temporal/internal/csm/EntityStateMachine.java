@@ -19,75 +19,13 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.workflow.Functions;
-import java.util.Optional;
 
-public class EntityStateMachine<State, Action, Data> {
+public interface EntityStateMachine {
+  void handleCommand(CommandType commandType);
 
-  private final StateMachine<State, Action, Data> stateMachine;
+  void handleEvent(HistoryEvent event);
 
-  private final Functions.Proc1<NewCommand> commandSink;
-
-  private NewCommand initialCommand;
-
-  protected HistoryEvent currentEvent;
-
-  public EntityStateMachine(
-      StateMachine<State, Action, Data> stateMachine, Functions.Proc1<NewCommand> commandSink) {
-    this.stateMachine = stateMachine;
-    this.commandSink = commandSink;
-  }
-
-  /**
-   * Notifies that command is included into the workflow task completion result.
-   *
-   * <p>Is not called for commands generated during replay.
-   */
-  public void handleCommand(CommandType commandType) {
-    stateMachine.handleCommand(commandType, (Data) this);
-  }
-
-  public void handleEvent(HistoryEvent event) {
-    this.currentEvent = event;
-    try {
-      stateMachine.handleEvent(event.getEventType(), (Data) this);
-    } finally {
-      this.currentEvent = null;
-    }
-  }
-
-  protected final void action(Action action) {
-    stateMachine.action(action, (Data) this);
-  }
-
-  protected final void addCommand(Command command) {
-    if (command.getCommandType() == CommandType.COMMAND_TYPE_UNSPECIFIED) {
-      throw new IllegalArgumentException("unspecified command type");
-    }
-    initialCommand = new NewCommand(command, this);
-    commandSink.apply(initialCommand);
-  }
-
-  protected final void cancelInitialCommand() {
-    initialCommand.cancel();
-  }
-
-  protected final long getInitialCommandEventId() {
-    Optional<Long> eventId = initialCommand.getInitialCommandEventId();
-    if (!eventId.isPresent()) {
-      throw new IllegalArgumentException("Initial eventId is not set yet");
-    }
-    return eventId.get();
-  }
-
-  public boolean isFinalState() {
-    return stateMachine.isFinalState();
-  }
-
-  protected State getState() {
-    return stateMachine.getState();
-  }
+  boolean isFinalState();
 }

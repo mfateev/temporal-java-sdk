@@ -26,7 +26,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
 public final class UpsertSearchAttributesStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         UpsertSearchAttributesStateMachine.State,
         UpsertSearchAttributesStateMachine.Action,
         UpsertSearchAttributesStateMachine> {

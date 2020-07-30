@@ -104,7 +104,7 @@ public final class EntityManager {
   private long startedEventId;
 
   /** Key is mutable side effect id */
-  private final Map<String, MutableSideEffectResult> mutableSideEffectResults = new HashMap<>();
+  private final Map<String, MutableSideEffectStateMachine> mutableSideEffects = new HashMap<>();
 
   /** Map of local activities by their id. */
   private Map<String, LocalActivityStateMachine> localActivityMap = new HashMap<>();
@@ -112,7 +112,6 @@ public final class EntityManager {
   private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
 
   public EntityManager(CommandsManagerListener callbacks) {
-    System.out.println("NEW " + this);
     this.callbacks = Objects.requireNonNull(callbacks);
     sink = (command) -> newCommands.add(command);
   }
@@ -139,7 +138,6 @@ public final class EntityManager {
     if (c != null) {
       c.handleEvent(event);
       if (c.isFinalState()) {
-        System.out.println("commands.remove " + initialCommandEventId);
         stateMachines.remove(initialCommandEventId);
       }
     } else {
@@ -153,14 +151,10 @@ public final class EntityManager {
    * @param event
    */
   public void handleCommand(HistoryEvent event) {
-    System.out.println("HANDLE COMMAND " + event.getEventType());
-
     if (event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
-
       MarkerRecordedEventAttributes attr = event.getMarkerRecordedEventAttributes();
       if (attr.getMarkerName().equals(LOCAL_ACTIVITY_MARKER_NAME)) {
         handleLocalActivityMarker(event, attr);
-        prepareCommands();
         return;
       }
     }
@@ -172,19 +166,13 @@ public final class EntityManager {
       }
       // Note that handleEvent can cause a command cancellation in case
       // of MutableSideEffect
-      System.out.println(
-          "handleEvent command="
-              + newCommand.getCommand().getCommandType()
-              + ", event="
-              + event.getEventType());
       newCommand.handleEvent(event);
       if (!newCommand.isCanceled()) {
-        System.out.println(
-            "handleEvent command=" + newCommand.getCommand().getCommandType() + " accepted");
         break;
       }
-      System.out.println(
-          "handleEvent command=" + newCommand.getCommand().getCommandType() + " cancelled");
+      if (newCommand.getCommandType() == CommandType.COMMAND_TYPE_RECORD_MARKER) {
+        prepareCommands();
+      }
     }
     if (newCommand == null) {
       throw new IllegalStateException("No command scheduled that corresponds to " + event);
@@ -192,19 +180,17 @@ public final class EntityManager {
     Command command = newCommand.getCommand();
     validateCommand(command, event);
     newCommand.setInitialCommandEventId(event.getEventId());
-    stateMachines.put(event.getEventId(), newCommand.getCommands());
-    System.out.println(
-        " takeCommand commands.put "
-            + event.getEventId()
-            + ", command="
-            + command.getCommandType());
+
+    EntityStateMachine commands = newCommand.getCommands();
+    if (!commands.isFinalState()) {
+      stateMachines.put(event.getEventId(), commands);
+    }
     if (event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
       prepareCommands();
     }
   }
 
   public List<Command> takeCommands() {
-    System.out.println("TAKE COMMANDS");
     List<Command> result = new ArrayList<>(commands.size());
     for (NewCommand newCommand : commands) {
       if (newCommand.isCanceled()) {
@@ -217,7 +203,6 @@ public final class EntityManager {
   }
 
   private void prepareCommands() {
-    System.out.println("PREPARE COMMANDS");
     // handleCommand can lead to code execution because of SideEffect, MutableSideEffect or local
     // activity completion. And code execution can lead to creation of new commands and
     // cancellation of existing commands. That is the reason for using Queue as a data structure for
@@ -237,14 +222,7 @@ public final class EntityManager {
     }
     for (NewCommand newCommand : filteredCommands) {
       if (!newCommand.isCanceled()) {
-        System.out.println(
-            "prepareCommands add canceled="
-                + newCommand.isCanceled()
-                + ": "
-                + newCommand.getCommand());
         commands.add(newCommand);
-      } else {
-        System.out.println("prepareCommands canceled=" + newCommand.isCanceled());
       }
     }
   }
@@ -259,6 +237,7 @@ public final class EntityManager {
     }
     commands.handleEvent(event);
     callbacks.eventLoop();
+    prepareCommands();
   }
 
   private void handleNonStatefulEvent(HistoryEvent event) {
@@ -325,7 +304,6 @@ public final class EntityManager {
   public ActivityStateMachine newActivity(
       ScheduleActivityTaskCommandAttributes attributes,
       Functions.Proc1<HistoryEvent> completionCallback) {
-    System.out.println("newActivity");
     return ActivityStateMachine.newInstance(attributes, completionCallback, sink);
   }
 
@@ -339,7 +317,6 @@ public final class EntityManager {
    */
   public Functions.Proc newTimer(
       StartTimerCommandAttributes attributes, Functions.Proc1<HistoryEvent> completionCallback) {
-    System.out.println("newTimer");
     TimerStateMachine timer = TimerStateMachine.newInstance(attributes, completionCallback, sink);
     return () -> timer.cancel();
   }
@@ -455,7 +432,7 @@ public final class EntityManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId >= startedEventId;
+    return previousStartedEventId >= startedEventId && startedEventId != workflowTaskStartedEventId;
   }
 
   public long currentTimeMillis() {
@@ -499,22 +476,17 @@ public final class EntityManager {
       String id,
       Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc1<Optional<Payloads>> callback) {
-    MutableSideEffectResult result = mutableSideEffectResults.get(id);
-    if (result == null) {
-      result = new MutableSideEffectResult(Optional.empty());
-    }
-    MutableSideEffectStateMachine.newInstance(
-        id,
-        this::isReplaying,
-        result,
+    MutableSideEffectStateMachine stateMachine =
+        mutableSideEffects.computeIfAbsent(
+            id,
+            (idKey) -> MutableSideEffectStateMachine.newInstance(idKey, this::isReplaying, sink));
+    stateMachine.mutableSideEffect(
         func,
         (r) -> {
-          mutableSideEffectResults.put(id, r);
-          callback.apply(r.getData());
+          callback.apply(r);
           // callback unblocked mutableSideEffect call. Give workflow code chance to make progress.
           callbacks.eventLoop();
-        },
-        sink);
+        });
   }
 
   public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
@@ -530,7 +502,6 @@ public final class EntityManager {
     }
     commands.handleCompletion(laCompletion);
     callbacks.eventLoop();
-    prepareCommands();
   }
 
   public Functions.Proc scheduleLocalActivityTask(

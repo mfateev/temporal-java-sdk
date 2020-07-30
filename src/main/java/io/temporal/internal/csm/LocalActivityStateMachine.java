@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class LocalActivityStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         LocalActivityStateMachine.State,
         LocalActivityStateMachine.Action,
         LocalActivityStateMachine> {
@@ -89,7 +89,6 @@ public final class LocalActivityStateMachine
       Functions.Proc2<Optional<Payloads>, Failure> callback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
-    System.out.println("NEW LocalActivityCommands: " + this);
     this.replaying = replaying;
     this.setCurrentTimeCallback = setCurrentTimeCallback;
     this.localActivityParameters = localActivityParameters;
@@ -138,9 +137,7 @@ public final class LocalActivityStateMachine
             LocalActivityStateMachine::notifyResultFromEvent);
   }
 
-  private void empty() {
-    System.out.println("Marke recorded no completion");
-  }
+  private void empty() {}
 
   public void cancel() {
     throw new UnsupportedOperationException("not implemented yet");

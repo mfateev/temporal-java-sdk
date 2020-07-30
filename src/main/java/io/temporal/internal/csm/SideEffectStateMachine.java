@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class SideEffectStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         SideEffectStateMachine.State, SideEffectStateMachine.Action, SideEffectStateMachine> {
 
   private static final String MARKER_HEADER_KEY = "header";
@@ -103,7 +103,6 @@ public final class SideEffectStateMachine
   }
 
   private void createMarkerCommand() {
-    System.out.println("createMarkerCommand isReplaying=" + replaying.apply());
     RecordMarkerCommandAttributes markerAttributes;
     if (replaying.apply()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();

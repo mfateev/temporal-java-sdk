@@ -29,7 +29,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
 public final class ChildWorkflowStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         ChildWorkflowStateMachine.State,
         ChildWorkflowStateMachine.Action,
         ChildWorkflowStateMachine> {

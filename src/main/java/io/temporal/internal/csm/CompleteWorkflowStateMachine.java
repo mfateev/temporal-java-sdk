@@ -28,7 +28,7 @@ import io.temporal.workflow.Functions;
 import java.util.Optional;
 
 public final class CompleteWorkflowStateMachine
-    extends EntityStateMachine<
+    extends EntityStateMachineInitialCommand<
         CompleteWorkflowStateMachine.State,
         CompleteWorkflowStateMachine.Action,
         CompleteWorkflowStateMachine> {
