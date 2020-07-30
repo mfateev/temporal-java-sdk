@@ -137,7 +137,9 @@ public final class LocalActivityStateMachine
             LocalActivityStateMachine::notifyResultFromEvent);
   }
 
-  private void empty() {}
+  private void empty() {
+    System.out.println("MARKER RECORDED");
+  }
 
   public void cancel() {
     throw new UnsupportedOperationException("not implemented yet");

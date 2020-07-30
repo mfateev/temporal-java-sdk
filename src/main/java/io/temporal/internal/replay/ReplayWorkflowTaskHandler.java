@@ -167,6 +167,11 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
 
   private Result handleWorkflowTaskWithEmbeddedQuery(
       PollWorkflowTaskQueueResponse.Builder workflowTask, Scope metricsScope) throws Throwable {
+    System.out.println(
+        "handleWorkflowTaskWithEmbeddedQuery BEGIN startedEventId="
+            + workflowTask.getStartedEventId()
+            + ", PreviousStartedEventId="
+            + workflowTask.getPreviousStartedEventId());
     WorkflowExecutor workflowExecutor = null;
     AtomicBoolean createdNew = new AtomicBoolean();
     WorkflowExecution execution = workflowTask.getWorkflowExecution();
@@ -237,6 +242,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       } else {
         cache.markProcessingDone(runId);
       }
+      System.out.println("handleWorkflowTaskWithEmbeddedQuery DONE");
     }
   }
 
@@ -277,16 +283,15 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
               + " REQUESTS");
       ActivityTaskHandler.Result laCompletion =
           laCompletions.poll(processingTime.toMillis(), TimeUnit.MILLISECONDS);
-      if (laCompletion != null) {
-        long count = laTaskCount.get(); // decrementAndGet();
-        System.out.println(
-            "processLocalActivityRequests HANDLE LA COMPLETION REQUESTS LEFT: "
-                + count
-                + " REQUESTS");
-        workflowExecutor.handleLocalActivityCompletion(laCompletion);
-      } else {
+      if (laCompletion == null) {
         break;
       }
+      long count = laTaskCount.get(); // decrementAndGet();
+      System.out.println(
+          "processLocalActivityRequests HANDLE LA COMPLETION REQUESTS LEFT: "
+              + count
+              + " REQUESTS");
+      workflowExecutor.handleLocalActivityCompletion(laCompletion);
     }
   }
 

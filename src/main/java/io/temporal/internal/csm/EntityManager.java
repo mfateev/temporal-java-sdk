@@ -58,6 +58,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public final class EntityManager {
 
@@ -114,6 +115,7 @@ public final class EntityManager {
   public EntityManager(CommandsManagerListener callbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
     sink = (command) -> newCommands.add(command);
+    System.out.println("NEW EntityManager " + this);
   }
 
   private void setStartedEventId(long startedEventId) {
@@ -127,9 +129,10 @@ public final class EntityManager {
 
   public final void handleEvent(HistoryEvent event) {
     if (isCommandEvent(event)) {
-      if (!isReplaying()) {
-        return;
-      }
+      //      if (!isReplaying()) {
+      //        // takeCommands already consumed it
+      //        return;
+      //      }
       handleCommand(event);
       return;
     }
@@ -151,7 +154,14 @@ public final class EntityManager {
    * @param event
    */
   public void handleCommand(HistoryEvent event) {
-    if (event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
+    System.out.println(
+        "HANDLE COMMAND: event="
+            + event.getEventType()
+            + " isReplaying="
+            + isReplaying()
+            + ", commands="
+            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
+    if (isReplaying() && event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
       MarkerRecordedEventAttributes attr = event.getMarkerRecordedEventAttributes();
       if (attr.getMarkerName().equals(LOCAL_ACTIVITY_MARKER_NAME)) {
         handleLocalActivityMarker(event, attr);
@@ -432,7 +442,7 @@ public final class EntityManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId >= startedEventId && startedEventId != workflowTaskStartedEventId;
+    return previousStartedEventId > startedEventId && startedEventId != workflowTaskStartedEventId;
   }
 
   public long currentTimeMillis() {
@@ -502,6 +512,7 @@ public final class EntityManager {
     }
     commands.handleCompletion(laCompletion);
     callbacks.eventLoop();
+    prepareCommands();
   }
 
   public Functions.Proc scheduleLocalActivityTask(

@@ -302,7 +302,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
     lock.lock();
     try {
-      queryResults.clear();
       entityManager.handleLocalActivityCompletion(laCompletion);
     } finally {
       lock.unlock();
