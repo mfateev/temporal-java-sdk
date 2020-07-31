@@ -34,6 +34,7 @@ import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.replay.WorkflowExecutorCache;
 import io.temporal.internal.sync.SyncActivityWorker;
 import io.temporal.internal.sync.SyncWorkflowWorker;
+import io.temporal.internal.sync.WorkflowInternal;
 import io.temporal.internal.worker.PollerOptions;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.internal.worker.Suspendable;
@@ -403,5 +404,15 @@ public final class Worker implements Suspendable {
   @Override
   public boolean isSuspended() {
     return workflowWorker.isSuspended() && activityWorker.isSuspended();
+  }
+
+  /**
+   * Name of the workflow type the interface defines. It is either the interface short name or value
+   * of {@link WorkflowMethod#name()} parameter.
+   *
+   * @param workflowInterfaceClass interface annotated with @WorkflowInterface
+   */
+  public static String getWorkflowType(Class<?> workflowInterfaceClass) {
+    return WorkflowInternal.getWorkflowType(workflowInterfaceClass);
   }
 }

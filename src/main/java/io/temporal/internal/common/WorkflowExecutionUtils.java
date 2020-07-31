@@ -58,7 +58,7 @@ import io.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest;
 import io.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse;
 import io.temporal.client.WorkflowFailedException;
 import io.temporal.common.converter.DataConverter;
-import io.temporal.common.converter.EncodedValue;
+import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.failure.TerminatedFailure;
 import io.temporal.failure.TimeoutFailure;
@@ -168,7 +168,7 @@ public class WorkflowExecutionUtils {
             closeEvent.getWorkflowExecutionCanceledEventAttributes();
         Optional<Payloads> details =
             attributes.hasDetails() ? Optional.of(attributes.getDetails()) : Optional.empty();
-        throw new CanceledFailure("Workflow canceled", new EncodedValue(details, converter), null);
+        throw new CanceledFailure("Workflow canceled", new EncodedValues(details, converter), null);
       case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
         WorkflowExecutionFailedEventAttributes failed =
             closeEvent.getWorkflowExecutionFailedEventAttributes();
@@ -804,9 +804,7 @@ public class WorkflowExecutionUtils {
                 || eventType == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED
                 || eventType == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW
                 || eventType == EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED
-                || eventType == EventType.EVENT_TYPE_REQUEST_CANCEL_ACTIVITY_TASK_FAILED
                 || eventType == EventType.EVENT_TYPE_TIMER_CANCELED
-                || eventType == EventType.EVENT_TYPE_CANCEL_TIMER_FAILED
                 || eventType
                     == EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED
                 || eventType == EventType.EVENT_TYPE_MARKER_RECORDED

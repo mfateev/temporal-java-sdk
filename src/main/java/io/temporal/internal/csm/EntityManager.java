@@ -249,7 +249,7 @@ public final class EntityManager {
   private void handleLocalActivityMarker(HistoryEvent event, MarkerRecordedEventAttributes attr) {
     Map<String, Payloads> detailsMap = attr.getDetailsMap();
     Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ACTIVITY_ID_KEY));
-    String id = dataConverter.fromPayloads(idPayloads, String.class, String.class);
+    String id = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
     LocalActivityStateMachine commands = localActivityMap.remove(id);
     if (commands == null) {
       throw new IllegalStateException("Unexpected local activity id: " + id);

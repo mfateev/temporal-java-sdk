@@ -19,12 +19,14 @@
 
 package io.temporal.internal.worker;
 
+import com.google.protobuf.util.Timestamps;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.Stopwatch;
 import com.uber.m3.util.ImmutableMap;
 import io.temporal.api.common.v1.RetryPolicy;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.common.RetryOptions;
+import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.ExecuteLocalActivityParameters;
@@ -226,8 +228,10 @@ public final class LocalActivityWorker implements SuspendableWorker {
       retryPolicy.getNonRetryableErrorTypesList().toArray(doNotRetry);
       RetryOptions retryOptions =
           RetryOptions.newBuilder()
-              .setMaximumInterval(Duration.ofSeconds(retryPolicy.getMaximumIntervalInSeconds()))
-              .setInitialInterval(Duration.ofSeconds(retryPolicy.getInitialIntervalInSeconds()))
+              .setMaximumInterval(
+                  ProtobufTimeUtils.ToJavaDuration(retryPolicy.getMaximumInterval()))
+              .setInitialInterval(
+                  ProtobufTimeUtils.ToJavaDuration(retryPolicy.getInitialInterval()))
               .setMaximumAttempts(retryPolicy.getMaximumAttempts())
               .setBackoffCoefficient(retryPolicy.getBackoffCoefficient())
               .setDoNotRetry(doNotRetry)
@@ -235,12 +239,11 @@ public final class LocalActivityWorker implements SuspendableWorker {
       long sleepMillis = retryOptions.calculateSleepTime(attempt);
       long elapsedTask = System.currentTimeMillis() - task.taskStartTime;
       long sinceScheduled =
-          System.currentTimeMillis()
-              - TimeUnit.NANOSECONDS.toMillis(activityTask.getScheduledTimestamp());
+          System.currentTimeMillis() - Timestamps.toMillis(activityTask.getScheduledTime());
       long elapsedTotal = elapsedTask + sinceScheduled;
-      int timeoutSeconds = activityTask.getScheduleToCloseTimeoutSeconds();
+      Duration timeout = ProtobufTimeUtils.ToJavaDuration(activityTask.getScheduleToCloseTimeout());
       Optional<Duration> expiration =
-          timeoutSeconds > 0 ? Optional.of(Duration.ofSeconds(timeoutSeconds)) : Optional.empty();
+          timeout.compareTo(Duration.ZERO) > 0 ? Optional.of(timeout) : Optional.empty();
       if (retryOptions.shouldRethrow(
           result.getTaskFailed().getFailure(), expiration, attempt, elapsedTotal, sleepMillis)) {
         return result;

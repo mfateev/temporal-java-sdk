@@ -58,11 +58,12 @@ import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
-import io.temporal.common.converter.EncodedValue;
+import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.failure.ChildWorkflowFailure;
 import io.temporal.failure.TerminatedFailure;
 import io.temporal.failure.TimeoutFailure;
+import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.csm.ActivityStateMachine;
 import io.temporal.internal.csm.EntityManager;
 import io.temporal.internal.metrics.ReplayAwareScope;
@@ -182,7 +183,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public Duration getWorkflowTaskTimeout() {
-    return Duration.ofSeconds(workflowContext.getWorkflowTaskTimeoutSeconds());
+    return workflowContext.getWorkflowTaskTimeout();
   }
 
   @Override
@@ -211,12 +212,12 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public Duration getWorkflowRunTimeout() {
-    return Duration.ofSeconds(workflowContext.getWorkflowRunTimeoutSeconds());
+    return workflowContext.getWorkflowRunTimeout();
   }
 
   @Override
   public Duration getWorkflowExecutionTimeout() {
-    return Duration.ofSeconds(workflowContext.getWorkflowExecutionTimeoutSeconds());
+    return workflowContext.getWorkflowExecutionTimeout();
   }
 
   @Override
@@ -422,7 +423,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
               event.getChildWorkflowExecutionCanceledEventAttributes();
           CanceledFailure failure =
               new CanceledFailure(
-                  "Child canceled", new EncodedValue(attributes.getDetails()), null);
+                  "Child canceled", new EncodedValues(attributes.getDetails()), null);
           callback.apply(Optional.empty(), failure);
           return;
         }
@@ -543,7 +544,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     int delaySeconds = roundUpToSeconds(delay);
     StartTimerCommandAttributes attributes =
         StartTimerCommandAttributes.newBuilder()
-            .setStartToFireTimeoutSeconds(delaySeconds)
+            .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(delay))
             .setTimerId(entityManager.randomUUID().toString())
             .build();
     Functions.Proc cancellationHandler =

@@ -130,13 +130,14 @@ public final class MutableSideEffectStateMachine implements EntityStateMachine {
     }
     Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
     Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-    String expectedId = dataConverter.fromPayloads(idPayloads, String.class, String.class);
+    String expectedId = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
     if (!id.equals(expectedId)) {
       notifyCachedResult();
       return;
     }
     int count =
         dataConverter.fromPayloads(
+            0,
             Optional.ofNullable(detailsMap.get(MARKER_SKIP_COUNT_KEY)),
             Integer.class,
             Integer.class);
@@ -216,7 +217,7 @@ public final class MutableSideEffectStateMachine implements EntityStateMachine {
     }
     Map<String, Payloads> map = attributes.getDetailsMap();
     Optional<Payloads> oid = Optional.ofNullable(map.get(MARKER_ID_KEY));
-    String idFromMarker = dataConverter.fromPayloads(oid, String.class, String.class);
+    String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
     if (!id.equals(idFromMarker)) {
       throw new UnsupportedOperationException(
           "TODO: deal with multiple side effects with different id");

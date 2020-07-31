@@ -223,7 +223,7 @@ public final class LocalActivityStateMachine
     }
     Map<String, Payloads> map = attributes.getDetailsMap();
     Optional<Payloads> timePayloads = Optional.ofNullable(map.get(MARKER_TIME_KEY));
-    long time = dataConverter.fromPayloads(timePayloads, Long.class, Long.class);
+    long time = dataConverter.fromPayloads(0, timePayloads, Long.class, Long.class);
     setCurrentTimeCallback.apply(time);
     if (attributes.hasFailure()) {
       callback.apply(null, attributes.getFailure());

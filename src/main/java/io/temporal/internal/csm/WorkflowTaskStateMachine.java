@@ -19,11 +19,11 @@
 
 package io.temporal.internal.csm;
 
+import com.google.protobuf.util.Timestamps;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 public final class WorkflowTaskStateMachine
     extends EntityStateMachineInitialCommand<
@@ -88,7 +88,7 @@ public final class WorkflowTaskStateMachine
   }
 
   private void handleStarted() {
-    currentTimeMillis = TimeUnit.NANOSECONDS.toMillis(currentEvent.getTimestamp());
+    currentTimeMillis = Timestamps.toMillis(currentEvent.getEventTime());
     startedEventId = currentEvent.getEventId();
     // The last started event in the history. So no completed is expected.
     if (currentEvent.getEventId() >= workflowTaskStartedEventId) {

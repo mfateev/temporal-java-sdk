@@ -19,16 +19,18 @@
 
 package io.temporal.internal.testservice;
 
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import io.grpc.Status;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.internal.common.WorkflowExecutionUtils;
 import io.temporal.internal.testservice.TestWorkflowStore.ActivityTask;
 import io.temporal.internal.testservice.TestWorkflowStore.WorkflowTask;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
 final class RequestContext {
@@ -41,18 +43,18 @@ final class RequestContext {
 
   static final class Timer {
 
-    private final long delaySeconds;
+    private final Duration delay;
     private final Runnable callback;
     private final String taskInfo;
 
-    Timer(long delaySeconds, Runnable callback, String taskInfo) {
-      this.delaySeconds = delaySeconds;
+    Timer(Duration delay, Runnable callback, String taskInfo) {
+      this.delay = delay;
       this.callback = callback;
       this.taskInfo = taskInfo;
     }
 
-    long getDelaySeconds() {
-      return delaySeconds;
+    Duration getDelay() {
+      return delay;
     }
 
     Runnable getCallback() {
@@ -61,6 +63,28 @@ final class RequestContext {
 
     String getTaskInfo() {
       return taskInfo;
+    }
+  }
+
+  static final class TimerLockChange {
+    private final String caller;
+    /** +1 or -1 */
+    private final int change;
+
+    TimerLockChange(String caller, int change) {
+      this.caller = Objects.requireNonNull(caller);
+      if (change != -1 && change != 1) {
+        throw new IllegalArgumentException("Invalid change: " + change);
+      }
+      this.change = change;
+    }
+
+    public String getCaller() {
+      return caller;
+    }
+
+    public int getChange() {
+      return change;
     }
   }
 
@@ -81,7 +105,7 @@ final class RequestContext {
   private boolean needWorkflowTask;
   // How many times call SelfAdvancedTimer#lockTimeSkipping.
   // Negative means how many times to call SelfAdvancedTimer#unlockTimeSkipping.
-  private int timerLocks;
+  private List<TimerLockChange> timerLocks = new ArrayList<>();
 
   /**
    * Creates an instance of the RequestContext
@@ -107,25 +131,25 @@ final class RequestContext {
     this.events.addAll(ctx.getEvents());
   }
 
-  void lockTimer() {
-    timerLocks++;
+  void lockTimer(String caller) {
+    timerLocks.add(new TimerLockChange(caller, +1));
   }
 
-  void unlockTimer() {
-    timerLocks--;
+  void unlockTimer(String caller) {
+    timerLocks.add(new TimerLockChange(caller, -1));
   }
 
-  int getTimerLocks() {
+  List<TimerLockChange> getTimerLocks() {
     return timerLocks;
   }
 
   void clearTimersAndLocks() {
-    timerLocks = 0;
+    timerLocks.clear();
     timers.clear();
   }
 
-  long currentTimeInNanoseconds() {
-    return TimeUnit.MILLISECONDS.toNanos(clock.getAsLong());
+  Timestamp currentTime() {
+    return Timestamps.fromMillis(clock.getAsLong());
   }
 
   /** Returns eventId of the added event; */
@@ -187,8 +211,8 @@ final class RequestContext {
     this.activityTasks.add(activityTask);
   }
 
-  void addTimer(long delaySeconds, Runnable callback, String name) {
-    Timer timer = new Timer(delaySeconds, callback, name);
+  void addTimer(Duration delay, Runnable callback, String name) {
+    Timer timer = new Timer(delay, callback, name);
     this.timers.add(timer);
   }
 

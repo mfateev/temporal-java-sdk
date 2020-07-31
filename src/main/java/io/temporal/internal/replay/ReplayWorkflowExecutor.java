@@ -24,6 +24,8 @@ import static io.temporal.worker.WorkflowErrorPolicy.FailWorkflow;
 
 import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.Stopwatch;
 import io.grpc.Status;
@@ -45,6 +47,7 @@ import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder
 import io.temporal.common.converter.DataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
+import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.RpcRetryOptions;
 import io.temporal.internal.csm.CommandsManagerListener;
 import io.temporal.internal.csm.EntityManager;
@@ -64,7 +67,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -96,8 +98,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private final Scope metricsScope;
 
-  private final long wfStartTimeNanos;
-
+  private final Timestamp wfStartTime;
   private final WorkflowExecutionStartedEventAttributes startedEvent;
 
   private final Lock lock = new ReentrantLock();
@@ -130,7 +131,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
-    wfStartTimeNanos = firstEvent.getTimestamp();
+    wfStartTime = firstEvent.getEventTime();
 
     context =
         new ReplayWorkflowContextImpl(
@@ -138,7 +139,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
             namespace,
             startedEvent,
             workflowTask.getWorkflowExecution(),
-            Duration.ofNanos(firstEvent.getTimestamp()).toMillis(),
+            Timestamps.toMillis(firstEvent.getEventTime()),
             options,
             metricsScope);
   }
@@ -207,8 +208,9 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       }
     }
 
-    long nanoTime = TimeUnit.NANOSECONDS.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-    com.uber.m3.util.Duration d = com.uber.m3.util.Duration.ofNanos(nanoTime - wfStartTimeNanos);
+    com.uber.m3.util.Duration d =
+        ProtobufTimeUtils.ToM3Duration(
+            Timestamps.fromMillis(System.currentTimeMillis()), wfStartTime);
     metricsScope.timer(MetricsType.WORKFLOW_E2E_LATENCY).record(d);
   }
 
@@ -265,7 +267,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           workflowTask.getPreviousStartedEventId(), workflowTask.getStartedEventId());
       WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
           new WorkflowTaskWithHistoryIteratorImpl(
-              workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
+              workflowTask,
+              ProtobufTimeUtils.ToJavaDuration(startedEvent.getWorkflowTaskTimeout()));
       Iterator<HistoryEvent> iterator = workflowTaskWithHistoryIterator.getHistory();
       while (iterator.hasNext()) {
         HistoryEvent event = iterator.next();
@@ -351,7 +354,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private HistoryHelper newHistoryHelper(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
     WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
         new WorkflowTaskWithHistoryIteratorImpl(
-            workflowTask, Duration.ofSeconds(startedEvent.getWorkflowTaskTimeoutSeconds()));
+            workflowTask, ProtobufTimeUtils.ToJavaDuration(startedEvent.getWorkflowTaskTimeout()));
     return new HistoryHelper(
         workflowTaskWithHistoryIterator, context.getReplayCurrentTimeMilliseconds());
   }

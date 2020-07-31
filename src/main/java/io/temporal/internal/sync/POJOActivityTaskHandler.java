@@ -213,8 +213,11 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
       inboundCallsInterceptor.init(context);
       try {
         Object[] args =
-            dataConverter.arrayFromPayloads(
-                input, method.getParameterTypes(), method.getGenericParameterTypes());
+            DataConverter.arrayFromPayloads(
+                dataConverter,
+                input,
+                method.getParameterTypes(),
+                method.getGenericParameterTypes());
         Object result = inboundCallsInterceptor.execute(args);
         if (context.isDoNotCompleteOnReturn()) {
           return new ActivityTaskHandler.Result(info.getActivityId(), null, null, null, null);
@@ -289,8 +292,11 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
       inboundCallsInterceptor.init(context);
       try {
         Object[] args =
-            dataConverter.arrayFromPayloads(
-                input, method.getParameterTypes(), method.getGenericParameterTypes());
+            DataConverter.arrayFromPayloads(
+                dataConverter,
+                input,
+                method.getParameterTypes(),
+                method.getGenericParameterTypes());
         Object result = inboundCallsInterceptor.execute(args);
         RespondActivityTaskCompletedRequest.Builder request =
             RespondActivityTaskCompletedRequest.newBuilder();
