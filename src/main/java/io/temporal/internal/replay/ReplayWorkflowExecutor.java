@@ -49,8 +49,8 @@ import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.RpcRetryOptions;
-import io.temporal.internal.csm.CommandsManagerListener;
 import io.temporal.internal.csm.EntityManager;
+import io.temporal.internal.csm.EntityManagerListener;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.HistoryHelper.WorkflowTaskEvents;
 import io.temporal.internal.worker.ActivityTaskHandler;
@@ -127,7 +127,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           "First event in the history is not WorkflowExecutionStarted");
     }
     startedEvent = firstEvent.getWorkflowExecutionStartedEventAttributes();
-    this.entityManager = new EntityManager(new CommandsManagerListenerImpl());
+    this.entityManager = new EntityManager(new EntityManagerListenerImpl());
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
 
@@ -480,7 +480,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     }
   }
 
-  private class CommandsManagerListenerImpl implements CommandsManagerListener {
+  private class EntityManagerListenerImpl implements EntityManagerListener {
     @Override
     public void start(HistoryEvent startWorkflowEvent) {
       workflow.start(startWorkflowEvent, context);

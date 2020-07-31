@@ -73,7 +73,7 @@ public final class EntityManager {
   /** The eventId of the started event of the last successfully executed workflow task. */
   private long previousStartedEventId;
 
-  private final CommandsManagerListener callbacks;
+  private final EntityManagerListener callbacks;
 
   /** Callback to send new commands to. */
   private Functions.Proc1<NewCommand> sink;
@@ -114,10 +114,10 @@ public final class EntityManager {
 
   private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
 
-  public EntityManager(CommandsManagerListener callbacks) {
+  public EntityManager(EntityManagerListener callbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
     sink = (command) -> newCommands.add(command);
-    System.out.println("NEW EntityManager " + this);
+    System.out.println("\nNEW EntityManager " + this);
   }
 
   private void setStartedEventId(long startedEventId) {
@@ -134,14 +134,16 @@ public final class EntityManager {
     System.out.println(
         "ENTITY MANAGER handleEvent envet=" + event.getEventType() + ", replaying=" + replaying);
     if (isCommandEvent(event)) {
-      //      if (!isReplaying()) {
-      //        // takeCommands already consumed it
-      //        return;
-      //      }
+      if (!isReplaying()) {
+        // takeCommands already consumed it
+        return;
+      }
       handleCommand(event);
       return;
     }
-    if (replaying && startedEventId > previousStartedEventId) {
+    if (replaying
+        && startedEventId > previousStartedEventId
+        && event.getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
       replaying = false;
       System.out.println("ENTITY MANAGER handleEvent changed replaying=" + replaying);
     }
@@ -210,6 +212,9 @@ public final class EntityManager {
   }
 
   public List<Command> takeCommands() {
+    System.out.println(
+        "takeCommands commands="
+            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
     List<Command> result = new ArrayList<>(commands.size());
     for (NewCommand newCommand : commands) {
       if (newCommand.isCanceled()) {
@@ -222,6 +227,10 @@ public final class EntityManager {
   }
 
   private void prepareCommands() {
+    System.out.println(
+        "prepareCommands commands="
+            + newCommands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
+
     // handleCommand can lead to code execution because of SideEffect, MutableSideEffect or local
     // activity completion. And code execution can lead to creation of new commands and
     // cancellation of existing commands. That is the reason for using Queue as a data structure for
@@ -244,6 +253,9 @@ public final class EntityManager {
         commands.add(newCommand);
       }
     }
+    System.out.println(
+        "end prepareCommands commands="
+            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
   }
 
   private void handleLocalActivityMarker(HistoryEvent event, MarkerRecordedEventAttributes attr) {
@@ -255,8 +267,13 @@ public final class EntityManager {
       throw new IllegalStateException("Unexpected local activity id: " + id);
     }
     commands.handleEvent(event);
-    callbacks.eventLoop();
+    eventLoop();
     prepareCommands();
+  }
+
+  private void eventLoop() {
+    System.out.println("eventLoop");
+    callbacks.eventLoop();
   }
 
   private void handleNonStatefulEvent(HistoryEvent event) {
@@ -286,7 +303,7 @@ public final class EntityManager {
     }
   }
 
-  long setCurrentTimeMillis(long currentTimeMillis) {
+  private long setCurrentTimeMillis(long currentTimeMillis) {
     if (this.currentTimeMillis < currentTimeMillis) {
       this.currentTimeMillis = currentTimeMillis;
       this.replayTimeUpdatedAtMillis = System.currentTimeMillis();
@@ -480,7 +497,7 @@ public final class EntityManager {
         (payloads) -> {
           callback.apply(payloads);
           // callback unblocked sideEffect call. Give workflow code chance to make progress.
-          callbacks.eventLoop();
+          eventLoop();
         },
         sink);
   }
@@ -504,7 +521,7 @@ public final class EntityManager {
         (r) -> {
           callback.apply(r);
           // callback unblocked mutableSideEffect call. Give workflow code chance to make progress.
-          callbacks.eventLoop();
+          eventLoop();
         });
   }
 
@@ -520,7 +537,7 @@ public final class EntityManager {
       throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
     }
     commands.handleCompletion(laCompletion);
-    callbacks.eventLoop();
+    eventLoop();
     prepareCommands();
   }
 
@@ -542,7 +559,7 @@ public final class EntityManager {
             (r, e) -> {
               callback.apply(r, e);
               // callback unblocked local activity call. Give workflow code chance to make progress.
-              callbacks.eventLoop();
+              eventLoop();
             },
             sink);
     localActivityMap.put(activityId, commands);
@@ -557,7 +574,7 @@ public final class EntityManager {
     public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
       setStartedEventId(startedEventId);
       setCurrentTimeMillis(currentTimeMillis);
-      EntityManager.this.callbacks.eventLoop();
+      eventLoop();
       prepareCommands();
     }
 

@@ -21,7 +21,7 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.history.v1.HistoryEvent;
 
-public interface CommandsManagerListener {
+public interface EntityManagerListener {
 
   void start(HistoryEvent startWorkflowEvent);
 
