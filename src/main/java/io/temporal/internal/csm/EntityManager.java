@@ -104,6 +104,8 @@ public final class EntityManager {
   /** EventId of the last handled WorkflowTaskStartedEvent. */
   private long startedEventId;
 
+  private boolean replaying;
+
   /** Key is mutable side effect id */
   private final Map<String, MutableSideEffectStateMachine> mutableSideEffects = new HashMap<>();
 
@@ -125,9 +127,12 @@ public final class EntityManager {
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
     this.previousStartedEventId = previousStartedEventId;
     this.workflowTaskStartedEventId = workflowTaskStartedEventId;
+    replaying = previousStartedEventId > 0;
   }
 
   public final void handleEvent(HistoryEvent event) {
+    System.out.println(
+        "ENTITY MANAGER handleEvent envet=" + event.getEventType() + ", replaying=" + replaying);
     if (isCommandEvent(event)) {
       //      if (!isReplaying()) {
       //        // takeCommands already consumed it
@@ -135,6 +140,10 @@ public final class EntityManager {
       //      }
       handleCommand(event);
       return;
+    }
+    if (replaying && startedEventId > previousStartedEventId) {
+      replaying = false;
+      System.out.println("ENTITY MANAGER handleEvent changed replaying=" + replaying);
     }
     Long initialCommandEventId = getInitialCommandEventId(event);
     EntityStateMachine c = stateMachines.get(initialCommandEventId);
@@ -442,7 +451,7 @@ public final class EntityManager {
   }
 
   public boolean isReplaying() {
-    return previousStartedEventId > startedEventId && startedEventId != workflowTaskStartedEventId;
+    return replaying;
   }
 
   public long currentTimeMillis() {
@@ -570,14 +579,10 @@ public final class EntityManager {
         return event.getActivityTaskTimedOutEventAttributes().getScheduledEventId();
       case EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED:
         return event.getActivityTaskCancelRequestedEventAttributes().getScheduledEventId();
-      case EVENT_TYPE_REQUEST_CANCEL_ACTIVITY_TASK_FAILED:
-        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
       case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
         return event.getActivityTaskCanceledEventAttributes().getScheduledEventId();
       case EVENT_TYPE_TIMER_FIRED:
         return event.getTimerFiredEventAttributes().getStartedEventId();
-      case EVENT_TYPE_CANCEL_TIMER_FAILED:
-        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
       case EVENT_TYPE_TIMER_CANCELED:
         return event.getTimerCanceledEventAttributes().getStartedEventId();
       case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:

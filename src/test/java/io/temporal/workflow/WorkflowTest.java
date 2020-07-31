@@ -313,7 +313,7 @@ public class WorkflowTest {
             .setNamespace(NAMESPACE)
             .build();
     boolean versionTest =
-        true; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+        false; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)
@@ -5713,7 +5713,7 @@ public class WorkflowTest {
       //        }
       //      }
       String laResult = localActivities.activity2("test", 123);
-      for (int i = 0; i < 1; i++) {
+      for (int i = 0; i < 2; i++) {
         laResult = localActivities.activity2("test", 12345);
         TestActivities normalActivities =
             Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
