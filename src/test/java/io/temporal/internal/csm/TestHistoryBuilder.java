@@ -46,27 +46,32 @@ class TestHistoryBuilder {
     return this;
   }
 
-  void addWorkflowTask() {
+  TestHistoryBuilder addWorkflowTask() {
     addWorkflowTaskScheduledAndStarted();
     addWorkflowTaskCompleted();
+    return this;
   }
 
-  void addWorkflowTaskCompleted() {
+  TestHistoryBuilder addWorkflowTaskCompleted() {
     add(EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED, workflowTaskScheduledEventId);
+    return this;
   }
 
-  void addWorkflowTaskScheduledAndStarted() {
+  TestHistoryBuilder addWorkflowTaskScheduledAndStarted() {
     addWorkflowTaskScheduled();
     addWorkflowTaskStarted();
+    return this;
   }
 
-  void addWorkflowTaskScheduled() {
+  TestHistoryBuilder addWorkflowTaskScheduled() {
     previousStartedEventId = workflowTaskScheduledEventId + 1;
     workflowTaskScheduledEventId = addGetEventId(EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED);
+    return this;
   }
 
-  void addWorkflowTaskStarted() {
+  TestHistoryBuilder addWorkflowTaskStarted() {
     add(EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED, workflowTaskScheduledEventId);
+    return this;
   }
 
   public int getWorkflowTaskCount() {

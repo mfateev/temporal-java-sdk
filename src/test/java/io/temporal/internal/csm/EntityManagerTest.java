@@ -191,21 +191,21 @@ public class EntityManagerTest {
     long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
     long timerStartedEventId2 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
     h.add(
-        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED,
-        WorkflowExecutionSignaledEventAttributes.newBuilder().setSignalName("signal1"));
-    h.addWorkflowTaskScheduled();
-    h.add(
-        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED,
-        WorkflowExecutionSignaledEventAttributes.newBuilder().setSignalName("signal1"));
-    h.addWorkflowTaskStarted();
-    h.addWorkflowTaskCompleted();
-    h.add(EventType.EVENT_TYPE_TIMER_CANCELED, timerStartedEventId1);
-    h.add(
-        EventType.EVENT_TYPE_TIMER_FIRED,
-        TimerFiredEventAttributes.newBuilder()
-            .setStartedEventId(timerStartedEventId2)
-            .setTimerId("timer2"));
-    h.addWorkflowTaskScheduledAndStarted();
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED,
+            WorkflowExecutionSignaledEventAttributes.newBuilder().setSignalName("signal1"))
+        .addWorkflowTaskScheduled()
+        .add(
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED,
+            WorkflowExecutionSignaledEventAttributes.newBuilder().setSignalName("signal1"))
+        .addWorkflowTaskStarted()
+        .addWorkflowTaskCompleted()
+        .add(EventType.EVENT_TYPE_TIMER_CANCELED, timerStartedEventId1)
+        .add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId2)
+                .setTimerId("timer2"))
+        .addWorkflowTaskScheduledAndStarted();
     {
       TestTimerCancellationListener listener = new TestTimerCancellationListener();
       manager = new EntityManager(listener);
@@ -227,11 +227,12 @@ public class EntityManagerTest {
         assertEquals("timer2", listener.getFiredTimerId());
       }
     }
-    //    {
-    //      TestEntityManagerListenerBase listener = new TestTimerCancellationListener();
-    //      manager = new EntityManager(listener);
-    //      List<Command> commands = h.handleWorkflowTask(manager);
-    //      assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
-    //    }
+    {
+      TestTimerCancellationListener listener = new TestTimerCancellationListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTask(manager);
+      assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
+      assertEquals("timer2", listener.getFiredTimerId());
+    }
   }
 }
