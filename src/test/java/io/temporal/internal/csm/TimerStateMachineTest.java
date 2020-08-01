@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
-public class EntityManagerTest {
+public class TimerStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
   private EntityManager manager;
@@ -27,14 +27,14 @@ public class EntityManagerTest {
   @Test
   public void testTimerFire() {
     class TestTimerFireListener extends TestEntityManagerListenerBase {
-      boolean timerCreated;
+      boolean invoked;
 
       @Override
       public void eventLoop() {
-        if (timerCreated) {
+        if (invoked) {
           return;
         }
-        timerCreated = true;
+        invoked = true;
         manager.newTimer(
             StartTimerCommandAttributes.newBuilder()
                 .setTimerId("timer1")
@@ -83,14 +83,14 @@ public class EntityManagerTest {
   @Test
   public void testImmediateTimerCancellation() {
     class TestTimerImmediateCancellationListener extends TestEntityManagerListenerBase {
-      boolean timerCreated;
+      boolean invoked;
 
       @Override
       public void eventLoop() {
-        if (timerCreated) {
+        if (invoked) {
           return;
         }
-        timerCreated = true;
+        invoked = true;
         Functions.Proc cancellationHandler =
             manager.newTimer(
                 StartTimerCommandAttributes.newBuilder()
@@ -142,7 +142,7 @@ public class EntityManagerTest {
   public void testStartedTimerCancellation() {
 
     class TestTimerCancellationListener extends TestEntityManagerListenerBase {
-      boolean timerCreated;
+      boolean invoked;
       private Functions.Proc cancellationHandler;
       private String firedTimerId;
 
@@ -152,10 +152,10 @@ public class EntityManagerTest {
 
       @Override
       public void eventLoop() {
-        if (timerCreated) {
+        if (invoked) {
           return;
         }
-        timerCreated = true;
+        invoked = true;
         cancellationHandler =
             manager.newTimer(
                 StartTimerCommandAttributes.newBuilder()

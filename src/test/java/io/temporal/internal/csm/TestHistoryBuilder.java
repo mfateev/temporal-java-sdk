@@ -134,8 +134,7 @@ class TestHistoryBuilder {
     System.out.println("handleWorkflowTask:\n" + eventsToString(events));
     PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
     long previous = 0;
-    long started = 3;
-    manager.setStartedIds(previous, started);
+    long started = 0;
     HistoryEvent event = null;
     int count =
         manager.getLastStartedEventId() > 0
@@ -155,6 +154,9 @@ class TestHistoryBuilder {
             || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
           previous = started;
           started = event.getEventId();
+          if (started == previous) {
+            throw new IllegalStateException("equal started and previous: " + started);
+          }
           manager.setStartedIds(previous, started);
           count++;
           if (count == toTaskIndex || !history.hasNext()) {

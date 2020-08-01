@@ -130,6 +130,9 @@ public final class SideEffectStateMachine
   }
 
   private void markerResultFromEvent() {
+    if (!replaying.apply()) {
+      return;
+    }
     MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
     if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
       throw new IllegalStateException(

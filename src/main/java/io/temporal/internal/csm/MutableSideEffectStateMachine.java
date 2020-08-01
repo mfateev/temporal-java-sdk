@@ -38,10 +38,10 @@ import java.util.Queue;
 public final class MutableSideEffectStateMachine implements EntityStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
-  private static final String MARKER_DATA_KEY = "data";
-  private static final String MARKER_SKIP_COUNT_KEY = "skipCount";
-  private static final String MARKER_ID_KEY = "id";
-  private static final String MUTABLE_SIDE_EFFECT_MARKER_NAME = "MutableSideEffect";
+  static final String MARKER_DATA_KEY = "data";
+  static final String MARKER_SKIP_COUNT_KEY = "skipCount";
+  static final String MARKER_ID_KEY = "id";
+  static final String MUTABLE_SIDE_EFFECT_MARKER_NAME = "MutableSideEffect";
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
   private final String id;

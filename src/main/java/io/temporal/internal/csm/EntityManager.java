@@ -125,6 +125,12 @@ public final class EntityManager {
   }
 
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
+    System.out.println(
+        "EntityManager setStartedIds("
+            + previousStartedEventId
+            + ", "
+            + workflowTaskStartedEventId
+            + ")");
     this.previousStartedEventId = previousStartedEventId;
     this.workflowTaskStartedEventId = workflowTaskStartedEventId;
     replaying = previousStartedEventId > 0;
@@ -226,10 +232,23 @@ public final class EntityManager {
     return result;
   }
 
+  private boolean preparing;
+
   private void prepareCommands() {
-    System.out.println(
-        "prepareCommands commands="
-            + newCommands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
+    if (preparing) {
+      System.out.println("prepareCommands already executing");
+      return;
+    }
+    preparing = true;
+    try {
+      prepareImpl();
+    } finally {
+      preparing = false;
+    }
+  }
+
+  private void prepareImpl() {
+    System.out.println("prepareCommands commands=" + newCommandsToString(newCommands));
 
     // handleCommand can lead to code execution because of SideEffect, MutableSideEffect or local
     // activity completion. And code execution can lead to creation of new commands and
@@ -253,9 +272,27 @@ public final class EntityManager {
         commands.add(newCommand);
       }
     }
-    System.out.println(
-        "end prepareCommands commands="
-            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
+    System.out.println("end prepareCommands commands=" + newCommandsToString(commands));
+  }
+
+  private String newCommandsToString(Queue<NewCommand> commands) {
+    StringBuilder result = new StringBuilder();
+    for (NewCommand command : commands) {
+      result.append("\n    ");
+      result.append(command.getCommandType());
+    }
+    result.append("\n");
+    return result.toString();
+  }
+
+  private String commandsToString(List<Command> commands) {
+    StringBuilder result = new StringBuilder();
+    for (Command command : commands) {
+      result.append("\n    ");
+      result.append(command.getCommandType());
+    }
+    result.append("\n");
+    return result.toString();
   }
 
   private void handleLocalActivityMarker(HistoryEvent event, MarkerRecordedEventAttributes attr) {
