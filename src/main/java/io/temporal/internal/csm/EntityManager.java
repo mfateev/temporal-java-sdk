@@ -102,9 +102,16 @@ public final class EntityManager {
   private final Queue<NewCommand> newCommands = new ArrayDeque<>();
 
   /** EventId of the last handled WorkflowTaskStartedEvent. */
-  private long startedEventId;
+  private long currentStartedEventId;
 
   private boolean replaying;
+
+  /**
+   * Used to avoid recursive calls to {@link #prepareCommands()}.
+   *
+   * <p>Such calls happen when sideEffects and localActivity markers are processed.
+   */
+  private boolean preparing;
 
   /** Key is mutable side effect id */
   private final Map<String, MutableSideEffectStateMachine> mutableSideEffects = new HashMap<>();
@@ -118,10 +125,6 @@ public final class EntityManager {
     this.callbacks = Objects.requireNonNull(callbacks);
     sink = (command) -> newCommands.add(command);
     System.out.println("\nNEW EntityManager " + this);
-  }
-
-  private void setStartedEventId(long startedEventId) {
-    this.startedEventId = startedEventId;
   }
 
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
@@ -148,7 +151,7 @@ public final class EntityManager {
       return;
     }
     if (replaying
-        && startedEventId > previousStartedEventId
+        && currentStartedEventId >= previousStartedEventId
         && event.getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
       replaying = false;
       System.out.println("ENTITY MANAGER handleEvent changed replaying=" + replaying);
@@ -178,12 +181,8 @@ public final class EntityManager {
             + isReplaying()
             + ", commands="
             + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
-    if (isReplaying() && event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
-      MarkerRecordedEventAttributes attr = event.getMarkerRecordedEventAttributes();
-      if (attr.getMarkerName().equals(LOCAL_ACTIVITY_MARKER_NAME)) {
-        handleLocalActivityMarker(event, attr);
-        return;
-      }
+    if (handleLocalActivityMarker(event)) {
+      return;
     }
     NewCommand newCommand;
     while (true) {
@@ -231,8 +230,6 @@ public final class EntityManager {
     }
     return result;
   }
-
-  private boolean preparing;
 
   private void prepareCommands() {
     if (preparing) {
@@ -295,16 +292,39 @@ public final class EntityManager {
     return result.toString();
   }
 
-  private void handleLocalActivityMarker(HistoryEvent event, MarkerRecordedEventAttributes attr) {
+  /**
+   * Local activity is different from all other entities. It don't schedule a marker command when
+   * the {@link #scheduleLocalActivityTask(ExecuteLocalActivityParameters, Functions.Proc2)} is
+   * called. The marker is scheduled only when activity completes through ({@link
+   * #handleLocalActivityCompletion(ActivityTaskHandler.Result)}).
+   *
+   * <p>That's why the normal logic of {@link #handleCommand(HistoryEvent)}, which assumes that each
+   * event has a correspondent command during replay, doesn't work. Instead local activities are
+   * matched by their id using localActivityMap.
+   *
+   * @return true if matched and false if normal event handling should continue.
+   */
+  private boolean handleLocalActivityMarker(HistoryEvent event) {
+    if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED) {
+      return false;
+    }
+    MarkerRecordedEventAttributes attr = event.getMarkerRecordedEventAttributes();
+    if (!attr.getMarkerName().equals(LOCAL_ACTIVITY_MARKER_NAME)) {
+      return false;
+    }
     Map<String, Payloads> detailsMap = attr.getDetailsMap();
     Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ACTIVITY_ID_KEY));
     String id = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
-    LocalActivityStateMachine commands = localActivityMap.remove(id);
-    if (commands == null) {
+    LocalActivityStateMachine stateMachine = localActivityMap.remove(id);
+    if (stateMachine == null) {
       throw new IllegalStateException("Unexpected local activity id: " + id);
     }
-    commands.handleEvent(event);
+    if (stateMachine.getState() != LocalActivityStateMachine.State.REQUEST_PREPARED) {
+      return false;
+    }
+    stateMachine.handleEvent(event);
     eventLoop();
+    return true;
   }
 
   private void eventLoop() {
@@ -349,7 +369,7 @@ public final class EntityManager {
   }
 
   public long getLastStartedEventId() {
-    return startedEventId;
+    return currentStartedEventId;
   }
 
   /** Validates that command matches the event during replay. */
@@ -608,7 +628,7 @@ public final class EntityManager {
   private class WorkflowTaskCommandsListener implements WorkflowTaskStateMachine.Listener {
     @Override
     public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
-      setStartedEventId(startedEventId);
+      EntityManager.this.currentStartedEventId = startedEventId;
       setCurrentTimeMillis(currentTimeMillis);
       eventLoop();
     }

@@ -48,7 +48,6 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(ContinueAsNewWorkflowStateMachine.class);
     generate(WorkflowTaskStateMachine.class);
     generate(SideEffectStateMachine.class);
-    generate(MutableSideEffectStateMachine.class);
     generate(LocalActivityStateMachine.class);
   }
 

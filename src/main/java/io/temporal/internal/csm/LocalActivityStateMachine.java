@@ -49,8 +49,8 @@ public final class LocalActivityStateMachine
 
   static final String LOCAL_ACTIVITY_MARKER_NAME = "LocalActivity";
   static final String MARKER_ACTIVITY_ID_KEY = "activityId";
-  private static final String MARKER_TIME_KEY = "time";
-  private static final String MARKER_DATA_KEY = "data";
+  static final String MARKER_TIME_KEY = "time";
+  static final String MARKER_DATA_KEY = "data";
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
 

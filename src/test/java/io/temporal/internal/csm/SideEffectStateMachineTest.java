@@ -19,21 +19,20 @@ public class SideEffectStateMachineTest {
 
   @Test
   public void testOne() {
-    class TestSingleMSEListener extends TestEntityManagerListenerBase {
-      boolean invoked;
+    class TestListener extends TestEntityManagerListenerBase {
       Optional<Payloads> result;
 
       @Override
-      public void eventLoop() {
-        if (invoked) {
-          return;
-        }
-        invoked = true;
+      public void eventLoopImpl() {
         manager.sideEffect(
             () -> converter.toPayloads("foo", "bar"),
             (r) -> {
               result = r;
-              manager.newCompleteWorkflow(Optional.empty());
+              manager.sideEffect(
+                  () -> converter.toPayloads("baz"),
+                  (rr) -> {
+                    manager.newCompleteWorkflow(Optional.empty());
+                  });
             });
       }
     }
@@ -43,21 +42,33 @@ public class SideEffectStateMachineTest {
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
             .addWorkflowTaskScheduledAndStarted();
 
-    TestEntityManagerListenerBase listener = new TestSingleMSEListener();
+    TestEntityManagerListenerBase listener = new TestListener();
     manager = new EntityManager(listener);
-    List<Command> commands = h.handleWorkflowTask(manager);
-    assertEquals(2, commands.size());
+    List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
+
+    assertEquals(3, commands.size());
     assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(0).getCommandType());
-    Optional<Payloads> data =
+    assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(1).getCommandType());
+    Optional<Payloads> data1 =
         Optional.of(
             commands
                 .get(0)
                 .getRecordMarkerCommandAttributes()
                 .getDetailsMap()
                 .get(MARKER_DATA_KEY));
-    assertEquals("foo", converter.fromPayloads(0, data, String.class, String.class));
-    assertEquals("bar", converter.fromPayloads(1, data, String.class, String.class));
+    assertEquals("foo", converter.fromPayloads(0, data1, String.class, String.class));
+    assertEquals("bar", converter.fromPayloads(1, data1, String.class, String.class));
+
+    Optional<Payloads> data2 =
+        Optional.of(
+            commands
+                .get(1)
+                .getRecordMarkerCommandAttributes()
+                .getDetailsMap()
+                .get(MARKER_DATA_KEY));
+    assertEquals("baz", converter.fromPayloads(0, data2, String.class, String.class));
+
     assertEquals(
-        CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(1).getCommandType());
+        CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(2).getCommandType());
   }
 }

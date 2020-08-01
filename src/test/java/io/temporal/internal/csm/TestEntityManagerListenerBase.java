@@ -2,7 +2,10 @@ package io.temporal.internal.csm;
 
 import io.temporal.api.history.v1.HistoryEvent;
 
-class TestEntityManagerListenerBase implements EntityManagerListener {
+abstract class TestEntityManagerListenerBase implements EntityManagerListener {
+
+  boolean invoked;
+
   @Override
   public void start(HistoryEvent startWorkflowEvent) {}
 
@@ -13,5 +16,13 @@ class TestEntityManagerListenerBase implements EntityManagerListener {
   public void cancel(HistoryEvent cancelEvent) {}
 
   @Override
-  public void eventLoop() {}
+  public final void eventLoop() {
+    if (invoked) {
+      return;
+    }
+    invoked = true;
+    eventLoopImpl();
+  }
+
+  protected abstract void eventLoopImpl();
 }

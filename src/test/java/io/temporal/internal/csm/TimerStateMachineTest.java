@@ -27,14 +27,9 @@ public class TimerStateMachineTest {
   @Test
   public void testTimerFire() {
     class TestTimerFireListener extends TestEntityManagerListenerBase {
-      boolean invoked;
 
       @Override
-      public void eventLoop() {
-        if (invoked) {
-          return;
-        }
-        invoked = true;
+      public void eventLoopImpl() {
         manager.newTimer(
             StartTimerCommandAttributes.newBuilder()
                 .setTimerId("timer1")
@@ -60,18 +55,18 @@ public class TimerStateMachineTest {
       assertEquals(2, h.getWorkflowTaskCount());
     }
     {
-      List<Command> commands = h.handleWorkflowTask(manager, 1);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
       assertCommand(CommandType.COMMAND_TYPE_START_TIMER, commands);
     }
     System.out.println("PROCESSING TASK 2");
     {
-      List<Command> commands = h.handleWorkflowTask(manager, 2);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
     }
     {
       TestEntityManagerListenerBase listener = new TestTimerFireListener();
       manager = new EntityManager(listener);
-      List<Command> commands = h.handleWorkflowTask(manager, 2);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
     }
   }
@@ -83,14 +78,9 @@ public class TimerStateMachineTest {
   @Test
   public void testImmediateTimerCancellation() {
     class TestTimerImmediateCancellationListener extends TestEntityManagerListenerBase {
-      boolean invoked;
 
       @Override
-      public void eventLoop() {
-        if (invoked) {
-          return;
-        }
-        invoked = true;
+      public void eventLoopImpl() {
         Functions.Proc cancellationHandler =
             manager.newTimer(
                 StartTimerCommandAttributes.newBuilder()
@@ -121,19 +111,19 @@ public class TimerStateMachineTest {
       TestEntityManagerListenerBase listener = new TestTimerImmediateCancellationListener();
       manager = new EntityManager(listener);
       {
-        List<Command> commands = h.handleWorkflowTask(manager, 1);
+        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
         assertCommand(CommandType.COMMAND_TYPE_START_TIMER, commands);
         assertEquals("timer2", commands.get(0).getStartTimerCommandAttributes().getTimerId());
       }
       {
-        List<Command> commands = h.handleWorkflowTask(manager);
+        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
         assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
       }
     }
     {
       TestEntityManagerListenerBase listener = new TestTimerImmediateCancellationListener();
       manager = new EntityManager(listener);
-      List<Command> commands = h.handleWorkflowTask(manager);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
     }
   }
@@ -142,7 +132,6 @@ public class TimerStateMachineTest {
   public void testStartedTimerCancellation() {
 
     class TestTimerCancellationListener extends TestEntityManagerListenerBase {
-      boolean invoked;
       private Functions.Proc cancellationHandler;
       private String firedTimerId;
 
@@ -151,11 +140,7 @@ public class TimerStateMachineTest {
       }
 
       @Override
-      public void eventLoop() {
-        if (invoked) {
-          return;
-        }
-        invoked = true;
+      public void eventLoopImpl() {
         cancellationHandler =
             manager.newTimer(
                 StartTimerCommandAttributes.newBuilder()
@@ -210,7 +195,7 @@ public class TimerStateMachineTest {
       TestTimerCancellationListener listener = new TestTimerCancellationListener();
       manager = new EntityManager(listener);
       {
-        List<Command> commands = h.handleWorkflowTask(manager, 1);
+        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
         assertEquals(2, commands.size());
         assertEquals(CommandType.COMMAND_TYPE_START_TIMER, commands.get(0).getCommandType());
         assertEquals(CommandType.COMMAND_TYPE_START_TIMER, commands.get(1).getCommandType());
@@ -218,11 +203,11 @@ public class TimerStateMachineTest {
         assertEquals("timer2", commands.get(1).getStartTimerCommandAttributes().getTimerId());
       }
       {
-        List<Command> commands = h.handleWorkflowTask(manager, 2);
+        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
         assertCommand(CommandType.COMMAND_TYPE_CANCEL_TIMER, commands);
       }
       {
-        List<Command> commands = h.handleWorkflowTask(manager);
+        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
         assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
         assertEquals("timer2", listener.getFiredTimerId());
       }
@@ -230,7 +215,7 @@ public class TimerStateMachineTest {
     {
       TestTimerCancellationListener listener = new TestTimerCancellationListener();
       manager = new EntityManager(listener);
-      List<Command> commands = h.handleWorkflowTask(manager);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
       assertEquals("timer2", listener.getFiredTimerId());
     }

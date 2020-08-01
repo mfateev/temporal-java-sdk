@@ -2,6 +2,7 @@ package io.temporal.internal.csm;
 
 import static org.junit.Assert.assertEquals;
 
+import com.google.common.base.Objects;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 import com.google.protobuf.util.Timestamps;
@@ -9,14 +10,17 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.history.v1.TimerCanceledEventAttributes;
 import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.api.history.v1.TimerStartedEventAttributes;
+import io.temporal.api.history.v1.WorkflowExecutionCompletedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskCompletedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskScheduledEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskStartedEventAttributes;
+import io.temporal.internal.common.WorkflowExecutionUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -97,6 +101,93 @@ class TestHistoryBuilder {
     }
   }
 
+  public static class HistoryInfo {
+    private final long previousStartedEventId;
+    private final long workflowTaskStartedEventId;
+
+    public HistoryInfo(long previousStartedEventId, long workflowTaskStartedEventId) {
+      this.previousStartedEventId = previousStartedEventId;
+      this.workflowTaskStartedEventId = workflowTaskStartedEventId;
+    }
+
+    public long getPreviousStartedEventId() {
+      return previousStartedEventId;
+    }
+
+    public long getWorkflowTaskStartedEventId() {
+      return workflowTaskStartedEventId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      HistoryInfo that = (HistoryInfo) o;
+      return previousStartedEventId == that.previousStartedEventId
+          && workflowTaskStartedEventId == that.workflowTaskStartedEventId;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(previousStartedEventId, workflowTaskStartedEventId);
+    }
+
+    @Override
+    public String toString() {
+      return "HistoryInfo{"
+          + "previousStartedEventId="
+          + previousStartedEventId
+          + ", workflowTaskStartedEventId="
+          + workflowTaskStartedEventId
+          + '}';
+    }
+  }
+
+  public HistoryInfo getHistoryInfo() {
+    return getHistoryInfo(Integer.MAX_VALUE);
+  }
+
+  public HistoryInfo getHistoryInfo(int toTaskIndex) {
+    PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
+    long previous = 0;
+    long started = 0;
+    HistoryEvent event = null;
+    int count = 0;
+    while (true) {
+      if (!history.hasNext()) {
+        if (WorkflowExecutionUtils.isWorkflowExecutionCompletedEvent(event)) {
+          return new HistoryInfo(previous, started);
+        }
+        if (started != event.getEventId()) {
+          throw new IllegalArgumentException(
+              "The last event in the history is not WorkflowTaskStarted");
+        }
+        throw new IllegalStateException("unreachable");
+      }
+      event = history.next();
+      if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED) {
+        if (!history.hasNext()
+            || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
+          previous = started;
+          started = event.getEventId();
+          if (started == previous) {
+            throw new IllegalStateException("equal started and previous: " + started);
+          }
+          count++;
+          if (count == toTaskIndex || !history.hasNext()) {
+            return new HistoryInfo(previous, started);
+          }
+        } else if (history.hasNext()
+            && (history.peek().getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED
+                && history.peek().getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT)) {
+          throw new IllegalStateException(
+              "Invalid history. Missing task completed, failed or timed out at "
+                  + history.peek().getEventId());
+        }
+      }
+    }
+  }
+
   private int getWorkflowTaskCount(long upToEventId) {
     PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
     int result = 0;
@@ -123,18 +214,27 @@ class TestHistoryBuilder {
     }
   }
 
-  List<Command> handleWorkflowTask(EntityManager manager) {
-    return handleWorkflowTask(manager, Integer.MAX_VALUE);
+  List<Command> handleWorkflowTaskTakeCommands(EntityManager manager) {
+    return handleWorkflowTaskTakeCommands(manager, Integer.MAX_VALUE);
   }
 
-  public List<Command> handleWorkflowTask(EntityManager manager, int toTaskIndex) {
+  public List<Command> handleWorkflowTaskTakeCommands(EntityManager manager, int toTaskIndex) {
+    handleWorkflowTask(manager, toTaskIndex);
+    return manager.takeCommands();
+  }
 
+  public void handleWorkflowTask(EntityManager manager) {
+    handleWorkflowTask(manager, Integer.MAX_VALUE);
+  }
+
+  public void handleWorkflowTask(EntityManager manager, int toTaskIndex) {
     List<HistoryEvent> events =
         this.events.subList((int) manager.getLastStartedEventId(), this.events.size());
     System.out.println("handleWorkflowTask:\n" + eventsToString(events));
     PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
-    long previous = 0;
-    long started = 0;
+    HistoryInfo info = getHistoryInfo(toTaskIndex);
+    manager.setStartedIds(info.getPreviousStartedEventId(), info.getWorkflowTaskStartedEventId());
+    long started = info.getPreviousStartedEventId();
     HistoryEvent event = null;
     int count =
         manager.getLastStartedEventId() > 0
@@ -142,6 +242,9 @@ class TestHistoryBuilder {
             : 0;
     while (true) {
       if (!history.hasNext()) {
+        if (WorkflowExecutionUtils.isWorkflowExecutionCompletedEvent(event)) {
+          return;
+        }
         if (started != event.getEventId()) {
           throw new IllegalArgumentException(
               "The last event in the history is not WorkflowTaskStarted");
@@ -152,16 +255,11 @@ class TestHistoryBuilder {
       if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED) {
         if (!history.hasNext()
             || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
-          previous = started;
           started = event.getEventId();
-          if (started == previous) {
-            throw new IllegalStateException("equal started and previous: " + started);
-          }
-          manager.setStartedIds(previous, started);
           count++;
           if (count == toTaskIndex || !history.hasNext()) {
             manager.handleEvent(event);
-            return manager.takeCommands();
+            return;
           }
         } else if (history.hasNext()
             && (history.peek().getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED
@@ -192,8 +290,12 @@ class TestHistoryBuilder {
         return TimerStartedEventAttributes.getDefaultInstance();
       case EVENT_TYPE_TIMER_CANCELED:
         return TimerCanceledEventAttributes.newBuilder().setStartedEventId(initialEventId);
-      case EVENT_TYPE_UNSPECIFIED:
+      case EVENT_TYPE_MARKER_RECORDED:
+        return MarkerRecordedEventAttributes.getDefaultInstance();
       case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
+        return WorkflowExecutionCompletedEventAttributes.getDefaultInstance();
+
+      case EVENT_TYPE_UNSPECIFIED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
       case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
@@ -210,7 +312,6 @@ class TestHistoryBuilder {
       case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
       case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
       case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-      case EVENT_TYPE_MARKER_RECORDED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW:
@@ -276,9 +377,15 @@ class TestHistoryBuilder {
         case EVENT_TYPE_TIMER_CANCELED:
           result.setTimerCanceledEventAttributes((TimerCanceledEventAttributes) attributes);
           break;
+        case EVENT_TYPE_MARKER_RECORDED:
+          result.setMarkerRecordedEventAttributes((MarkerRecordedEventAttributes) attributes);
+          break;
+        case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
+          result.setWorkflowExecutionCompletedEventAttributes(
+              (WorkflowExecutionCompletedEventAttributes) attributes);
+          break;
 
         case EVENT_TYPE_UNSPECIFIED:
-        case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
         case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
@@ -295,7 +402,6 @@ class TestHistoryBuilder {
         case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED:
         case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
         case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-        case EVENT_TYPE_MARKER_RECORDED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW:
         case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED:
