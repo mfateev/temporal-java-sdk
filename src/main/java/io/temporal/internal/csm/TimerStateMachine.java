@@ -106,6 +106,7 @@ public final class TimerStateMachine
             Action.CANCEL,
             State.CANCEL_TIMER_COMMAND_CREATED,
             TimerStateMachine::createCancelTimerCommand)
+        .add(State.CANCEL_TIMER_COMMAND_CREATED, Action.CANCEL, State.CANCEL_TIMER_COMMAND_CREATED)
         .add(
             State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_CANCELED,

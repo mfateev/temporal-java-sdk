@@ -243,7 +243,7 @@ public final class EntityManager {
         break;
       }
       // handleCommand should be called even on cancelled ones to support mutableSideEffect
-      newCommand.getCommands().handleCommand(newCommand.getCommandType());
+      newCommand.handleCommand(newCommand.getCommandType());
       if (!newCommand.isCanceled()) {
         filteredCommands.add(newCommand);
       }
@@ -268,12 +268,12 @@ public final class EntityManager {
     }
     commands.handleEvent(event);
     eventLoop();
-    prepareCommands();
   }
 
   private void eventLoop() {
     System.out.println("eventLoop");
     callbacks.eventLoop();
+    prepareCommands();
   }
 
   private void handleNonStatefulEvent(HistoryEvent event) {
@@ -538,7 +538,6 @@ public final class EntityManager {
     }
     commands.handleCompletion(laCompletion);
     eventLoop();
-    prepareCommands();
   }
 
   public Functions.Proc scheduleLocalActivityTask(
@@ -575,7 +574,6 @@ public final class EntityManager {
       setStartedEventId(startedEventId);
       setCurrentTimeMillis(currentTimeMillis);
       eventLoop();
-      prepareCommands();
     }
 
     @Override

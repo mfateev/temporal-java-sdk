@@ -70,6 +70,12 @@ public class NewCommand {
     return command.getCommandType();
   }
 
+  public void handleCommand(CommandType commandType) {
+    if (!canceled) {
+      commands.handleCommand(commandType);
+    }
+  }
+
   public void handleEvent(HistoryEvent event) {
     if (canceled) {
       return;
