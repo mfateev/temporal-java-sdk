@@ -134,10 +134,10 @@ public final class EntityManager {
     System.out.println(
         "ENTITY MANAGER handleEvent envet=" + event.getEventType() + ", replaying=" + replaying);
     if (isCommandEvent(event)) {
-      if (!isReplaying()) {
-        // takeCommands already consumed it
-        return;
-      }
+      //      if (!isReplaying()) {
+      //        // takeCommands already consumed it
+      //        return;
+      //      }
       handleCommand(event);
       return;
     }

@@ -37,84 +37,34 @@ public class EntityManagerTest {
     HistoryBuilder h = new HistoryBuilder();
     h.add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED);
     h.addWorkflowTask();
-    //    System.out.println(h);
-    //    h.handleEvents(manager);
-    //    List<Command> commands = manager.takeCommands();
-    //    assertEquals(1, commands.size());
-    //    assertEquals(CommandType.COMMAND_TYPE_START_TIMER, commands.get(0).getCommandType());
 
-    //    // Next workflow task
+    h.addWorkflowTaskCompleted();
+    long timerStartedEventId = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(EventType.EVENT_TYPE_TIMER_FIRED, timerStartedEventId);
+    h.addWorkflowTask();
+    assertEquals(2, h.getWorkflowTaskCount());
+
+    {
+      List<Command> commands = h.handleWorkflowTask(manager, 1);
+
+      assertEquals(1, commands.size());
+      assertEquals(CommandType.COMMAND_TYPE_START_TIMER, commands.get(0).getCommandType());
+    }
+    System.out.println("PROCESSING TASK 2");
+    {
+      List<Command> commands = h.handleWorkflowTask(manager, 2);
+      assertEquals(1, commands.size());
+      assertEquals(
+          CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(0).getCommandType());
+    }
     //    {
-    //      HistoryBuilder h2 = h.nextTask();
-    //      System.out.println(h2);
-    //      long timerStartedEventId = h2.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
-    //      h2.add(EventType.EVENT_TYPE_TIMER_FIRED, timerStartedEventId);
-    //      h2.addWorkflowTask();
-    //      System.out.println("To Process: " + h2);
-    //      h2.handleEvents(manager);
-    //      commands = manager.takeCommands();
+    //      manager = new EntityManager(listener);
+    //      List<Command> commands = h.handleWorkflowTask(manager, 2);
     //      assertEquals(1, commands.size());
     //      assertEquals(
     //          CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION,
     // commands.get(0).getCommandType());
     //    }
-
-    // Full replay
-    h.addWorkflowTaskCompleted();
-    long timerStartedEventId = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
-    h.add(EventType.EVENT_TYPE_TIMER_FIRED, timerStartedEventId);
-    h.addWorkflowTask();
-    listener = new TestTimerListener();
-    manager = new EntityManager(listener);
-    List<Command> commands = h.newExecutor().handleCached(manager);
-    //    h.handleEvents(manager);
-    //    commands = manager.takeCommands();
-
-    assertEquals(1, commands.size());
-    assertEquals(
-        CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(0).getCommandType());
-  }
-
-  private static class TestTaskExecutor {
-    private final List<HistoryEvent> events;
-
-    private TestTaskExecutor(List<HistoryEvent> events) {
-      this.events = events;
-    }
-
-    List<Command> handleCached(EntityManager manager) {
-      PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
-      if (!history.hasNext()
-          || history.peek().getEventType() != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED) {
-        throw new IllegalArgumentException(
-            "The first event in the history is not WorkflowExecutionStarted");
-      }
-      long previous = 0;
-      long started = 3;
-      manager.setStartedIds(previous, started);
-      while (true) {
-        HistoryEvent event = null;
-        while (true) {
-          if (!history.hasNext()) {
-            if (started != event.getEventId()) {
-              throw new IllegalArgumentException(
-                  "The last event in the history is not WorkflowTaskStarted");
-            }
-            return manager.takeCommands();
-          }
-          event = history.next();
-          if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
-              && (!history.hasNext()
-                  || history.peek().getEventType()
-                      == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)) {
-            previous = started;
-            started = event.getEventId();
-            manager.setStartedIds(previous, started);
-          }
-          manager.handleEvent(event);
-        }
-      }
-    }
   }
 
   private static class HistoryBuilder {
@@ -122,10 +72,6 @@ public class EntityManagerTest {
     private final List<HistoryEvent> events = new ArrayList<>();
     private long workflowTaskScheduledEventId;
     private long previousStartedEventId;
-
-    TestTaskExecutor newExecutor() {
-      return new TestTaskExecutor(events);
-    }
 
     private List<HistoryEvent> build() {
       return new ArrayList<>(events);
@@ -155,6 +101,97 @@ public class EntityManagerTest {
       workflowTaskScheduledEventId = addGetEventId(EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED);
       add(EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED, workflowTaskScheduledEventId);
       return eventId;
+    }
+
+    public int getWorkflowTaskCount() {
+      PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
+      int result = 0;
+      long started = 0;
+      HistoryEvent event = null;
+      while (true) {
+        if (!history.hasNext()) {
+          if (started != event.getEventId()) {
+            throw new IllegalArgumentException(
+                "The last event in the history is not WorkflowTaskStarted");
+          }
+          return result;
+        }
+        event = history.next();
+        if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            && (!history.hasNext()
+                || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)) {
+          started = event.getEventId();
+          result++;
+        }
+      }
+    }
+
+    private int getWorkflowTaskCount(long upToEventId) {
+      PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
+      int result = 0;
+      long started = 0;
+      HistoryEvent event = null;
+      while (true) {
+        if (!history.hasNext()) {
+          if (started != event.getEventId()) {
+            throw new IllegalArgumentException(
+                "The last event in the history is not WorkflowTaskStarted");
+          }
+          return result;
+        }
+        event = history.next();
+        if (event.getEventId() > upToEventId) {
+          return result;
+        }
+        if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            && (!history.hasNext()
+                || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)) {
+          started = event.getEventId();
+          result++;
+        }
+      }
+    }
+
+    List<Command> handleWorkflowTask(EntityManager manager, int toTaskIndex) {
+
+      List<HistoryEvent> events =
+          this.events.subList((int) manager.getLastStartedEventId(), this.events.size());
+      System.out.println("handleWorkflowTask:\n" + eventsToString(events));
+      PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
+      long previous = 0;
+      long started = 3;
+      manager.setStartedIds(previous, started);
+      HistoryEvent event = null;
+      int count =
+          manager.getLastStartedEventId() > 0
+              ? getWorkflowTaskCount(history.peek().getEventId() - 1)
+              : 0;
+      while (true) {
+        if (!history.hasNext()) {
+          if (started != event.getEventId()) {
+            throw new IllegalArgumentException(
+                "The last event in the history is not WorkflowTaskStarted");
+          }
+          if (count < toTaskIndex) {
+            throw new IllegalArgumentException(
+                "taskIndex is higher than number tasks in the history: " + getWorkflowTaskCount());
+          }
+        }
+        event = history.next();
+        if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            && (!history.hasNext()
+                || history.peek().getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)) {
+          previous = started;
+          started = event.getEventId();
+          manager.setStartedIds(previous, started);
+          count++;
+          if (count == toTaskIndex) {
+            manager.handleEvent(event);
+            return manager.takeCommands();
+          }
+        }
+        manager.handleEvent(event);
+      }
     }
 
     private Object newAttributes(EventType type, long initialEventId) {
@@ -322,11 +359,16 @@ public class EntityManagerTest {
           + ", previousStartedEventId="
           + previousStartedEventId
           + ", events=\n    "
-          + events.stream()
-              .map((event) -> event.getEventId() + ": " + event.getEventType())
-              .collect(Collectors.joining("\n    "))
+          + eventsToString(events)
           + '}';
     }
+  }
+
+  private static String eventsToString(List<HistoryEvent> events) {
+    return "    "
+        + events.stream()
+            .map((event) -> event.getEventId() + ": " + event.getEventType())
+            .collect(Collectors.joining("\n    "));
   }
 
   private static class TestEntityManagerListener implements EntityManagerListener {
