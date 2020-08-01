@@ -35,8 +35,8 @@ public final class SideEffectStateMachine
         SideEffectStateMachine.State, SideEffectStateMachine.Action, SideEffectStateMachine> {
 
   private static final String MARKER_HEADER_KEY = "header";
-  private static final String MARKER_DATA_KEY = "data";
-  private static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
+  static final String MARKER_DATA_KEY = "data";
+  static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
 
   private final Functions.Proc1<Optional<Payloads>> callback;
   private final Functions.Func<Optional<Payloads>> func;
