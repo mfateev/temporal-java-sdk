@@ -76,14 +76,15 @@ public class NewCommand {
     }
   }
 
-  public void handleEvent(HistoryEvent event) {
+  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
     if (canceled) {
-      return;
+      return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
     }
-    commands.handleEvent(event);
-    if (!canceled) {
+    EntityManager.HandleEventStatus result = commands.handleEvent(event);
+    if (result == EntityManager.HandleEventStatus.OK) {
       initialCommandEventId = Optional.of(event.getEventId());
     }
+    return result;
   }
 
   @Override

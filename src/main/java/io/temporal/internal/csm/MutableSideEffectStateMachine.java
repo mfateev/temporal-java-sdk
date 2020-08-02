@@ -144,14 +144,14 @@ public final class MutableSideEffectStateMachine {
     }
 
     @Override
-    public void handleEvent(HistoryEvent event) {
+    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
               .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return;
+        return null;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
@@ -162,9 +162,10 @@ public final class MutableSideEffectStateMachine {
       }
       if (!id.equals(expectedId)) {
         action(Action.NON_MATCHING_EVENT);
-        return;
+        return null;
       }
       super.handleEvent(event);
+      return null;
     }
 
     State createMarker() {

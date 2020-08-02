@@ -25,7 +25,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 public interface EntityStateMachine {
   void handleCommand(CommandType commandType);
 
-  void handleEvent(HistoryEvent event);
+  EntityManager.HandleEventStatus handleEvent(HistoryEvent event);
 
   boolean isFinalState();
 }

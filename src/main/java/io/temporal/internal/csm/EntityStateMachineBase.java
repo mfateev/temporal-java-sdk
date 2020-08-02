@@ -48,13 +48,17 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
   }
 
   @Override
-  public void handleEvent(HistoryEvent event) {
+  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
+    if (!stateMachine.getValidEventTypes().contains(event.getEventType())) {
+      return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+    }
     this.currentEvent = event;
     try {
       stateMachine.handleEvent(event.getEventType(), (Data) this);
     } finally {
       this.currentEvent = null;
     }
+    return null;
   }
 
   protected final void action(Action action) {

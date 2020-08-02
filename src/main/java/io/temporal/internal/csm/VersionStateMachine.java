@@ -40,7 +40,7 @@ public final class VersionStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
   static final String MARKER_VERSION_KEY = "version";
-  static final String MARKER_ID_KEY = "id";
+  static final String MARKER_CHANGE_ID_KEY = "changeId";
   static final String VERSION_MARKER_NAME = "Version";
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
@@ -148,27 +148,28 @@ public final class VersionStateMachine {
     }
 
     @Override
-    public void handleEvent(HistoryEvent event) {
+    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
               .equals(VERSION_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return;
+        return null;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
-      Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
+      Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_CHANGE_ID_KEY));
       String expectedId = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
       if (Strings.isNullOrEmpty(expectedId)) {
         throw new IllegalStateException(
-            "Marker details map missing required key: " + MARKER_ID_KEY);
+            "Marker details map missing required key: " + MARKER_CHANGE_ID_KEY);
       }
       if (!changeId.equals(expectedId)) {
         action(Action.NON_MATCHING_EVENT);
-        return;
+        return null;
       }
       super.handleEvent(event);
+      return null;
     }
 
     State createMarker() {
@@ -181,7 +182,7 @@ public final class VersionStateMachine {
         version = maxSupported;
         DataConverter dataConverter = DataConverter.getDefaultInstance();
         Map<String, Payloads> details = new HashMap<>();
-        details.put(MARKER_ID_KEY, dataConverter.toPayloads(changeId).get());
+        details.put(MARKER_CHANGE_ID_KEY, dataConverter.toPayloads(changeId).get());
         details.put(MARKER_VERSION_KEY, dataConverter.toPayloads(version).get());
         markerAttributes =
             RecordMarkerCommandAttributes.newBuilder()
@@ -224,25 +225,7 @@ public final class VersionStateMachine {
     }
 
     State notifyFromEventImpl() {
-      MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
-      if (!attributes.getMarkerName().equals(VERSION_MARKER_NAME)) {
-        throw new IllegalStateException(
-            "Expected " + VERSION_MARKER_NAME + ", received: " + attributes);
-      }
-      Map<String, Payloads> detailsMap = attributes.getDetailsMap();
-      Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-      String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
-      if (!changeId.equals(idFromMarker)) {
-        throw new UnsupportedOperationException(
-            "TODO: deal with multiple side effects with different id");
-      }
-      Optional<Payloads> skipCountPayloads =
-          Optional.ofNullable(detailsMap.get(MARKER_VERSION_KEY));
-      if (!skipCountPayloads.isPresent()) {
-        throw new IllegalStateException(
-            "Marker details detailsMap missing required key: " + MARKER_VERSION_KEY);
-      }
-      version = dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
+      updateVersionFromEvent(currentEvent);
       validateVersion();
       return State.MARKER_COMMAND_RECORDED;
     }
@@ -255,6 +238,27 @@ public final class VersionStateMachine {
       cancelInitialCommand();
       notifyResult();
     }
+  }
+
+  private void updateVersionFromEvent(HistoryEvent event) {
+    MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
+    if (!attributes.getMarkerName().equals(VERSION_MARKER_NAME)) {
+      throw new IllegalStateException(
+          "Expected " + VERSION_MARKER_NAME + ", received: " + attributes);
+    }
+    Map<String, Payloads> detailsMap = attributes.getDetailsMap();
+    Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_CHANGE_ID_KEY));
+    String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
+    if (!changeId.equals(idFromMarker)) {
+      throw new UnsupportedOperationException(
+          "TODO: deal with multiple side effects with different id");
+    }
+    Optional<Payloads> skipCountPayloads = Optional.ofNullable(detailsMap.get(MARKER_VERSION_KEY));
+    if (!skipCountPayloads.isPresent()) {
+      throw new IllegalStateException(
+          "Marker details detailsMap missing required key: " + MARKER_VERSION_KEY);
+    }
+    version = dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
   }
 
   /** Creates new VersionStateMachine */
@@ -274,6 +278,10 @@ public final class VersionStateMachine {
     InvocationStateMachine ism = new InvocationStateMachine(minSupported, maxSupported, callback);
     ism.action(Action.CHECK_EXECUTION_STATE);
     ism.action(Action.SCHEDULE);
+  }
+
+  public void handleNonMatchingEvent(HistoryEvent event) {
+    updateVersionFromEvent(event);
   }
 
   public static String asPlantUMLStateDiagram() {

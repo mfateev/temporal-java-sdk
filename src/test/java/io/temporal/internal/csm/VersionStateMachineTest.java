@@ -19,10 +19,8 @@
 
 package io.temporal.internal.csm;
 
-import static io.temporal.internal.csm.MutableSideEffectStateMachine.MARKER_ID_KEY;
 import static io.temporal.internal.csm.TestHistoryBuilder.assertCommand;
-import static io.temporal.internal.csm.VersionStateMachine.MARKER_VERSION_KEY;
-import static io.temporal.internal.csm.VersionStateMachine.VERSION_MARKER_NAME;
+import static io.temporal.internal.csm.VersionStateMachine.*;
 import static io.temporal.workflow.Workflow.DEFAULT_VERSION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -69,7 +67,7 @@ public class VersionStateMachineTest {
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
             .setMarkerName(VERSION_MARKER_NAME)
-            .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
@@ -138,7 +136,7 @@ public class VersionStateMachineTest {
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
             .setMarkerName(VERSION_MARKER_NAME)
-            .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
@@ -237,10 +235,6 @@ public class VersionStateMachineTest {
       9: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
       10: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
     */
-    MarkerRecordedEventAttributes.Builder markerBuilder =
-        MarkerRecordedEventAttributes.newBuilder()
-            .setMarkerName(VERSION_MARKER_NAME)
-            .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
@@ -283,34 +277,36 @@ public class VersionStateMachineTest {
                   "id1",
                   DEFAULT_VERSION,
                   maxSupported - 10,
-                  (v2) ->
-                      manager.newTimer(
-                          StartTimerCommandAttributes.newBuilder()
-                              .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                              .build(),
-                          (e1) ->
-                              manager.newTimer(
-                                  StartTimerCommandAttributes.newBuilder()
-                                      .setStartToFireTimeout(
-                                          Duration.newBuilder().setSeconds(100).build())
-                                      .build(),
-                                  (e2) ->
-                                      manager.getVersion(
-                                          "id1",
-                                          maxSupported - 3,
-                                          maxSupported + 10,
-                                          (v3) -> {
-                                            trace.append(v3 + ", ");
-                                            manager.getVersion(
-                                                "id1",
-                                                DEFAULT_VERSION,
-                                                maxSupported + 100,
-                                                (v4) -> {
-                                                  trace.append(v4);
-                                                  manager.newCompleteWorkflow(
-                                                      converter.toPayloads(v3));
-                                                });
-                                          }))));
+                  (v2) -> {
+                    trace.append(v2 + ", ");
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        (e1) ->
+                            manager.newTimer(
+                                StartTimerCommandAttributes.newBuilder()
+                                    .setStartToFireTimeout(
+                                        Duration.newBuilder().setSeconds(100).build())
+                                    .build(),
+                                (e2) ->
+                                    manager.getVersion(
+                                        "id1",
+                                        maxSupported - 3,
+                                        maxSupported + 10,
+                                        (v3) -> {
+                                          trace.append(v3 + ", ");
+                                          manager.getVersion(
+                                              "id1",
+                                              DEFAULT_VERSION,
+                                              maxSupported + 100,
+                                              (v4) -> {
+                                                trace.append(v4);
+                                                manager.newCompleteWorkflow(
+                                                    converter.toPayloads(v4));
+                                              });
+                                        })));
+                  });
             });
       }
     }
@@ -336,7 +332,7 @@ public class VersionStateMachineTest {
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
             .setMarkerName(VERSION_MARKER_NAME)
-            .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
@@ -400,7 +396,238 @@ public class VersionStateMachineTest {
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(
-          maxSupported + ", " + maxSupported + ", " + maxSupported, listener.trace.toString());
+          maxSupported + ", " + maxSupported + ", " + maxSupported + ", " + maxSupported,
+          listener.trace.toString());
+    }
+  }
+
+  /**
+   * Test that the correct versions are returned even after some GetVersion calls removals. Based on
+   * {@link #testRecordAcrossMultipleWorkflowTasks()} with some getVersion calls removed.
+   */
+  @Test
+  public void testGetVersionCallsRemoval() {
+    final int maxSupported = 12654;
+    class TestListener extends TestEntityManagerListenerBase {
+      final StringBuilder trace = new StringBuilder();
+
+      @Override
+      public void eventLoopImpl() {
+        /*
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) -> {*/
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported + 10,
+            (v2) -> {
+              trace.append(v2 + ", ");
+              manager.newTimer(
+                  StartTimerCommandAttributes.newBuilder()
+                      .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                      .build(),
+                  (e1) ->
+                      manager.newTimer(
+                          StartTimerCommandAttributes.newBuilder()
+                              .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                              .build(),
+                          (e2) ->
+                          /*
+                          manager.getVersion(
+                              "id1",
+                              maxSupported - 3,
+                              maxSupported + 10,
+                              (v3) -> */ {
+                            manager.getVersion(
+                                "id1",
+                                DEFAULT_VERSION,
+                                maxSupported + 100,
+                                (v4) -> {
+                                  trace.append(v4);
+                                  manager.newCompleteWorkflow(converter.toPayloads(v4));
+                                });
+                          }));
+            });
+      }
+    }
+    /*
+      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      5: EVENT_TYPE_MARKER_RECORDED
+      6: EVENT_TYPE_TIMER_STARTED
+      7: EVENT_TYPE_TIMER_FIRED
+      8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      9: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      10: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      11: EVENT_TYPE_TIMER_STARTED
+      12: EVENT_TYPE_TIMER_FIRED
+      13: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      14: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      15: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      16: EVENT_TYPE_MARKER_RECORDED
+      17: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder()
+            .setMarkerName(VERSION_MARKER_NAME)
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask()
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                markerBuilder
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
+                    .build());
+    long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId1)
+                .setTimerId("timer1"))
+        .addWorkflowTask();
+    long timerStartedEventId2 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId2)
+                .setTimerId("timer2"))
+        .addWorkflowTask()
+        .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+    {
+      // Full replay
+      TestListener listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
+      assertTrue(commands.isEmpty());
+      assertEquals(maxSupported + ", " + maxSupported, listener.trace.toString());
+    }
+  }
+
+  /**
+   * Test that the correct versions are returned even after some GetVersion calls removals. Based on
+   * {@link #testRecordAcrossMultipleWorkflowTasks()} with some getVersion calls removed.
+   */
+  @Test
+  public void testGetVersionCallsRemovalInNextWorkflowTask() {
+    final int maxSupported = 12654;
+    class TestListener extends TestEntityManagerListenerBase {
+      final StringBuilder trace = new StringBuilder();
+
+      @Override
+      public void eventLoopImpl() {
+        /*
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) -> {
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported - 10,
+            (v2) ->*/
+        manager.newTimer(
+            StartTimerCommandAttributes.newBuilder()
+                .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                .build(),
+            (e1) ->
+                manager.newTimer(
+                    StartTimerCommandAttributes.newBuilder()
+                        .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                        .build(),
+                    (e2) ->
+                    /*
+                    manager.getVersion(
+                        "id1",
+                        maxSupported - 3,
+                        maxSupported + 10,
+                        (v3) -> */ {
+                      manager.getVersion(
+                          "id1",
+                          DEFAULT_VERSION,
+                          maxSupported + 100,
+                          (v4) -> {
+                            trace.append(v4);
+                            manager.newCompleteWorkflow(converter.toPayloads(v4));
+                          });
+                    }));
+      }
+    }
+    /*
+      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      5: EVENT_TYPE_MARKER_RECORDED
+      6: EVENT_TYPE_TIMER_STARTED
+      7: EVENT_TYPE_TIMER_FIRED
+      8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      9: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      10: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      11: EVENT_TYPE_TIMER_STARTED
+      12: EVENT_TYPE_TIMER_FIRED
+      13: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      14: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      15: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      16: EVENT_TYPE_MARKER_RECORDED
+      17: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder()
+            .setMarkerName(VERSION_MARKER_NAME)
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask()
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                markerBuilder
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
+                    .build());
+    long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId1)
+                .setTimerId("timer1"))
+        .addWorkflowTask();
+    long timerStartedEventId2 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId2)
+                .setTimerId("timer2"))
+        .addWorkflowTask()
+        .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+    {
+      TestEntityManagerListenerBase listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
+      assertCommand(CommandType.COMMAND_TYPE_START_TIMER, commands);
+    }
+    {
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 3);
+      assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
+      Optional<Payloads> resultData =
+          Optional.of(commands.get(0).getCompleteWorkflowExecutionCommandAttributes().getResult());
+      assertEquals(
+          maxSupported, (int) converter.fromPayloads(0, resultData, Integer.class, Integer.class));
+    }
+    {
+      // Full replay
+      TestListener listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
+      assertTrue(commands.isEmpty());
+      assertEquals(String.valueOf(maxSupported), listener.trace.toString());
     }
   }
 }

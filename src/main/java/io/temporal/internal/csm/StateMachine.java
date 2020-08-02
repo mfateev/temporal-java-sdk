@@ -24,10 +24,12 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * State machine of a single server side entity like activity, workflow task or the whole workflow.
@@ -48,6 +50,7 @@ final class StateMachine<State, Action, Data> {
   private final String name;
   private final State initialState;
   private final List<State> finalStates;
+  private final Set<EventType> validEventTypes = new HashSet<>();
 
   private State state;
 
@@ -61,6 +64,10 @@ final class StateMachine<State, Action, Data> {
     this.initialState = Objects.requireNonNull(initialState);
     this.finalStates = Arrays.asList(finalStates);
     this.state = initialState;
+  }
+
+  public Set<EventType> getValidEventTypes() {
+    return validEventTypes;
   }
 
   public State getState() {
@@ -100,6 +107,7 @@ final class StateMachine<State, Action, Data> {
     transitions.put(
         new Transition<>(from, new ActionOrEventType<>(eventType)),
         new FixedTransitionTarget<>(to, callback));
+    validEventTypes.add(eventType);
     return this;
   }
 
@@ -107,6 +115,7 @@ final class StateMachine<State, Action, Data> {
     transitions.put(
         new Transition<>(from, new ActionOrEventType<>(eventType)),
         new FixedTransitionTarget<>(to, (data) -> {}));
+    validEventTypes.add(eventType);
     return this;
   }
 
@@ -125,6 +134,7 @@ final class StateMachine<State, Action, Data> {
     transitions.put(
         new Transition<>(from, new ActionOrEventType<>(eventType)),
         new DynamicTransitionTarget<>(toStates, callback));
+    validEventTypes.add(eventType);
     return this;
   }
 

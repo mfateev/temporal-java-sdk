@@ -23,6 +23,8 @@ import static io.temporal.internal.common.WorkflowExecutionUtils.getEventTypeFor
 import static io.temporal.internal.common.WorkflowExecutionUtils.isCommandEvent;
 import static io.temporal.internal.csm.LocalActivityStateMachine.LOCAL_ACTIVITY_MARKER_NAME;
 import static io.temporal.internal.csm.LocalActivityStateMachine.MARKER_ACTIVITY_ID_KEY;
+import static io.temporal.internal.csm.VersionStateMachine.MARKER_CHANGE_ID_KEY;
+import static io.temporal.internal.csm.VersionStateMachine.VERSION_MARKER_NAME;
 
 import com.google.common.base.Strings;
 import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
@@ -61,6 +63,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public final class EntityManager {
+
+  enum HandleEventStatus {
+    OK,
+    NOT_MATCHING_EVENT,
+  }
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
 
@@ -203,13 +210,30 @@ public final class EntityManager {
     }
     NewCommand newCommand;
     while (true) {
-      newCommand = commands.poll();
+      // handleVersionMarker can skip a marker event if the getVersion call was removed.
+      // In this case we don't want to consume a command.
+      newCommand = commands.peek();
       if (newCommand == null) {
         break;
       }
       // Note that handleEvent can cause a command cancellation in case
       // of MutableSideEffect
-      newCommand.handleEvent(event);
+      HandleEventStatus status = newCommand.handleEvent(event);
+      if (status == HandleEventStatus.NOT_MATCHING_EVENT) {
+        if (handleVersionMarker(event)) {
+          return;
+        }
+        throw new IllegalStateException(
+            "Event "
+                + event.getEventId()
+                + " of "
+                + event.getEventType()
+                + " does not"
+                + " match command "
+                + newCommand.getCommandType());
+      }
+      // Consume the command
+      commands.poll();
       if (!newCommand.isCanceled()) {
         break;
       }
@@ -231,6 +255,25 @@ public final class EntityManager {
     if (event.getEventType() == EventType.EVENT_TYPE_MARKER_RECORDED) {
       prepareCommands();
     }
+  }
+
+  private boolean handleVersionMarker(HistoryEvent event) {
+    if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED) {
+      return false;
+    }
+    MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
+    if (!attributes.getMarkerName().equals(VERSION_MARKER_NAME)) {
+      return false;
+    }
+    Map<String, Payloads> detailsMap = attributes.getDetailsMap();
+    Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_CHANGE_ID_KEY));
+    String changeId = dataConverter.fromPayloads(0, oid, String.class, String.class);
+    VersionStateMachine versionStateMachine =
+        vesions.computeIfAbsent(
+            changeId,
+            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, sink));
+    versionStateMachine.handleNonMatchingEvent(event);
+    return true;
   }
 
   public List<Command> takeCommands() {

@@ -50,6 +50,7 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(SideEffectStateMachine.class);
     generate(MutableSideEffectStateMachine.class);
     generate(LocalActivityStateMachine.class);
+    generate(VersionStateMachine.class);
   }
 
   private void generate(Class<?> commandClass) {
