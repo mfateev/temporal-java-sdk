@@ -20,7 +20,6 @@
 package io.temporal.workflow;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 public interface QueueConsumer<E> {
 
@@ -62,7 +61,7 @@ public interface QueueConsumer<E> {
   /**
    * Retrieves and removes the head of this queue, waiting up to the specified wait time if
    * necessary for an element to become available. It is not unblocked in case of the enclosing
-   * CancellationScope cancellation. Use {@link #cancellablePoll(long, TimeUnit)} instead.
+   * CancellationScope cancellation. Use {@link #cancellablePoll(Duration)} instead.
    *
    * @param timeout how long to wait before giving up.
    * @return the head of this queue, or {@code null} if the specified waiting time elapses before an

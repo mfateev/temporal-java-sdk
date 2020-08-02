@@ -787,6 +787,11 @@ public class DeterministicRunnerTest {
 
     @Override
     public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {}
+
+    @Override
+    public Duration getWorkflowTaskTimeout() {
+      return Duration.ofSeconds(10);
+    }
   }
 
   @Test

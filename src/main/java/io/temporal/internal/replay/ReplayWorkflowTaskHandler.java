@@ -126,7 +126,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       // Only fail workflow task on the first attempt, subsequent failures of the same workflow task
       // should timeout. This is to avoid spin on the failed workflow task as the service doesn't
       // yet increase the retry interval.
-      if (workflowTask.getAttempt() > 0) {
+      if (workflowTask.getAttempt() > 1) {
         if (e instanceof Error) {
           throw (Error) e;
         }
@@ -167,11 +167,6 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
 
   private Result handleWorkflowTaskWithEmbeddedQuery(
       PollWorkflowTaskQueueResponse.Builder workflowTask, Scope metricsScope) throws Throwable {
-    System.out.println(
-        "handleWorkflowTaskWithEmbeddedQuery BEGIN startedEventId="
-            + workflowTask.getStartedEventId()
-            + ", PreviousStartedEventId="
-            + workflowTask.getPreviousStartedEventId());
     WorkflowExecutor workflowExecutor = null;
     AtomicBoolean createdNew = new AtomicBoolean();
     WorkflowExecution execution = workflowTask.getWorkflowExecution();
@@ -242,16 +237,16 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       } else {
         cache.markProcessingDone(runId);
       }
-      System.out.println("handleWorkflowTaskWithEmbeddedQuery DONE");
     }
   }
 
   private void processLocalActivityRequests(WorkflowExecutor workflowExecutor, long startTime)
       throws InterruptedException {
+    Duration maxProcessingTime =
+        workflowExecutor.getWorkflowTaskTimeout().multipliedBy(4).dividedBy(5);
     while (true) {
       List<ExecuteLocalActivityParameters> laRequests = workflowExecutor.getLocalActivityRequests();
       long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
-      System.out.println("LOCAL ACTIVITY REQUESTS: " + laRequests);
       for (ExecuteLocalActivityParameters laRequest : laRequests) {
         // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
         // much sense. I believe we should add ScheduleToStart timeout for the local activities
@@ -268,29 +263,20 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           throw new Error("Unable to schedule local activity for execution");
         }
       }
-      if (System.currentTimeMillis() - startTime <= timeoutInterval) {
+      Duration processingTime = Duration.ofMillis(System.currentTimeMillis() - startTime);
+      Duration maxWaitAllowed = maxProcessingTime.minus(processingTime);
+      if (maxWaitAllowed.isZero() || maxWaitAllowed.isNegative()) {
         return;
       }
-      Duration processingTime =
-          Duration.ofMillis(Math.min(System.currentTimeMillis() - startTime, timeoutInterval));
       if (laTaskCount.get() == 0) {
-        System.out.println("processLocalActivityRequests EXITING 0 REQUESTS");
         return;
       }
-      System.out.println(
-          "processLocalActivityRequests WAITING FOR LA COMPLETION "
-              + laTaskCount.get()
-              + " REQUESTS");
       ActivityTaskHandler.Result laCompletion =
-          laCompletions.poll(processingTime.toMillis(), TimeUnit.MILLISECONDS);
+          laCompletions.poll(maxWaitAllowed.toMillis(), TimeUnit.MILLISECONDS);
       if (laCompletion == null) {
-        break;
+        return;
       }
       long count = laTaskCount.get(); // decrementAndGet();
-      System.out.println(
-          "processLocalActivityRequests HANDLE LA COMPLETION REQUESTS LEFT: "
-              + count
-              + " REQUESTS");
       workflowExecutor.handleLocalActivityCompletion(laCompletion);
     }
   }

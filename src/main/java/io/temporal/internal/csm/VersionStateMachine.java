@@ -196,7 +196,6 @@ public final class VersionStateMachine {
                 .build();
         toState = State.MARKER_COMMAND_CREATED;
       }
-      System.out.println("version createMarker version=" + version);
       addCommand(
           Command.newBuilder()
               .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)

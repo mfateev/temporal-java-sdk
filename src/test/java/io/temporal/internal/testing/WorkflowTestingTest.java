@@ -191,7 +191,6 @@ public class WorkflowTestingTest {
 
     @Override
     public String workflow1(String input) {
-      System.out.println("ActivityWorkflow workflow1 start");
       Workflow.sleep(Duration.ofHours(1)); // test time skipping
       try {
         return activity.activity1(input);

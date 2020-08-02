@@ -442,7 +442,6 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
                 runner.executeInWorkflowThread(
                     "child workflow completion callback",
                     () -> {
-                      System.out.println("Child completion callback: " + output);
                       result.complete(output);
                     });
               }
@@ -577,8 +576,6 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
       String id, Class<R> resultClass, Type resultType, BiPredicate<R, R> updated, Func<R> func) {
     CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
     AtomicReference<R> unserializedResult = new AtomicReference<>();
-    System.out.println("Calling mutable side effect ");
-
     context.mutableSideEffect(
         id,
         (storedBinary) -> {
@@ -597,24 +594,19 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
             runner.executeInWorkflowThread(
                 "mutable-side-effect-callback", () -> result.complete(Objects.requireNonNull(p))));
 
-    System.out.println("Blocking waiting for mutable side effect result");
     if (!result.get().isPresent()) {
       throw new IllegalArgumentException("No value found for mutableSideEffectId=" + id);
     }
     // An optimization that avoids unnecessary deserialization of the result.
     R unserialized = unserializedResult.get();
     if (unserialized != null) {
-      System.out.println("Returning  mutable side effect result (unserialized)");
       return unserialized;
     }
-    System.out.println("Returning  mutable side effect result: " + result.get());
     return converter.fromPayloads(0, result.get(), resultClass, resultType);
   }
 
   @Override
   public int getVersion(String changeId, int minSupported, int maxSupported) {
-    System.out.println(
-        "SyncWorkflowContext getVersion changeId=" + changeId + ", maxSupported=" + maxSupported);
     CompletablePromise<Integer> result = Workflow.newPromise();
     context.getVersion(
         changeId,
@@ -622,7 +614,6 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
         maxSupported,
         (v) -> runner.executeInWorkflowThread("version-callback", () -> result.complete(v)));
     int r = result.get();
-    System.out.println("SyncWorkflowContext getVersion changeId=" + changeId + ", version=" + r);
     return r;
   }
 

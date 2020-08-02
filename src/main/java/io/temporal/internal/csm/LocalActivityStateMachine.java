@@ -127,17 +127,12 @@ public final class LocalActivityStateMachine
         .add(
             State.MARKER_COMMAND_CREATED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED,
-            LocalActivityStateMachine::empty)
+            State.MARKER_COMMAND_RECORDED)
         .add(
             State.REQUEST_PREPARED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED,
             LocalActivityStateMachine::notifyResultFromEvent);
-  }
-
-  private void empty() {
-    System.out.println("MARKER RECORDED");
   }
 
   public void cancel() {

@@ -25,6 +25,7 @@ import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.query.v1.WorkflowQueryResult;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 import io.temporal.internal.worker.ActivityTaskHandler;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,8 @@ public interface WorkflowExecutor {
   void close();
 
   void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
+
+  Duration getWorkflowTaskTimeout();
 
   class WorkflowTaskResult {
 

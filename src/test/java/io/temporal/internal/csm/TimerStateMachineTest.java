@@ -77,7 +77,6 @@ public class TimerStateMachineTest {
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
       assertCommand(CommandType.COMMAND_TYPE_START_TIMER, commands);
     }
-    System.out.println("PROCESSING TASK 2");
     {
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);

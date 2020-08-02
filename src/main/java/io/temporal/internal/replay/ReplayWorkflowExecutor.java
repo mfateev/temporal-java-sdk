@@ -311,6 +311,11 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     }
   }
 
+  @Override
+  public Duration getWorkflowTaskTimeout() {
+    return ProtobufTimeUtils.ToJavaDuration(startedEvent.getWorkflowTaskTimeout());
+  }
+
   private void executeQueries(Map<String, WorkflowQuery> queries) {
     for (Map.Entry<String, WorkflowQuery> entry : queries.entrySet()) {
       WorkflowQuery query = entry.getValue();

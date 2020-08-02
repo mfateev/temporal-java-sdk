@@ -192,7 +192,6 @@ public final class MutableSideEffectStateMachine {
         currentSkipCount = 0;
         toState = State.MARKER_COMMAND_CREATED;
       }
-      System.out.println("createMarker updated=" + updated + ", skipCount=" + currentSkipCount);
       addCommand(
           Command.newBuilder()
               .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)

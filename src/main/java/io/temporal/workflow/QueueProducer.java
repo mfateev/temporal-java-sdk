@@ -20,7 +20,6 @@
 package io.temporal.workflow;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 public interface QueueProducer<E> {
 
@@ -71,7 +70,7 @@ public interface QueueProducer<E> {
   /**
    * Inserts the specified element into this queue, waiting up to the specified wait time if
    * necessary for space to become available. It is not unblocked in case of the enclosing
-   * CancellationScope cancellation. Use {@link #cancellableOffer(Object, long, TimeUnit)} instead.
+   * CancellationScope cancellation. Use {@link #cancellableOffer(Object, Duration)} instead.
    *
    * @param e the element to add
    * @param timeout how long to wait before giving up

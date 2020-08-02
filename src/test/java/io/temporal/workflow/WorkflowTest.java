@@ -177,7 +177,7 @@ public class WorkflowTest {
 
   @Rule public TestName testName = new TestName();
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 10);
+  @Rule public Timeout globalTimeout = Timeout.seconds(DEBUGGER_TIMEOUTS ? 500 : 30);
 
   @Rule
   public TestWatcher watchman =
@@ -3210,8 +3210,6 @@ public class WorkflowTest {
       String r2 = child2.execute("World!");
       assertEquals(child2Id, Workflow.getWorkflowExecution(child2).get().getWorkflowId());
       String result = r1.get() + r2;
-      System.out.println("TestParentWorkflow completed with result=" + result);
-
       return result;
     }
   }
@@ -4707,7 +4705,6 @@ public class WorkflowTest {
       long time1 = Workflow.sideEffect(long.class, () -> workflowTime);
       long time2 = Workflow.sideEffect(long.class, () -> workflowTime);
       assertEquals(time1, time2);
-      System.out.println("workflowTime=" + workflowTime + ", time=" + time1);
       Workflow.sleep(Duration.ofSeconds(1));
       String result;
       if (workflowTime == time1) {
@@ -5222,7 +5219,6 @@ public class WorkflowTest {
       // Do not ever do it in production code.
       try {
         version = Workflow.getVersion("test_change", 2, 3);
-        System.out.println("VERSION=" + version);
       } catch (Error e) {
         throw Workflow.wrap(new Exception("unsupported change version"));
       }
@@ -5821,7 +5817,8 @@ public class WorkflowTest {
         "activity Activity2");
   }
 
-  public static class TestLocalActivityMultiBatchWorkflowImpl implements TestWorkflow1 {
+  public static class TestLocalActivitiesWorkflowTaskHeartbeatWorkflowImpl
+      implements TestWorkflow1 {
     @Override
     public String execute(String taskQueue) {
       TestActivities localActivities =
@@ -5835,18 +5832,43 @@ public class WorkflowTest {
   }
 
   @Test
-  public void testLocalActivityMultipleBatches() {
-    startWorkerFor(TestLocalActivityMultiBatchWorkflowImpl.class);
+  public void testLocalActivitiesWorkflowTaskHeartbeat() {
+    startWorkerFor(TestLocalActivitiesWorkflowTaskHeartbeatWorkflowImpl.class);
     WorkflowOptions options =
         WorkflowOptions.newBuilder()
             .setWorkflowRunTimeout(Duration.ofMinutes(5))
-            .setWorkflowTaskTimeout(Duration.ofSeconds(20))
+            .setWorkflowTaskTimeout(Duration.ofSeconds(10))
             .setTaskQueue(taskQueue)
             .build();
     TestWorkflow1 workflowStub = workflowClient.newWorkflowStub(TestWorkflow1.class, options);
     String result = workflowStub.execute(taskQueue);
     assertEquals("sleepActivity0sleepActivity1sleepActivity2sleepActivity3sleepActivity4", result);
     assertEquals(activitiesImpl.toString(), 5, activitiesImpl.invocations.size());
+  }
+
+  public static class TestLongLocalActivityWorkflowTaskHeartbeatWorkflowImpl
+      implements TestWorkflow1 {
+    @Override
+    public String execute(String taskQueue) {
+      TestActivities localActivities =
+          Workflow.newLocalActivityStub(TestActivities.class, newLocalActivityOptions1());
+      return localActivities.sleepActivity(5000, 123);
+    }
+  }
+
+  @Test
+  public void testLongLocalActivityWorkflowTaskHeartbeat() {
+    startWorkerFor(TestLongLocalActivityWorkflowTaskHeartbeatWorkflowImpl.class);
+    WorkflowOptions options =
+        WorkflowOptions.newBuilder()
+            .setWorkflowRunTimeout(Duration.ofMinutes(5))
+            .setWorkflowTaskTimeout(Duration.ofSeconds(2))
+            .setTaskQueue(taskQueue)
+            .build();
+    TestWorkflow1 workflowStub = workflowClient.newWorkflowStub(TestWorkflow1.class, options);
+    String result = workflowStub.execute(taskQueue);
+    assertEquals("sleepActivity123", result);
+    assertEquals(activitiesImpl.toString(), 1, activitiesImpl.invocations.size());
   }
 
   public static class TestParallelLocalActivityExecutionWorkflowImpl implements TestWorkflow1 {

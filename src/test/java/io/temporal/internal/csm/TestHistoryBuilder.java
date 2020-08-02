@@ -249,7 +249,6 @@ class TestHistoryBuilder {
   public void handleWorkflowTask(EntityManager manager, int toTaskIndex) {
     List<HistoryEvent> events =
         this.events.subList((int) manager.getLastStartedEventId(), this.events.size());
-    System.out.println("handleWorkflowTask:\n" + eventsToString(events));
     PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());
     HistoryInfo info = getHistoryInfo(toTaskIndex);
     manager.setStartedIds(info.getPreviousStartedEventId(), info.getWorkflowTaskStartedEventId());

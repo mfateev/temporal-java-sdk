@@ -60,7 +60,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public final class EntityManager {
 
@@ -134,16 +133,9 @@ public final class EntityManager {
   public EntityManager(EntityManagerListener callbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
     sink = (command) -> newCommands.add(command);
-    System.out.println("\nNEW EntityManager " + this);
   }
 
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
-    System.out.println(
-        "EntityManager setStartedIds("
-            + previousStartedEventId
-            + ", "
-            + workflowTaskStartedEventId
-            + ")");
     this.previousStartedEventId = previousStartedEventId;
     this.workflowTaskStartedEventId = workflowTaskStartedEventId;
     replaying = previousStartedEventId > 0;
@@ -164,13 +156,7 @@ public final class EntityManager {
   }
 
   private void handleEventImpl(HistoryEvent event) {
-    System.out.println(
-        "ENTITY MANAGER handleEvent envet=" + event.getEventType() + ", replaying=" + replaying);
     if (isCommandEvent(event)) {
-      //      if (!isReplaying()) {
-      //        // takeCommands already consumed it
-      //        return;
-      //      }
       handleCommand(event);
       return;
     }
@@ -178,7 +164,6 @@ public final class EntityManager {
         && currentStartedEventId >= previousStartedEventId
         && event.getEventType() != EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED) {
       replaying = false;
-      System.out.println("ENTITY MANAGER handleEvent changed replaying=" + replaying);
     }
     Long initialCommandEventId = getInitialCommandEventId(event);
     EntityStateMachine c = stateMachines.get(initialCommandEventId);
@@ -198,13 +183,6 @@ public final class EntityManager {
    * @param event
    */
   public void handleCommand(HistoryEvent event) {
-    System.out.println(
-        "HANDLE COMMAND: event="
-            + event.getEventType()
-            + " isReplaying="
-            + isReplaying()
-            + ", commands="
-            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
     if (handleLocalActivityMarker(event)) {
       return;
     }
@@ -277,9 +255,6 @@ public final class EntityManager {
   }
 
   public List<Command> takeCommands() {
-    System.out.println(
-        "takeCommands commands="
-            + commands.stream().map((c) -> c.getCommandType()).collect(Collectors.toList()));
     List<Command> result = new ArrayList<>(commands.size());
     for (NewCommand newCommand : commands) {
       if (newCommand.isCanceled()) {
@@ -293,7 +268,6 @@ public final class EntityManager {
 
   private void prepareCommands() {
     if (preparing) {
-      System.out.println("prepareCommands already executing");
       return;
     }
     preparing = true;
@@ -305,8 +279,6 @@ public final class EntityManager {
   }
 
   private void prepareImpl() {
-    System.out.println("prepareCommands commands=" + newCommandsToString(newCommands));
-
     // handleCommand can lead to code execution because of SideEffect, MutableSideEffect or local
     // activity completion. And code execution can lead to creation of new commands and
     // cancellation of existing commands. That is the reason for using Queue as a data structure for
@@ -329,7 +301,6 @@ public final class EntityManager {
         commands.add(newCommand);
       }
     }
-    System.out.println("end prepareCommands commands=" + newCommandsToString(commands));
   }
 
   private String newCommandsToString(Queue<NewCommand> commands) {
@@ -388,7 +359,6 @@ public final class EntityManager {
   }
 
   private void eventLoop() {
-    System.out.println("eventLoop");
     callbacks.eventLoop();
     prepareCommands();
   }
