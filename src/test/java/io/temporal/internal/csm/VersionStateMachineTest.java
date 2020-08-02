@@ -184,6 +184,87 @@ public class VersionStateMachineTest {
     }
   }
 
+  /**
+   * Tests that getVersion call returns DEFAULT version when there is no correspondent marker in the
+   * history. It happens when getVersion call was added at the workflow place that already executed.
+   */
+  @Test
+  public void testNewGetVersion() {
+    final int maxSupported = 13;
+    class TestListener extends TestEntityManagerListenerBase {
+      final StringBuilder trace = new StringBuilder();
+
+      @Override
+      public void eventLoopImpl() {
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) -> {
+              trace.append(v1 + ", ");
+              manager.getVersion(
+                  "id1",
+                  DEFAULT_VERSION,
+                  maxSupported + 10,
+                  (v2) -> {
+                    trace.append(v2 + ", ");
+                    manager.getVersion(
+                        "id1",
+                        DEFAULT_VERSION,
+                        maxSupported + 100,
+                        (v3) -> {
+                          trace.append(v3);
+                          manager.newTimer(
+                              StartTimerCommandAttributes.newBuilder()
+                                  .setStartToFireTimeout(
+                                      Duration.newBuilder().setSeconds(100).build())
+                                  .build(),
+                              (e1) -> manager.newCompleteWorkflow(converter.toPayloads(v3)));
+                        });
+                  });
+            });
+      }
+    }
+    /*
+      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      5: EVENT_TYPE_TIMER_STARTED
+      6: EVENT_TYPE_TIMER_FIRED
+      7: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      8: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      9: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      10: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder()
+            .setMarkerName(VERSION_MARKER_NAME)
+            .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask();
+    long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId1)
+                .setTimerId("timer1"))
+        .addWorkflowTask()
+        .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+    {
+      // Full replay
+      TestListener listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
+      assertTrue(commands.isEmpty());
+      assertEquals(
+          DEFAULT_VERSION + ", " + DEFAULT_VERSION + ", " + DEFAULT_VERSION,
+          listener.trace.toString());
+    }
+  }
+
   @Test
   public void testRecordAcrossMultipleWorkflowTasks() {
     final int maxSupported = 133;
