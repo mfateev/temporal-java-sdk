@@ -140,6 +140,20 @@ public final class EntityManager {
   }
 
   public final void handleEvent(HistoryEvent event) {
+    try {
+      handleEventImpl(event);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException(
+          "Failure handling event "
+              + event.getEventId()
+              + " of '"
+              + event.getEventType()
+              + "' type.",
+          e);
+    }
+  }
+
+  private void handleEventImpl(HistoryEvent event) {
     System.out.println(
         "ENTITY MANAGER handleEvent envet=" + event.getEventType() + ", replaying=" + replaying);
     if (isCommandEvent(event)) {

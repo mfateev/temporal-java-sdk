@@ -19,6 +19,7 @@
 
 package io.temporal.internal.csm;
 
+import com.google.common.base.Strings;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
@@ -28,14 +29,12 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.workflow.Functions;
-import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Queue;
 
-public final class MutableSideEffectStateMachine implements EntityStateMachine {
+public final class MutableSideEffectStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
   static final String MARKER_DATA_KEY = "data";
@@ -48,21 +47,227 @@ public final class MutableSideEffectStateMachine implements EntityStateMachine {
   private final Functions.Func<Boolean> replaying;
   private final Functions.Proc1<NewCommand> commandSink;
 
-  private Functions.Proc1<Optional<Payloads>> currentCallback;
-  private Functions.Func1<Optional<Payloads>, Optional<Payloads>> currentFunc;
-
-  private Queue<NewCommand> newCommands = new ArrayDeque<>();
   private Optional<Payloads> result = Optional.empty();
 
   private int currentSkipCount;
 
   private int skipCountFromMarker = Integer.MAX_VALUE;
 
-  /**
-   * Creates new MutableSideEffect Marker
-   *
-   * @return
-   */
+  enum Action {
+    CHECK_EXECUTION_STATE,
+    SCHEDULE,
+    NON_MATCHING_EVENT
+  }
+
+  enum State {
+    CREATED,
+    REPLAYING,
+    EXECUTING,
+    MARKER_COMMAND_CREATED,
+    SKIPPED,
+    CACHED_RESULT_NOTIFIED,
+    RESULT_NOTIFIED,
+    SKIPPED_NOTIFIED,
+    RESULT_NOTIFIED_REPLAYING,
+    MARKER_COMMAND_CREATED_REPLAYING,
+    MARKER_COMMAND_RECORDED,
+  }
+
+  private static StateMachine<State, Action, InvocationStateMachine> newInvocationStateMachine() {
+    return StateMachine.<State, Action, InvocationStateMachine>newInstance(
+            "MutableSideEffect",
+            State.CREATED,
+            State.MARKER_COMMAND_RECORDED,
+            State.SKIPPED_NOTIFIED)
+        .add(
+            State.CREATED,
+            Action.CHECK_EXECUTION_STATE,
+            new State[] {State.REPLAYING, State.EXECUTING},
+            InvocationStateMachine::getExecutionState)
+        .add(
+            State.EXECUTING,
+            Action.SCHEDULE,
+            new State[] {State.MARKER_COMMAND_CREATED, State.SKIPPED},
+            InvocationStateMachine::createMarker)
+        .add(
+            State.MARKER_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.RESULT_NOTIFIED,
+            InvocationStateMachine::notifyCachedResult)
+        .add(
+            State.RESULT_NOTIFIED,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+            State.MARKER_COMMAND_RECORDED)
+        .add(
+            State.SKIPPED,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.SKIPPED_NOTIFIED,
+            InvocationStateMachine::cancelCommandNotifyCachedResult)
+        .add(
+            State.REPLAYING,
+            Action.SCHEDULE,
+            State.MARKER_COMMAND_CREATED_REPLAYING,
+            InvocationStateMachine::createFakeCommand)
+        .add(
+            State.MARKER_COMMAND_CREATED_REPLAYING,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.RESULT_NOTIFIED_REPLAYING)
+        .add(
+            State.RESULT_NOTIFIED_REPLAYING,
+            Action.NON_MATCHING_EVENT,
+            State.SKIPPED_NOTIFIED,
+            InvocationStateMachine::cancelCommandNotifyCachedResult)
+        .add(
+            State.RESULT_NOTIFIED_REPLAYING,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+            new State[] {State.MARKER_COMMAND_RECORDED, State.SKIPPED_NOTIFIED},
+            InvocationStateMachine::notifyFromEvent);
+  }
+
+  /** Represents a single invocation of mutableSideEffect. */
+  private class InvocationStateMachine
+      extends EntityStateMachineInitialCommand<State, Action, InvocationStateMachine> {
+
+    private Functions.Proc1<Optional<Payloads>> resultCallback;
+    private Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;
+
+    InvocationStateMachine(
+        Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
+        Functions.Proc1<Optional<Payloads>> callback) {
+      super(newInvocationStateMachine(), MutableSideEffectStateMachine.this.commandSink);
+      this.func = Objects.requireNonNull(func);
+      this.resultCallback = Objects.requireNonNull(callback);
+    }
+
+    State getExecutionState() {
+      return replaying.apply() ? State.REPLAYING : State.EXECUTING;
+    }
+
+    @Override
+    public void handleEvent(HistoryEvent event) {
+      if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
+          || !event
+              .getMarkerRecordedEventAttributes()
+              .getMarkerName()
+              .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
+        action(Action.NON_MATCHING_EVENT);
+        return;
+      }
+      Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
+      Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
+      String expectedId = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
+      if (Strings.isNullOrEmpty(expectedId)) {
+        throw new IllegalStateException(
+            "Marker details map missing required key: " + MARKER_ID_KEY);
+      }
+      if (!id.equals(expectedId)) {
+        action(Action.NON_MATCHING_EVENT);
+        return;
+      }
+      super.handleEvent(event);
+    }
+
+    State createMarker() {
+      State toState;
+      RecordMarkerCommandAttributes markerAttributes;
+      Optional<Payloads> updated;
+      updated = func.apply(result);
+      if (!updated.isPresent()) {
+        markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
+        currentSkipCount++;
+        toState = State.SKIPPED;
+      } else {
+        result = updated;
+        DataConverter dataConverter = DataConverter.getDefaultInstance();
+        Map<String, Payloads> details = new HashMap<>();
+        details.put(MARKER_ID_KEY, dataConverter.toPayloads(id).get());
+        details.put(MARKER_DATA_KEY, updated.get());
+        details.put(MARKER_SKIP_COUNT_KEY, dataConverter.toPayloads(currentSkipCount).get());
+        markerAttributes =
+            RecordMarkerCommandAttributes.newBuilder()
+                .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
+                .putAllDetails(details)
+                .build();
+        currentSkipCount = 0;
+        toState = State.MARKER_COMMAND_CREATED;
+      }
+      System.out.println("createMarker updated=" + updated + ", skipCount=" + currentSkipCount);
+      addCommand(
+          Command.newBuilder()
+              .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
+              .setRecordMarkerCommandAttributes(markerAttributes)
+              .build());
+      return toState;
+    }
+
+    void createFakeCommand() {
+      addCommand(
+          Command.newBuilder()
+              .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
+              .setRecordMarkerCommandAttributes(RecordMarkerCommandAttributes.getDefaultInstance())
+              .build());
+    }
+
+    /**
+     * Returns MARKER_COMMAND_RECORDED only if the currentEvent:
+     *
+     * <ul>
+     *   <li>Is a Marker
+     *   <li>Has MutableSideEffect marker name
+     *   <li>Its skip count matches. Not matching access count means that current event is for a
+     *       some following mutableSideEffect invocation.
+     * </ul>
+     */
+    State notifyFromEvent() {
+      State r = notifyFromEventImpl();
+      notifyCachedResult();
+      return r;
+    }
+
+    State notifyFromEventImpl() {
+      Map<String, Payloads> detailsMap =
+          currentEvent.getMarkerRecordedEventAttributes().getDetailsMap();
+      Optional<Payloads> skipCountPayloads =
+          Optional.ofNullable(detailsMap.get(MARKER_SKIP_COUNT_KEY));
+      if (!skipCountPayloads.isPresent()) {
+        throw new IllegalStateException(
+            "Marker details map missing required key: " + MARKER_SKIP_COUNT_KEY);
+      }
+      skipCountFromMarker =
+          dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
+      if (++currentSkipCount < skipCountFromMarker) {
+        skipCountFromMarker = Integer.MAX_VALUE;
+        return State.SKIPPED_NOTIFIED;
+      }
+
+      MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
+      if (!attributes.getMarkerName().equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
+        throw new IllegalStateException(
+            "Expected " + MUTABLE_SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
+      }
+      Map<String, Payloads> map = attributes.getDetailsMap();
+      Optional<Payloads> oid = Optional.ofNullable(map.get(MARKER_ID_KEY));
+      String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
+      if (!id.equals(idFromMarker)) {
+        throw new UnsupportedOperationException(
+            "TODO: deal with multiple side effects with different id");
+      }
+      currentSkipCount = 0;
+      result = Optional.ofNullable(map.get(MARKER_DATA_KEY));
+      return State.MARKER_COMMAND_RECORDED;
+    }
+
+    void notifyCachedResult() {
+      resultCallback.apply(result);
+    }
+
+    void cancelCommandNotifyCachedResult() {
+      cancelInitialCommand();
+      notifyCachedResult();
+    }
+  }
+
+  /** Creates new MutableSideEffectStateMachine */
   public static MutableSideEffectStateMachine newInstance(
       String id, Functions.Func<Boolean> replaying, Functions.Proc1<NewCommand> commandSink) {
     return new MutableSideEffectStateMachine(id, replaying, commandSink);
@@ -78,169 +283,12 @@ public final class MutableSideEffectStateMachine implements EntityStateMachine {
   public void mutableSideEffect(
       Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc1<Optional<Payloads>> callback) {
-    this.currentFunc = Objects.requireNonNull(func);
-    this.currentCallback = Objects.requireNonNull(callback);
-    if (replaying.apply()) {
-      createFakeMarkerCommand();
-    } else {
-      createMarkerCommand();
-    }
+    InvocationStateMachine ism = new InvocationStateMachine(func, callback);
+    ism.action(Action.CHECK_EXECUTION_STATE);
+    ism.action(Action.SCHEDULE);
   }
 
-  @Override
-  public void handleCommand(CommandType commandType) {
-    if (replaying.apply()) {
-      return;
-    }
-    NewCommand command = newCommands.poll();
-    if (command == null) {
-      throw new IllegalStateException("Unexpected handleCommand call");
-    }
-    if (!command.isCanceled()) {
-      RecordMarkerCommandAttributes attributes =
-          command.getCommand().getRecordMarkerCommandAttributes();
-      Payloads payloads = attributes.getDetailsOrDefault(MARKER_DATA_KEY, null);
-      result = Optional.ofNullable(payloads);
-    }
-    currentCallback.apply(result);
-  }
-
-  /**
-   * Reject event by calling NO_MARKER_EVENT action (which calls cancelInitialCommand during
-   * handling). Event is not rejected only if:
-   *
-   * <ul>
-   *   <li>It is marker
-   *   <li>It has MutableSideEffect marker name
-   *   <li>Its access count matches. Not matching access count means that recorded event is for a
-   *       some future mutableSideEffect call.
-   * </ul>
-   *
-   * @param event
-   */
-  @Override
-  public void handleEvent(HistoryEvent event) {
-    if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
-        || !event
-            .getMarkerRecordedEventAttributes()
-            .getMarkerName()
-            .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
-      notifyCachedResult();
-      return;
-    }
-    Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
-    Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-    String expectedId = dataConverter.fromPayloads(0, idPayloads, String.class, String.class);
-    if (!id.equals(expectedId)) {
-      notifyCachedResult();
-      return;
-    }
-    int count =
-        dataConverter.fromPayloads(
-            0,
-            Optional.ofNullable(detailsMap.get(MARKER_SKIP_COUNT_KEY)),
-            Integer.class,
-            Integer.class);
-    skipCountFromMarker = count;
-    notifyCachedResult();
-    markerResultFromEvent(event);
-  }
-
-  private <T> void notifyCachedResult() {
-    while (true) {
-      if (++currentSkipCount > skipCountFromMarker) {
-        skipCountFromMarker = Integer.MAX_VALUE;
-        break;
-      }
-      NewCommand command = newCommands.poll();
-      if (command == null) {
-        return;
-      }
-      command.cancel();
-      currentCallback.apply(result);
-    }
-  }
-
-  @Override
-  public boolean isFinalState() {
-    // Always true to avoid storing in EntityManager.stateMachines
-    return true;
-  }
-
-  private void createFakeMarkerCommand() {
-    RecordMarkerCommandAttributes markerAttributes =
-        RecordMarkerCommandAttributes.getDefaultInstance();
-    addCommand(
-        Command.newBuilder()
-            .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
-            .setRecordMarkerCommandAttributes(markerAttributes)
-            .build(),
-        false);
-  }
-
-  private void createMarkerCommand() {
-    RecordMarkerCommandAttributes markerAttributes;
-    boolean cancelled = false;
-    Optional<Payloads> updated;
-    updated = currentFunc.apply(result);
-    if (!updated.isPresent()) {
-      markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
-      cancelled = true;
-      currentSkipCount++;
-    } else {
-      result = updated;
-      DataConverter dataConverter = DataConverter.getDefaultInstance();
-      Map<String, Payloads> details = new HashMap<>();
-      details.put(MARKER_ID_KEY, dataConverter.toPayloads(id).get());
-      details.put(MARKER_DATA_KEY, updated.get());
-      details.put(MARKER_SKIP_COUNT_KEY, dataConverter.toPayloads(currentSkipCount).get());
-      markerAttributes =
-          RecordMarkerCommandAttributes.newBuilder()
-              .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
-              .putAllDetails(details)
-              .build();
-      currentSkipCount = 0;
-    }
-    addCommand(
-        Command.newBuilder()
-            .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
-            .setRecordMarkerCommandAttributes(markerAttributes)
-            .build(),
-        cancelled);
-  }
-
-  private void markerResultFromEvent(HistoryEvent event) {
-    MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
-    if (!attributes.getMarkerName().equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
-      throw new IllegalStateException(
-          "Expected " + MUTABLE_SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
-    }
-    Map<String, Payloads> map = attributes.getDetailsMap();
-    Optional<Payloads> oid = Optional.ofNullable(map.get(MARKER_ID_KEY));
-    String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
-    if (!id.equals(idFromMarker)) {
-      throw new UnsupportedOperationException(
-          "TODO: deal with multiple side effects with different id");
-    }
-    currentSkipCount = 0;
-    newCommands.poll();
-    result = Optional.ofNullable(map.get(MARKER_DATA_KEY));
-    currentCallback.apply(result);
-  }
-
-  private void notifyResult() {
-    currentCallback.apply(result);
-  }
-
-  protected final void addCommand(Command command, boolean cancelled) {
-    if (command.getCommandType() != CommandType.COMMAND_TYPE_RECORD_MARKER) {
-      throw new IllegalArgumentException("invalid command type");
-    }
-    NewCommand newCommand = new NewCommand(command, this);
-    if (cancelled) {
-      newCommand.cancel();
-    }
-    newCommands.add(newCommand);
-    commandSink.apply(newCommand);
+  public static String asPlantUMLStateDiagram() {
+    return newInvocationStateMachine().asPlantUMLStateDiagram();
   }
 }

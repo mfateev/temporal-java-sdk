@@ -34,6 +34,19 @@ public final class SideEffectStateMachine
     extends EntityStateMachineInitialCommand<
         SideEffectStateMachine.State, SideEffectStateMachine.Action, SideEffectStateMachine> {
 
+  enum Action {
+    SCHEDULE
+  }
+
+  enum State {
+    CREATED,
+    MARKER_COMMAND_CREATED,
+    RESULT_NOTIFIED,
+    RESULT_NOTIFIED_REPLAYING,
+    MARKER_COMMAND_CREATED_REPLAYING,
+    MARKER_COMMAND_RECORDED,
+  }
+
   private static final String MARKER_HEADER_KEY = "header";
   static final String MARKER_DATA_KEY = "data";
   static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
@@ -43,7 +56,34 @@ public final class SideEffectStateMachine
   private final Functions.Func<Boolean> replaying;
 
   private Optional<Payloads> result;
-  private int accessCount;
+
+  private static StateMachine<State, Action, SideEffectStateMachine> newStateMachine() {
+    return StateMachine.<State, Action, SideEffectStateMachine>newInstance(
+            "SideEffect", State.CREATED, State.MARKER_COMMAND_RECORDED)
+        .add(
+            State.CREATED,
+            Action.SCHEDULE,
+            new State[] {State.MARKER_COMMAND_CREATED, State.MARKER_COMMAND_CREATED_REPLAYING},
+            SideEffectStateMachine::createMarkerCommand)
+        .add(
+            State.MARKER_COMMAND_CREATED_REPLAYING,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.RESULT_NOTIFIED_REPLAYING)
+        .add(
+            State.MARKER_COMMAND_CREATED,
+            CommandType.COMMAND_TYPE_RECORD_MARKER,
+            State.RESULT_NOTIFIED,
+            SideEffectStateMachine::markerResultFromFunc)
+        .add(
+            State.RESULT_NOTIFIED,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+            State.MARKER_COMMAND_RECORDED)
+        .add(
+            State.RESULT_NOTIFIED_REPLAYING,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+            State.MARKER_COMMAND_RECORDED,
+            SideEffectStateMachine::markerResultFromEvent);
+  }
 
   /**
    * Creates new SideEffect Marker
@@ -72,40 +112,11 @@ public final class SideEffectStateMachine
     action(Action.SCHEDULE);
   }
 
-  enum Action {
-    SCHEDULE
-  }
-
-  enum State {
-    CREATED,
-    MARKER_COMMAND_CREATED,
-    MARKER_COMMAND_RECORDED,
-  }
-
-  private static StateMachine<State, Action, SideEffectStateMachine> newStateMachine() {
-    return StateMachine.<State, Action, SideEffectStateMachine>newInstance(
-            "SideEffect", State.CREATED, State.MARKER_COMMAND_RECORDED)
-        .add(
-            State.CREATED,
-            Action.SCHEDULE,
-            State.MARKER_COMMAND_CREATED,
-            SideEffectStateMachine::createMarkerCommand)
-        .add(
-            State.MARKER_COMMAND_CREATED,
-            CommandType.COMMAND_TYPE_RECORD_MARKER,
-            State.MARKER_COMMAND_CREATED,
-            SideEffectStateMachine::markerResultFromFunc)
-        .add(
-            State.MARKER_COMMAND_CREATED,
-            EventType.EVENT_TYPE_MARKER_RECORDED,
-            State.MARKER_COMMAND_RECORDED,
-            SideEffectStateMachine::markerResultFromEvent);
-  }
-
-  private void createMarkerCommand() {
+  private State createMarkerCommand() {
     RecordMarkerCommandAttributes markerAttributes;
     if (replaying.apply()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
+      return State.MARKER_COMMAND_CREATED_REPLAYING;
     } else {
       // executing first time
       result = func.apply();
@@ -127,12 +138,10 @@ public final class SideEffectStateMachine
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes)
             .build());
+    return State.MARKER_COMMAND_CREATED;
   }
 
   private void markerResultFromEvent() {
-    if (!replaying.apply()) {
-      return;
-    }
     MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
     if (!attributes.getMarkerName().equals(SIDE_EFFECT_MARKER_NAME)) {
       throw new IllegalStateException(
@@ -144,9 +153,7 @@ public final class SideEffectStateMachine
   }
 
   private void markerResultFromFunc() {
-    if (!replaying.apply()) {
-      callback.apply(result);
-    }
+    callback.apply(result);
   }
 
   public static String asPlantUMLStateDiagram() {

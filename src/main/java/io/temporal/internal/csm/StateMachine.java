@@ -75,6 +75,7 @@ final class StateMachine<State, Action, Data> {
    * Registers a transition between states.
    *
    * @param from initial state that transition applies to
+   * @param action action that caused the transition
    * @param to destination state of a transition.
    * @param callback callback to invoke upon transition
    * @return the current StateMachine instance for the fluid pattern.
@@ -106,6 +107,24 @@ final class StateMachine<State, Action, Data> {
     transitions.put(
         new Transition<>(from, new ActionOrEventType<>(eventType)),
         new FixedTransitionTarget<>(to, (data) -> {}));
+    return this;
+  }
+
+  /**
+   * Registers a dynamic transition between states. Used when the same action can transition to more
+   * than one state depending on data.
+   *
+   * @param from initial state that transition applies to
+   * @param eventType the event that caused the transition.
+   * @param toStates allowed destination states of a transition.
+   * @param callback callback to invoke upon transition
+   * @return the current StateMachine instance for the fluid pattern.
+   */
+  StateMachine<State, Action, Data> add(
+      State from, EventType eventType, State[] toStates, DynamicCallback<State, Data> callback) {
+    transitions.put(
+        new Transition<>(from, new ActionOrEventType<>(eventType)),
+        new DynamicTransitionTarget<>(toStates, callback));
     return this;
   }
 

@@ -163,7 +163,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * re-executed giving SideEffect another chance to succeed.
    *
    * @param func function that is called once to return a value.
-   * @return callback value of the side effect.
+   * @param callback function that accepts the result of the side effect.
    */
   void sideEffect(Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback);
 

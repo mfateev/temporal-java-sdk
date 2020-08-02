@@ -1,3 +1,22 @@
+/*
+ *  Copyright (C) 2020 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ *  Copyright 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ *  Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"). You may not
+ *  use this file except in compliance with the License. A copy of the License is
+ *  located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ *  or in the "license" file accompanying this file. This file is distributed on
+ *  an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ *  express or implied. See the License for the specific language governing
+ *  permissions and limitations under the License.
+ */
+
 package io.temporal.internal.csm;
 
 import static io.temporal.internal.csm.MutableSideEffectStateMachine.MARKER_DATA_KEY;
@@ -21,7 +40,7 @@ public class SideEffectStateMachineTest {
   private EntityManager manager;
 
   @Test
-  public void testOne() {
+  public void testSideEffectStateMachine() {
     class TestListener extends TestEntityManagerListenerBase {
       Optional<Payloads> result;
 
@@ -39,20 +58,20 @@ public class SideEffectStateMachineTest {
             });
       }
     }
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder().setMarkerName(SIDE_EFFECT_MARKER_NAME);
     TestHistoryBuilder h =
         new TestHistoryBuilder()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
             .addWorkflowTask()
             .add(
                 EventType.EVENT_TYPE_MARKER_RECORDED,
-                MarkerRecordedEventAttributes.newBuilder()
-                    .setMarkerName(SIDE_EFFECT_MARKER_NAME)
+                markerBuilder
                     .putDetails(MARKER_DATA_KEY, converter.toPayloads("m1Arg1", "m1Arg2").get())
                     .build())
             .add(
                 EventType.EVENT_TYPE_MARKER_RECORDED,
-                MarkerRecordedEventAttributes.newBuilder()
-                    .setMarkerName(SIDE_EFFECT_MARKER_NAME)
+                markerBuilder
                     .putDetails(MARKER_DATA_KEY, converter.toPayloads("m2Arg1").get())
                     .build())
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);

@@ -48,10 +48,11 @@ public class CommandsGeneratePlantUMLStateDiagrams {
     generate(ContinueAsNewWorkflowStateMachine.class);
     generate(WorkflowTaskStateMachine.class);
     generate(SideEffectStateMachine.class);
+    generate(MutableSideEffectStateMachine.class);
     generate(LocalActivityStateMachine.class);
   }
 
-  private void generate(Class<? extends EntityStateMachine> commandClass) {
+  private void generate(Class<?> commandClass) {
     Method generator;
     try {
       generator = commandClass.getDeclaredMethod("asPlantUMLStateDiagram");
