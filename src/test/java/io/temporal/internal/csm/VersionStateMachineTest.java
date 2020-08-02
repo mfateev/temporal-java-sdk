@@ -181,6 +181,59 @@ public class VersionStateMachineTest {
     }
   }
 
+  @Test
+  public void testUnsupportedVersion() {
+    final int maxSupported = 13;
+    class TestListener extends TestEntityManagerListenerBase {
+      @Override
+      public void eventLoopImpl() {
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) ->
+                manager.getVersion(
+                    "id1",
+                    maxSupported + 10,
+                    maxSupported + 10,
+                    (v2) -> manager.newCompleteWorkflow(converter.toPayloads(v2))));
+      }
+    }
+    /*
+      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      5: EVENT_TYPE_MARKER_RECORDED
+      6: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder()
+            .setMarkerName(VERSION_MARKER_NAME)
+            .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get());
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask()
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                markerBuilder
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
+                    .build())
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+
+    TestEntityManagerListenerBase listener = new TestListener();
+    manager = new EntityManager(listener);
+    try {
+      h.handleWorkflowTaskTakeCommands(manager);
+      fail("failure expected");
+    } catch (Throwable e) {
+      assertTrue(
+          e.getMessage()
+              .startsWith("Version " + maxSupported + " of changeId id1 is not supported"));
+    }
+  }
+
   /**
    * Tests that getVersion call returns DEFAULT version when there is no correspondent marker in the
    * history. It happens when getVersion call was added at the workflow place that already executed.
@@ -275,7 +328,7 @@ public class VersionStateMachineTest {
               manager.getVersion(
                   "id1",
                   DEFAULT_VERSION,
-                  maxSupported - 10,
+                  maxSupported + 10,
                   (v2) -> {
                     trace.append(v2 + ", ");
                     manager.newTimer(
@@ -630,6 +683,7 @@ public class VersionStateMachineTest {
     }
   }
 
+  /** It is not allowed to add getVersion calls with existing changeId. */
   @Test
   public void testAddingGetVersionExistingIdFails() {
     final int maxSupported = 133;

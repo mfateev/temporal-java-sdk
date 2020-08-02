@@ -705,7 +705,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
 
     @Override
     public boolean isReplaying() {
-      throw new UnsupportedOperationException("not implemented");
+      return false;
     }
 
     @Override

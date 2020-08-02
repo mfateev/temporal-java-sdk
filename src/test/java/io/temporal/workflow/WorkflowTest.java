@@ -5224,7 +5224,8 @@ public class WorkflowTest {
       // Catching error from getVersion is only for unit test purpose.
       // Do not ever do it in production code.
       try {
-        Workflow.getVersion("test_change", 2, 3);
+        version = Workflow.getVersion("test_change", 2, 3);
+        System.out.println("VERSION=" + version);
       } catch (Error e) {
         throw Workflow.wrap(new Exception("unsupported change version"));
       }

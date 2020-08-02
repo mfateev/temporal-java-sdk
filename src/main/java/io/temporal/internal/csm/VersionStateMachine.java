@@ -180,6 +180,7 @@ public final class VersionStateMachine {
       State toState;
       RecordMarkerCommandAttributes markerAttributes;
       if (version.isPresent()) {
+        validateVersion();
         markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
         toState = State.SKIPPED;
       } else {
