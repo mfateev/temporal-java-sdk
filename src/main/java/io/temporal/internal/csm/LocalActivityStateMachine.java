@@ -141,7 +141,7 @@ public final class LocalActivityStateMachine
   }
 
   public void cancel() {
-    throw new UnsupportedOperationException("not implemented yet");
+    // TODO(maxim): Cancellation of local activity.
     //    action(Action.CANCEL);
   }
 

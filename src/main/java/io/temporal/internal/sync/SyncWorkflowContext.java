@@ -613,7 +613,17 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   @Override
   public int getVersion(String changeId, int minSupported, int maxSupported) {
-    return context.getVersion(changeId, converter, minSupported, maxSupported);
+    System.out.println(
+        "SyncWorkflowContext getVersion changeId=" + changeId + ", maxSupported=" + maxSupported);
+    CompletablePromise<Integer> result = Workflow.newPromise();
+    context.getVersion(
+        changeId,
+        minSupported,
+        maxSupported,
+        (v) -> runner.executeInWorkflowThread("version-callback", () -> result.complete(v)));
+    int r = result.get();
+    System.out.println("SyncWorkflowContext getVersion changeId=" + changeId + ", version=" + r);
+    return r;
   }
 
   public Optional<Payloads> query(String type, Optional<Payloads> args) {

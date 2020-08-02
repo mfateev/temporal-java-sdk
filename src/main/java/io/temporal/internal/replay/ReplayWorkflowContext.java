@@ -29,7 +29,6 @@ import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.common.context.ContextPropagator;
-import io.temporal.common.converter.DataConverter;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
@@ -185,9 +184,10 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param changeId identifier of a particular change
    * @param minSupported min version supported for the change
    * @param maxSupported max version supported for the change
-   * @return version
+   * @param callback used to return version
    */
-  int getVersion(String changeId, DataConverter dataConverter, int minSupported, int maxSupported);
+  void getVersion(
+      String changeId, int minSupported, int maxSupported, Functions.Proc1<Integer> callback);
 
   Random newRandom();
 

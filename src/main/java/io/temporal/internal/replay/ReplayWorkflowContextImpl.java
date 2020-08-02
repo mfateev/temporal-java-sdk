@@ -57,7 +57,6 @@ import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.context.ContextPropagator;
-import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.failure.ChildWorkflowFailure;
@@ -585,10 +584,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public int getVersion(
-      String changeId, DataConverter converter, int minSupported, int maxSupported) {
-    //    return workflowClock.getVersion(changeId, converter, minSupported, maxSupported);
-    throw new UnsupportedOperationException("TODO");
+  public void getVersion(
+      String changeId, int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
+    entityManager.getVersion(changeId, minSupported, maxSupported, callback);
   }
 
   @Override

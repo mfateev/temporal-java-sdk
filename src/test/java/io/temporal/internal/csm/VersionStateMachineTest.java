@@ -188,42 +188,49 @@ public class VersionStateMachineTest {
   public void testRecordAcrossMultipleWorkflowTasks() {
     final int maxSupported = 133;
     class TestListener extends TestEntityManagerListenerBase {
+      final StringBuilder trace = new StringBuilder();
+
       @Override
       public void eventLoopImpl() {
         manager.getVersion(
             "id1",
             DEFAULT_VERSION,
             maxSupported,
-            (v1) ->
-                manager.getVersion(
-                    "id1",
-                    DEFAULT_VERSION,
-                    maxSupported - 10,
-                    (v2) ->
-                        manager.newTimer(
-                            StartTimerCommandAttributes.newBuilder()
-                                .setStartToFireTimeout(
-                                    Duration.newBuilder().setSeconds(100).build())
-                                .build(),
-                            (e1) ->
-                                manager.newTimer(
-                                    StartTimerCommandAttributes.newBuilder()
-                                        .setStartToFireTimeout(
-                                            Duration.newBuilder().setSeconds(100).build())
-                                        .build(),
-                                    (e2) ->
-                                        manager.getVersion(
-                                            "id1",
-                                            maxSupported - 3,
-                                            maxSupported + 10,
-                                            (v3) ->
-                                                manager.getVersion(
-                                                    "id1",
-                                                    DEFAULT_VERSION,
-                                                    maxSupported + 100,
-                                                    (v4) ->
-                                                        manager.newCompleteWorkflow(
-                                                            converter.toPayloads(v3))))))));
+            (v1) -> {
+              trace.append(v1 + ", ");
+              manager.getVersion(
+                  "id1",
+                  DEFAULT_VERSION,
+                  maxSupported - 10,
+                  (v2) ->
+                      manager.newTimer(
+                          StartTimerCommandAttributes.newBuilder()
+                              .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                              .build(),
+                          (e1) ->
+                              manager.newTimer(
+                                  StartTimerCommandAttributes.newBuilder()
+                                      .setStartToFireTimeout(
+                                          Duration.newBuilder().setSeconds(100).build())
+                                      .build(),
+                                  (e2) ->
+                                      manager.getVersion(
+                                          "id1",
+                                          maxSupported - 3,
+                                          maxSupported + 10,
+                                          (v3) -> {
+                                            trace.append(v3 + ", ");
+                                            manager.getVersion(
+                                                "id1",
+                                                DEFAULT_VERSION,
+                                                maxSupported + 100,
+                                                (v4) -> {
+                                                  trace.append(v4);
+                                                  manager.newCompleteWorkflow(
+                                                      converter.toPayloads(v3));
+                                                });
+                                          }))));
+            });
       }
     }
     /*
@@ -307,10 +314,12 @@ public class VersionStateMachineTest {
     }
     {
       // Full replay
-      TestEntityManagerListenerBase listener = new TestListener();
+      TestListener listener = new TestListener();
       manager = new EntityManager(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
+      assertEquals(
+          maxSupported + ", " + maxSupported + ", " + maxSupported, listener.trace.toString());
     }
   }
 }

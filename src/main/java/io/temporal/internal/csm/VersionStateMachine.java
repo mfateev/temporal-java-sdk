@@ -87,7 +87,7 @@ public final class VersionStateMachine {
             State.MARKER_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_RECORD_MARKER,
             State.RESULT_NOTIFIED,
-            InvocationStateMachine::notifyCachedResult)
+            InvocationStateMachine::notifyResult)
         .add(
             State.RESULT_NOTIFIED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
@@ -219,7 +219,7 @@ public final class VersionStateMachine {
      */
     State notifyFromEvent() {
       State r = notifyFromEventImpl();
-      notifyCachedResult();
+      notifyResult();
       return r;
     }
 
@@ -247,13 +247,13 @@ public final class VersionStateMachine {
       return State.MARKER_COMMAND_RECORDED;
     }
 
-    void notifyCachedResult() {
+    void notifyResult() {
       resultCallback.apply(version);
     }
 
     void cancelCommandNotifyCachedResult() {
       cancelInitialCommand();
-      notifyCachedResult();
+      notifyResult();
     }
   }
 

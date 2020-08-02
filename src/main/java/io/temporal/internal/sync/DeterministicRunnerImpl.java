@@ -709,8 +709,8 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public int getVersion(
-        String changeId, DataConverter converter, int minSupported, int maxSupported) {
+    public void getVersion(
+        String changeId, int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 

@@ -605,7 +605,13 @@ public final class EntityManager {
         vesions.computeIfAbsent(
             changeId,
             (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, sink));
-    stateMachine.getVersion(minSupported, maxSupported, callback);
+    stateMachine.getVersion(
+        minSupported,
+        maxSupported,
+        (v) -> {
+          callback.apply(v);
+          eventLoop();
+        });
   }
 
   public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
