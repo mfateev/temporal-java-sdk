@@ -19,6 +19,8 @@
 
 package io.temporal.internal.csm;
 
+import static io.temporal.internal.sync.WorkflowInternal.DEFAULT_VERSION;
+
 import com.google.common.base.Strings;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RecordMarkerCommandAttributes;
@@ -34,24 +36,19 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class MutableSideEffectStateMachine {
+public final class VersionStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
-  static final String MARKER_DATA_KEY = "data";
-  static final String MARKER_SKIP_COUNT_KEY = "skipCount";
+  static final String MARKER_VERSION_KEY = "version";
   static final String MARKER_ID_KEY = "id";
-  static final String MUTABLE_SIDE_EFFECT_MARKER_NAME = "MutableSideEffect";
+  static final String VERSION_MARKER_NAME = "Version";
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
-  private final String id;
+  private final String changeId;
   private final Functions.Func<Boolean> replaying;
   private final Functions.Proc1<NewCommand> commandSink;
 
-  private Optional<Payloads> result = Optional.empty();
-
-  private int currentSkipCount;
-
-  private int skipCountFromMarker = Integer.MAX_VALUE;
+  private int version = DEFAULT_VERSION;
 
   enum Action {
     CHECK_EXECUTION_STATE,
@@ -75,10 +72,7 @@ public final class MutableSideEffectStateMachine {
 
   private static StateMachine<State, Action, InvocationStateMachine> newInvocationStateMachine() {
     return StateMachine.<State, Action, InvocationStateMachine>newInstance(
-            "MutableSideEffect",
-            State.CREATED,
-            State.MARKER_COMMAND_RECORDED,
-            State.SKIPPED_NOTIFIED)
+            "Version", State.CREATED, State.MARKER_COMMAND_RECORDED, State.SKIPPED_NOTIFIED)
         .add(
             State.CREATED,
             Action.CHECK_EXECUTION_STATE,
@@ -124,19 +118,29 @@ public final class MutableSideEffectStateMachine {
             InvocationStateMachine::notifyFromEvent);
   }
 
-  /** Represents a single invocation of mutableSideEffect. */
+  /** Represents a single invocation of version. */
   private class InvocationStateMachine
       extends EntityStateMachineInitialCommand<State, Action, InvocationStateMachine> {
 
-    private Functions.Proc1<Optional<Payloads>> resultCallback;
-    private Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;
+    private final int minSupported;
+    private final int maxSupported;
 
-    InvocationStateMachine(
-        Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-        Functions.Proc1<Optional<Payloads>> callback) {
-      super(newInvocationStateMachine(), MutableSideEffectStateMachine.this.commandSink);
-      this.func = Objects.requireNonNull(func);
+    private Functions.Proc1<Integer> resultCallback;
+
+    InvocationStateMachine(int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
+      super(newInvocationStateMachine(), VersionStateMachine.this.commandSink);
+      this.minSupported = minSupported;
+      this.maxSupported = maxSupported;
       this.resultCallback = Objects.requireNonNull(callback);
+    }
+
+    private void validateVersion() {
+      if ((version < minSupported || version > maxSupported) && version != DEFAULT_VERSION) {
+        throw new Error(
+            String.format(
+                "Version %d of changeId %s is not supported. Supported version is between %d and %d.",
+                version, changeId, minSupported, maxSupported));
+      }
     }
 
     State getExecutionState() {
@@ -149,7 +153,7 @@ public final class MutableSideEffectStateMachine {
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
-              .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
+              .equals(VERSION_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
         return;
       }
@@ -160,7 +164,7 @@ public final class MutableSideEffectStateMachine {
         throw new IllegalStateException(
             "Marker details map missing required key: " + MARKER_ID_KEY);
       }
-      if (!id.equals(expectedId)) {
+      if (!changeId.equals(expectedId)) {
         action(Action.NON_MATCHING_EVENT);
         return;
       }
@@ -170,28 +174,23 @@ public final class MutableSideEffectStateMachine {
     State createMarker() {
       State toState;
       RecordMarkerCommandAttributes markerAttributes;
-      Optional<Payloads> updated;
-      updated = func.apply(result);
-      if (!updated.isPresent()) {
+      if (version != DEFAULT_VERSION) {
         markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
-        currentSkipCount++;
         toState = State.SKIPPED;
       } else {
-        result = updated;
+        version = maxSupported;
         DataConverter dataConverter = DataConverter.getDefaultInstance();
         Map<String, Payloads> details = new HashMap<>();
-        details.put(MARKER_ID_KEY, dataConverter.toPayloads(id).get());
-        details.put(MARKER_DATA_KEY, updated.get());
-        details.put(MARKER_SKIP_COUNT_KEY, dataConverter.toPayloads(currentSkipCount).get());
+        details.put(MARKER_ID_KEY, dataConverter.toPayloads(changeId).get());
+        details.put(MARKER_VERSION_KEY, dataConverter.toPayloads(version).get());
         markerAttributes =
             RecordMarkerCommandAttributes.newBuilder()
-                .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
+                .setMarkerName(VERSION_MARKER_NAME)
                 .putAllDetails(details)
                 .build();
-        currentSkipCount = 0;
         toState = State.MARKER_COMMAND_CREATED;
       }
-      System.out.println("createMarker updated=" + updated + ", skipCount=" + currentSkipCount);
+      System.out.println("version createMarker version=" + version);
       addCommand(
           Command.newBuilder()
               .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
@@ -213,9 +212,9 @@ public final class MutableSideEffectStateMachine {
      *
      * <ul>
      *   <li>Is a Marker
-     *   <li>Has MutableSideEffect marker name
+     *   <li>Has Version marker name
      *   <li>Its skip count matches. Not matching access count means that current event is for a
-     *       some following mutableSideEffect invocation.
+     *       some following version invocation.
      * </ul>
      */
     State notifyFromEvent() {
@@ -226,35 +225,30 @@ public final class MutableSideEffectStateMachine {
 
     State notifyFromEventImpl() {
       MarkerRecordedEventAttributes attributes = currentEvent.getMarkerRecordedEventAttributes();
-      Map<String, Payloads> detailsMap = attributes.getDetailsMap();
-      Optional<Payloads> skipCountPayloads =
-          Optional.ofNullable(detailsMap.get(MARKER_SKIP_COUNT_KEY));
-      if (!skipCountPayloads.isPresent()) {
+      if (!attributes.getMarkerName().equals(VERSION_MARKER_NAME)) {
         throw new IllegalStateException(
-            "Marker details detailsMap missing required key: " + MARKER_SKIP_COUNT_KEY);
+            "Expected " + VERSION_MARKER_NAME + ", received: " + attributes);
       }
+      Map<String, Payloads> detailsMap = attributes.getDetailsMap();
       Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
       String idFromMarker = dataConverter.fromPayloads(0, oid, String.class, String.class);
-      if (!id.equals(idFromMarker)) {
-        throw new IllegalArgumentException("Ids doesnt match: " + id + "<>" + idFromMarker);
+      if (!changeId.equals(idFromMarker)) {
+        throw new UnsupportedOperationException(
+            "TODO: deal with multiple side effects with different id");
       }
-      skipCountFromMarker =
-          dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
-      if (++currentSkipCount < skipCountFromMarker) {
-        skipCountFromMarker = Integer.MAX_VALUE;
-        return State.SKIPPED_NOTIFIED;
-      }
-      if (!attributes.getMarkerName().equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
+      Optional<Payloads> skipCountPayloads =
+          Optional.ofNullable(detailsMap.get(MARKER_VERSION_KEY));
+      if (!skipCountPayloads.isPresent()) {
         throw new IllegalStateException(
-            "Expected " + MUTABLE_SIDE_EFFECT_MARKER_NAME + ", received: " + attributes);
+            "Marker details detailsMap missing required key: " + MARKER_VERSION_KEY);
       }
-      currentSkipCount = 0;
-      result = Optional.ofNullable(detailsMap.get(MARKER_DATA_KEY));
+      version = dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
+      validateVersion();
       return State.MARKER_COMMAND_RECORDED;
     }
 
     void notifyCachedResult() {
-      resultCallback.apply(result);
+      resultCallback.apply(version);
     }
 
     void cancelCommandNotifyCachedResult() {
@@ -263,23 +257,21 @@ public final class MutableSideEffectStateMachine {
     }
   }
 
-  /** Creates new MutableSideEffectStateMachine */
-  public static MutableSideEffectStateMachine newInstance(
+  /** Creates new VersionStateMachine */
+  public static VersionStateMachine newInstance(
       String id, Functions.Func<Boolean> replaying, Functions.Proc1<NewCommand> commandSink) {
-    return new MutableSideEffectStateMachine(id, replaying, commandSink);
+    return new VersionStateMachine(id, replaying, commandSink);
   }
 
-  private MutableSideEffectStateMachine(
-      String id, Functions.Func<Boolean> replaying, Functions.Proc1<NewCommand> commandSink) {
-    this.id = Objects.requireNonNull(id);
+  private VersionStateMachine(
+      String changeId, Functions.Func<Boolean> replaying, Functions.Proc1<NewCommand> commandSink) {
+    this.changeId = Objects.requireNonNull(changeId);
     this.replaying = Objects.requireNonNull(replaying);
     this.commandSink = Objects.requireNonNull(commandSink);
   }
 
-  public void mutableSideEffect(
-      Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback) {
-    InvocationStateMachine ism = new InvocationStateMachine(func, callback);
+  public void getVersion(int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
+    InvocationStateMachine ism = new InvocationStateMachine(minSupported, maxSupported, callback);
     ism.action(Action.CHECK_EXECUTION_STATE);
     ism.action(Action.SCHEDULE);
   }

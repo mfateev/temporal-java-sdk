@@ -313,7 +313,7 @@ public class WorkflowTest {
             .setNamespace(NAMESPACE)
             .build();
     boolean versionTest =
-        false; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
+        true; // testMethod.contains("GetVersion") || testMethod.contains("Deterministic");
     WorkerFactoryOptions factoryOptions =
         WorkerFactoryOptions.newBuilder()
             .setWorkflowInterceptors(tracer)

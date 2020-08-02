@@ -19,8 +19,11 @@
 
 package io.temporal.internal.csm;
 
-import static io.temporal.internal.csm.MutableSideEffectStateMachine.*;
+import static io.temporal.internal.csm.MutableSideEffectStateMachine.MARKER_ID_KEY;
 import static io.temporal.internal.csm.TestHistoryBuilder.assertCommand;
+import static io.temporal.internal.csm.VersionStateMachine.MARKER_VERSION_KEY;
+import static io.temporal.internal.csm.VersionStateMachine.VERSION_MARKER_NAME;
+import static io.temporal.workflow.Workflow.DEFAULT_VERSION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -37,18 +40,22 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
 
-public class MutableSideEffectStateMachineTest {
+public class VersionStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
   private EntityManager manager;
 
   @Test
   public void testOne() {
+    final int maxSupported = 12;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
       public void eventLoopImpl() {
-        manager.mutableSideEffect(
-            "id1", (p) -> converter.toPayloads("result1"), (r) -> manager.newCompleteWorkflow(r));
+        manager.getVersion(
+            "id1",
+            DEFAULT_VERSION,
+            maxSupported,
+            (v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*
@@ -61,7 +68,7 @@ public class MutableSideEffectStateMachineTest {
     */
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
-            .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
+            .setMarkerName(VERSION_MARKER_NAME)
             .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
@@ -70,8 +77,7 @@ public class MutableSideEffectStateMachineTest {
             .add(
                 EventType.EVENT_TYPE_MARKER_RECORDED,
                 markerBuilder
-                    .putDetails(MARKER_DATA_KEY, converter.toPayloads("result1").get())
-                    .putDetails(MARKER_SKIP_COUNT_KEY, converter.toPayloads(0).get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
                     .build())
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
 
@@ -86,7 +92,8 @@ public class MutableSideEffectStateMachineTest {
           CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(1).getCommandType());
       Optional<Payloads> resultData =
           Optional.of(commands.get(1).getCompleteWorkflowExecutionCommandAttributes().getResult());
-      assertEquals("result1", converter.fromPayloads(0, resultData, String.class, String.class));
+      assertEquals(
+          maxSupported, (int) converter.fromPayloads(0, resultData, Integer.class, Integer.class));
     }
     {
       // Full replay
@@ -98,22 +105,26 @@ public class MutableSideEffectStateMachineTest {
   }
 
   @Test
-  public void testDefaultThenRecord() {
+  public void testMultiple() {
+    final int maxSupported = 13;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
       public void eventLoopImpl() {
-        manager.mutableSideEffect(
+        manager.getVersion(
             "id1",
-            (p) -> Optional.empty(),
-            (r) ->
-                manager.mutableSideEffect(
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) ->
+                manager.getVersion(
                     "id1",
-                    (pp) -> Optional.empty(),
-                    (rr) ->
-                        manager.mutableSideEffect(
+                    DEFAULT_VERSION,
+                    maxSupported + 10,
+                    (v2) ->
+                        manager.getVersion(
                             "id1",
-                            (ppp) -> converter.toPayloads("result1"),
-                            (rrr) -> manager.newCompleteWorkflow(rrr))));
+                            DEFAULT_VERSION,
+                            maxSupported + 100,
+                            (v3) -> manager.newCompleteWorkflow(converter.toPayloads(v3)))));
       }
     }
     /*
@@ -126,7 +137,7 @@ public class MutableSideEffectStateMachineTest {
     */
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
-            .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
+            .setMarkerName(VERSION_MARKER_NAME)
             .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
@@ -135,8 +146,7 @@ public class MutableSideEffectStateMachineTest {
             .add(
                 EventType.EVENT_TYPE_MARKER_RECORDED,
                 markerBuilder
-                    .putDetails(MARKER_DATA_KEY, converter.toPayloads("result1").get())
-                    .putDetails(MARKER_SKIP_COUNT_KEY, converter.toPayloads(2).get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
                     .build())
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
 
@@ -147,22 +157,23 @@ public class MutableSideEffectStateMachineTest {
 
       assertEquals(2, commands.size());
       assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(0).getCommandType());
-      int skipCount =
+      int version =
           converter.fromPayloads(
               0,
               Optional.ofNullable(
                   commands
                       .get(0)
                       .getRecordMarkerCommandAttributes()
-                      .getDetailsOrThrow(MARKER_SKIP_COUNT_KEY)),
+                      .getDetailsOrThrow(MARKER_VERSION_KEY)),
               Integer.class,
               Integer.class);
-      assertEquals(2, skipCount);
+      assertEquals(maxSupported, version);
       assertEquals(
           CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(1).getCommandType());
       Optional<Payloads> resultData =
           Optional.of(commands.get(1).getCompleteWorkflowExecutionCommandAttributes().getResult());
-      assertEquals("result1", converter.fromPayloads(0, resultData, String.class, String.class));
+      assertEquals(
+          maxSupported, (int) converter.fromPayloads(0, resultData, Integer.class, Integer.class));
     }
     {
       // Full replay
@@ -175,17 +186,20 @@ public class MutableSideEffectStateMachineTest {
 
   @Test
   public void testRecordAcrossMultipleWorkflowTasks() {
+    final int maxSupported = 133;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
       public void eventLoopImpl() {
-        manager.mutableSideEffect(
+        manager.getVersion(
             "id1",
-            (p) -> converter.toPayloads("result1"),
-            (r1) ->
-                manager.mutableSideEffect(
+            DEFAULT_VERSION,
+            maxSupported,
+            (v1) ->
+                manager.getVersion(
                     "id1",
-                    (pp) -> Optional.empty(),
-                    (r2) ->
+                    DEFAULT_VERSION,
+                    maxSupported - 10,
+                    (v2) ->
                         manager.newTimer(
                             StartTimerCommandAttributes.newBuilder()
                                 .setStartToFireTimeout(
@@ -198,14 +212,18 @@ public class MutableSideEffectStateMachineTest {
                                             Duration.newBuilder().setSeconds(100).build())
                                         .build(),
                                     (e2) ->
-                                        manager.mutableSideEffect(
+                                        manager.getVersion(
                                             "id1",
-                                            (pp) -> Optional.empty(),
-                                            (r3) ->
-                                                manager.mutableSideEffect(
+                                            maxSupported - 3,
+                                            maxSupported + 10,
+                                            (v3) ->
+                                                manager.getVersion(
                                                     "id1",
-                                                    (ppp) -> converter.toPayloads("result2"),
-                                                    (r4) -> manager.newCompleteWorkflow(r4)))))));
+                                                    DEFAULT_VERSION,
+                                                    maxSupported + 100,
+                                                    (v4) ->
+                                                        manager.newCompleteWorkflow(
+                                                            converter.toPayloads(v3))))))));
       }
     }
     /*
@@ -229,7 +247,7 @@ public class MutableSideEffectStateMachineTest {
     */
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
-            .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
+            .setMarkerName(VERSION_MARKER_NAME)
             .putDetails(MARKER_ID_KEY, converter.toPayloads("id1").get());
     TestHistoryBuilder h =
         new TestHistoryBuilder()
@@ -238,8 +256,7 @@ public class MutableSideEffectStateMachineTest {
             .add(
                 EventType.EVENT_TYPE_MARKER_RECORDED,
                 markerBuilder
-                    .putDetails(MARKER_DATA_KEY, converter.toPayloads("result1").get())
-                    .putDetails(MARKER_SKIP_COUNT_KEY, converter.toPayloads(0).get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
                     .build());
     long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
     h.add(
@@ -255,12 +272,6 @@ public class MutableSideEffectStateMachineTest {
                 .setStartedEventId(timerStartedEventId2)
                 .setTimerId("timer2"))
         .addWorkflowTask()
-        .add(
-            EventType.EVENT_TYPE_MARKER_RECORDED,
-            markerBuilder
-                .putDetails(MARKER_DATA_KEY, converter.toPayloads("result2").get())
-                .putDetails(MARKER_SKIP_COUNT_KEY, converter.toPayloads(2).get())
-                .build())
         .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
     {
       TestEntityManagerListenerBase listener = new TestListener();
@@ -269,17 +280,17 @@ public class MutableSideEffectStateMachineTest {
 
       assertEquals(2, commands.size());
       assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(0).getCommandType());
-      int skipCount =
+      int version =
           converter.fromPayloads(
               0,
               Optional.ofNullable(
                   commands
                       .get(0)
                       .getRecordMarkerCommandAttributes()
-                      .getDetailsOrThrow(MARKER_SKIP_COUNT_KEY)),
+                      .getDetailsOrThrow(MARKER_VERSION_KEY)),
               Integer.class,
               Integer.class);
-      assertEquals(0, skipCount);
+      assertEquals(maxSupported, version);
       assertEquals(CommandType.COMMAND_TYPE_START_TIMER, commands.get(1).getCommandType());
     }
     {
@@ -288,25 +299,11 @@ public class MutableSideEffectStateMachineTest {
     }
     {
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 3);
-
-      assertEquals(2, commands.size());
-      assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(0).getCommandType());
-      int skipCount =
-          converter.fromPayloads(
-              0,
-              Optional.ofNullable(
-                  commands
-                      .get(0)
-                      .getRecordMarkerCommandAttributes()
-                      .getDetailsOrThrow(MARKER_SKIP_COUNT_KEY)),
-              Integer.class,
-              Integer.class);
-      assertEquals(2, skipCount);
-      assertEquals(
-          CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(1).getCommandType());
+      assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
       Optional<Payloads> resultData =
-          Optional.of(commands.get(1).getCompleteWorkflowExecutionCommandAttributes().getResult());
-      assertEquals("result2", converter.fromPayloads(0, resultData, String.class, String.class));
+          Optional.of(commands.get(0).getCompleteWorkflowExecutionCommandAttributes().getResult());
+      assertEquals(
+          maxSupported, (int) converter.fromPayloads(0, resultData, Integer.class, Integer.class));
     }
     {
       // Full replay

@@ -116,6 +116,9 @@ public final class EntityManager {
   /** Key is mutable side effect id */
   private final Map<String, MutableSideEffectStateMachine> mutableSideEffects = new HashMap<>();
 
+  /** Key is changeId */
+  private final Map<String, VersionStateMachine> vesions = new HashMap<>();
+
   /** Map of local activities by their id. */
   private Map<String, LocalActivityStateMachine> localActivityMap = new HashMap<>();
 
@@ -594,6 +597,15 @@ public final class EntityManager {
           // callback unblocked mutableSideEffect call. Give workflow code chance to make progress.
           eventLoop();
         });
+  }
+
+  public void getVersion(
+      String changeId, int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
+    VersionStateMachine stateMachine =
+        vesions.computeIfAbsent(
+            changeId,
+            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, sink));
+    stateMachine.getVersion(minSupported, maxSupported, callback);
   }
 
   public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
