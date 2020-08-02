@@ -2450,13 +2450,10 @@ public class WorkflowTest {
     public String execute(boolean useExternalService) {
       Promise<Void> timer1;
       Promise<Void> timer2;
-      if (useExternalService) {
-        timer1 = Workflow.newTimer(Duration.ofMillis(700));
-        timer2 = Workflow.newTimer(Duration.ofMillis(1300));
-      } else {
-        timer1 = Workflow.newTimer(Duration.ofSeconds(700));
-        timer2 = Workflow.newTimer(Duration.ofSeconds(1300));
-      }
+      Duration timeout1 = useExternalService ? Duration.ofMillis(700) : Duration.ofSeconds(700);
+      Duration timeout2 = useExternalService ? Duration.ofMillis(1300) : Duration.ofSeconds(1300);
+      timer1 = Workflow.newTimer(timeout1);
+      timer2 = Workflow.newTimer(timeout2);
       long time = Workflow.currentTimeMillis();
       timer1
           .thenApply(
@@ -2474,10 +2471,10 @@ public class WorkflowTest {
       timer1.get();
       long slept = Workflow.currentTimeMillis() - time;
       // Also checks that rounding up to a second works.
-      assertTrue(String.valueOf(slept), slept > 1000);
+      assertTrue(String.valueOf(slept), slept >= timeout1.toMillis());
       timer2.get();
       slept = Workflow.currentTimeMillis() - time;
-      assertTrue(String.valueOf(slept), slept > 2000);
+      assertTrue(String.valueOf(slept), slept >= timeout2.toMillis());
       return "testTimer";
     }
 
@@ -5777,30 +5774,27 @@ public class WorkflowTest {
     public String execute(String taskQueue) {
       TestActivities localActivities =
           Workflow.newLocalActivityStub(TestActivities.class, newLocalActivityOptions1());
-      //      try {
-      //        localActivities.throwIO();
-      //      } catch (ActivityFailure e) {
-      //        try {
-      //          assertTrue(e.getMessage().contains("ThrowIO"));
-      //          assertTrue(e.getCause() instanceof ApplicationFailure);
-      //          assertEquals(IOException.class.getName(), ((ApplicationFailure)
-      // e.getCause()).getType());
-      //          assertEquals(
-      //              "message='simulated IO problem', type='java.io.IOException',
-      // nonRetryable=false",
-      //              e.getCause().getMessage());
-      //        } catch (AssertionError ae) {
-      //          // Errors cause workflow task to fail. But we want workflow to fail in this case.
-      //          throw new RuntimeException(ae);
-      //        }
-      //      }
-      String laResult = localActivities.activity2("test", 123);
-      for (int i = 0; i < 2; i++) {
-        laResult = localActivities.activity2("test", 12345);
-        TestActivities normalActivities =
-            Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
-        laResult = normalActivities.activity2(laResult, 1234);
+      try {
+        localActivities.throwIO();
+      } catch (ActivityFailure e) {
+        e.printStackTrace();
+        try {
+          assertTrue(e.getMessage().contains("ThrowIO"));
+          assertTrue(e.getCause() instanceof ApplicationFailure);
+          assertEquals(IOException.class.getName(), ((ApplicationFailure) e.getCause()).getType());
+          assertEquals(
+              "message='simulated IO problem', type='java.io.IOException', nonRetryable=false",
+              e.getCause().getMessage());
+        } catch (AssertionError ae) {
+          // Errors cause workflow task to fail. But we want workflow to fail in this case.
+          throw new RuntimeException(ae);
+        }
       }
+
+      String laResult = localActivities.activity2("test", 123);
+      TestActivities normalActivities =
+          Workflow.newActivityStub(TestActivities.class, newActivityOptions1(taskQueue));
+      laResult = normalActivities.activity2(laResult, 123);
       return laResult;
     }
   }
@@ -5818,8 +5812,10 @@ public class WorkflowTest {
         "interceptExecuteWorkflow " + UUID_REGEXP,
         "newThread workflow-method",
         "executeLocalActivity ThrowIO",
+        "currentTimeMillis",
         "local activity ThrowIO",
         "executeLocalActivity Activity2",
+        "currentTimeMillis",
         "local activity Activity2",
         "executeActivity Activity2",
         "activity Activity2");
