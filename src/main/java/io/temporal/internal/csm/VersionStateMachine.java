@@ -48,7 +48,7 @@ public final class VersionStateMachine {
   private final Functions.Func<Boolean> replaying;
   private final Functions.Proc1<NewCommand> commandSink;
 
-  private int version = DEFAULT_VERSION;
+  private Optional<Integer> version = Optional.empty();
 
   enum Action {
     CHECK_EXECUTION_STATE,
@@ -110,7 +110,7 @@ public final class VersionStateMachine {
             State.RESULT_NOTIFIED_REPLAYING,
             Action.NON_MATCHING_EVENT,
             State.SKIPPED_NOTIFIED,
-            InvocationStateMachine::cancelCommandNotifyCachedResult)
+            InvocationStateMachine::missingMarkerNotifyCachedOrDefault)
         .add(
             State.RESULT_NOTIFIED_REPLAYING,
             EventType.EVENT_TYPE_MARKER_RECORDED,
@@ -135,11 +135,15 @@ public final class VersionStateMachine {
     }
 
     private void validateVersion() {
-      if ((version < minSupported || version > maxSupported) && version != DEFAULT_VERSION) {
+      if (!version.isPresent()) {
+        throw new IllegalStateException("Version not set");
+      }
+      int v = version.get();
+      if ((v < minSupported || v > maxSupported) && v != DEFAULT_VERSION) {
         throw new Error(
             String.format(
-                "Version %d of changeId %s is not supported. Supported version is between %d and %d.",
-                version, changeId, minSupported, maxSupported));
+                "Version %d of changeId %s is not supported. Supported v is between %d and %d.",
+                v, changeId, minSupported, maxSupported));
       }
     }
 
@@ -175,15 +179,15 @@ public final class VersionStateMachine {
     State createMarker() {
       State toState;
       RecordMarkerCommandAttributes markerAttributes;
-      if (version != DEFAULT_VERSION) {
+      if (version.isPresent()) {
         markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
         toState = State.SKIPPED;
       } else {
-        version = maxSupported;
+        version = Optional.of(maxSupported);
         DataConverter dataConverter = DataConverter.getDefaultInstance();
         Map<String, Payloads> details = new HashMap<>();
         details.put(MARKER_CHANGE_ID_KEY, dataConverter.toPayloads(changeId).get());
-        details.put(MARKER_VERSION_KEY, dataConverter.toPayloads(version).get());
+        details.put(MARKER_VERSION_KEY, dataConverter.toPayloads(version.get()).get());
         markerAttributes =
             RecordMarkerCommandAttributes.newBuilder()
                 .setMarkerName(VERSION_MARKER_NAME)
@@ -231,16 +235,31 @@ public final class VersionStateMachine {
     }
 
     void notifyResult() {
-      resultCallback.apply(version);
+      resultCallback.apply(version.get());
     }
 
     void cancelCommandNotifyCachedResult() {
       cancelInitialCommand();
       notifyResult();
     }
+
+    void missingMarkerNotifyCachedOrDefault() {
+      cancelInitialCommand();
+      if (!version.isPresent()) {
+        version = Optional.of(DEFAULT_VERSION);
+      }
+      notifyResult();
+    }
   }
 
   private void updateVersionFromEvent(HistoryEvent event) {
+    if (version.isPresent()) {
+      throw new IllegalStateException(
+          "Version is already set to "
+              + version.get()
+              + ". The most probable cause is retroactive addition "
+              + "of a getVersion call with an existing 'changeId'");
+    }
     MarkerRecordedEventAttributes attributes = event.getMarkerRecordedEventAttributes();
     if (!attributes.getMarkerName().equals(VERSION_MARKER_NAME)) {
       throw new IllegalStateException(
@@ -258,7 +277,8 @@ public final class VersionStateMachine {
       throw new IllegalStateException(
           "Marker details detailsMap missing required key: " + MARKER_VERSION_KEY);
     }
-    version = dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
+    int v = dataConverter.fromPayloads(0, skipCountPayloads, Integer.class, Integer.class);
+    version = Optional.of(v);
   }
 
   /** Creates new VersionStateMachine */
