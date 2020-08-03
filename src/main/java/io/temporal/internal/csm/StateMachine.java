@@ -234,4 +234,8 @@ final class StateMachine<State, Action, Data> {
     result.append("@enduml\n");
     return result.toString();
   }
+
+  public String getHistory() {
+    return transitionHistory.toString();
+  }
 }

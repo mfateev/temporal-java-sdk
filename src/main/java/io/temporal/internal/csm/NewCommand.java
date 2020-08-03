@@ -99,7 +99,7 @@ public class NewCommand {
         + '}';
   }
 
-  public void handleNonMatching() {
-    commands.handleNonMatching();
+  public void handleWorkflowTaskStarted() {
+    commands.handleWorkflowTaskStarted();
   }
 }

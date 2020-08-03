@@ -62,9 +62,7 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
   }
 
   @Override
-  public void handleNonMatching() {
-    throw new IllegalStateException("Unexpected");
-  }
+  public void handleWorkflowTaskStarted() {}
 
   protected final void action(Action action) {
     stateMachine.action(action, (Data) this);

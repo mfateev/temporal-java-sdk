@@ -27,7 +27,7 @@ public interface EntityStateMachine {
 
   EntityManager.HandleEventStatus handleEvent(HistoryEvent event);
 
-  void handleNonMatching();
+  void handleWorkflowTaskStarted();
 
   boolean isFinalState();
 }

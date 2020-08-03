@@ -221,13 +221,30 @@ public class TimerStateMachineTest {
       }
 
       @Override
-      public void signal(HistoryEvent signalEvent) {
+      protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        cancellationHandler.apply();
+        builder.add((v) -> cancellationHandler.apply());
       }
     }
 
+    /*
+      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      5: EVENT_TYPE_TIMER_STARTED
+      6: EVENT_TYPE_TIMER_STARTED
+      7: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+      8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      9: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+      10: EVENT_TYPE_WORKFLOW_TASK_STARTED
+      11: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+      12: EVENT_TYPE_TIMER_CANCELED
+      13: EVENT_TYPE_TIMER_FIRED
+      14: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+      15: EVENT_TYPE_WORKFLOW_TASK_STARTED
+    */
     TestHistoryBuilder h = new TestHistoryBuilder();
     h.add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED);
     h.addWorkflowTask();
@@ -249,6 +266,7 @@ public class TimerStateMachineTest {
                 .setStartedEventId(timerStartedEventId2)
                 .setTimerId("timer2"))
         .addWorkflowTaskScheduledAndStarted();
+    System.out.println(h);
     {
       TestTimerCancellationListener listener = new TestTimerCancellationListener();
       manager = new EntityManager(listener);

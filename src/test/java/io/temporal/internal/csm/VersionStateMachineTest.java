@@ -333,7 +333,6 @@ public class VersionStateMachineTest {
       manager = new EntityManager(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
-      assertTrue(String.valueOf(commands), commands.isEmpty());
     }
   }
 

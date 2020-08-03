@@ -38,7 +38,11 @@ abstract class TestEntityManagerListenerBase implements EntityManagerListener {
   protected abstract void buildWorkflow(AsyncWorkflowBuilder<Void> builder);
 
   @Override
-  public void signal(HistoryEvent signalEvent) {}
+  public final void signal(HistoryEvent signalEvent) {
+    signal(signalEvent, AsyncWorkflowBuilder.newScheduler(callbacks, null));
+  }
+
+  protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {}
 
   @Override
   public void cancel(HistoryEvent cancelEvent) {}

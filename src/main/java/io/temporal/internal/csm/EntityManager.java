@@ -260,7 +260,7 @@ public final class EntityManager {
     List<Command> result = new ArrayList<>(commands.size());
     for (NewCommand newCommand : commands) {
       if (newCommand.isCanceled()) {
-        throw new IllegalStateException("Canceled command: " + newCommand.getCommand());
+        continue;
       }
       Command command = newCommand.getCommand();
       result.add(command);
@@ -696,12 +696,11 @@ public final class EntityManager {
     @Override
     public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
       // If some new commands are pending and there are no more command events.
-      while (true) {
-        NewCommand newCommand = newCommands.poll();
+      for (NewCommand newCommand : commands) {
         if (newCommand == null) {
           break;
         }
-        newCommand.handleNonMatching();
+        newCommand.handleWorkflowTaskStarted();
       }
       EntityManager.this.currentStartedEventId = startedEventId;
       setCurrentTimeMillis(currentTimeMillis);

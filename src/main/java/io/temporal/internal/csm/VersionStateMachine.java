@@ -177,8 +177,12 @@ public final class VersionStateMachine {
     }
 
     @Override
-    public void handleNonMatching() {
-      action(Action.NON_MATCHING_EVENT);
+    public void handleWorkflowTaskStarted() {
+      // Needed to support getVersion calls added after this part of the workflow code has executed.
+      // Accounts for the case when there are no events following the expected version marker.
+      if (getState() == State.RESULT_NOTIFIED_REPLAYING) {
+        action(Action.NON_MATCHING_EVENT);
+      }
     }
 
     State createMarker() {
