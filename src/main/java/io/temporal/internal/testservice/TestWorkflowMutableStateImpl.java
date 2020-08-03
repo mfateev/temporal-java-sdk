@@ -1159,7 +1159,8 @@ class TestWorkflowMutableStateImpl implements TestWorkflowMutableState {
         WorkflowExecutionContinuedAsNewEventAttributes continuedAsNewEventAttributes =
             event.getWorkflowExecutionContinuedAsNewEventAttributes();
 
-        Optional<TestServiceRetryState> continuedRetryState = Optional.of(rs.getNextAttempt());
+        Optional<TestServiceRetryState> continuedRetryState =
+            Optional.of(rs.getNextAttempt(Optional.of(d.getFailure())));
         String runId =
             service.continueAsNew(
                 startRequest,

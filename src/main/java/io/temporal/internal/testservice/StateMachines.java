@@ -1493,10 +1493,27 @@ class StateMachines {
     if (!request.getFailure().hasApplicationFailureInfo()) {
       throw new IllegalArgumentException("application failure expected: " + request.getFailure());
     }
-    ApplicationFailureInfo info = request.getFailure().getApplicationFailureInfo();
-    RetryState retryState = attemptActivityRetry(ctx, Optional.of(info), data);
+    Failure failure = request.getFailure();
+    RetryState retryState = attemptActivityRetry(ctx, Optional.of(failure), data);
     if (retryState == RetryState.RETRY_STATE_IN_PROGRESS) {
       return INITIATED;
+    }
+    if (data.retryState.getAttempt() > 1) {
+      ActivityTaskStartedEventAttributes.Builder a =
+          ActivityTaskStartedEventAttributes.newBuilder()
+              .setIdentity(request.getIdentity())
+              .setScheduledEventId(data.scheduledEventId)
+              .setAttempt(data.retryState.getAttempt());
+      Optional<Failure> lastFailure = data.retryState.getLastFailure();
+      if (lastFailure.isPresent()) {
+        a.setLastFailure(lastFailure.get());
+      }
+      HistoryEvent event =
+          HistoryEvent.newBuilder()
+              .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED)
+              .setActivityTaskStartedEventAttributes(a)
+              .build();
+      ctx.addEvent(event);
     }
     ActivityTaskFailedEventAttributes.Builder a =
         ActivityTaskFailedEventAttributes.newBuilder()
@@ -1520,10 +1537,27 @@ class StateMachines {
     if (!request.getFailure().hasApplicationFailureInfo()) {
       throw new IllegalArgumentException("application failure expected: " + request.getFailure());
     }
-    ApplicationFailureInfo info = request.getFailure().getApplicationFailureInfo();
-    RetryState retryState = attemptActivityRetry(ctx, Optional.of(info), data);
+    Failure failure = request.getFailure();
+    RetryState retryState = attemptActivityRetry(ctx, Optional.of(failure), data);
     if (retryState == RetryState.RETRY_STATE_IN_PROGRESS) {
       return INITIATED;
+    }
+    if (data.retryState.getAttempt() > 1) {
+      ActivityTaskStartedEventAttributes.Builder a =
+          ActivityTaskStartedEventAttributes.newBuilder()
+              .setIdentity(request.getIdentity())
+              .setScheduledEventId(data.scheduledEventId)
+              .setAttempt(data.retryState.getAttempt());
+      Optional<Failure> lastFailure = data.retryState.getLastFailure();
+      if (lastFailure.isPresent()) {
+        a.setLastFailure(lastFailure.get());
+      }
+      HistoryEvent event =
+          HistoryEvent.newBuilder()
+              .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED)
+              .setActivityTaskStartedEventAttributes(a)
+              .build();
+      ctx.addEvent(event);
     }
     ActivityTaskFailedEventAttributes.Builder a =
         ActivityTaskFailedEventAttributes.newBuilder()
@@ -1597,14 +1631,17 @@ class StateMachines {
   }
 
   private static RetryState attemptActivityRetry(
-      RequestContext ctx, Optional<ApplicationFailureInfo> info, ActivityTaskData data) {
+      RequestContext ctx, Optional<Failure> failure, ActivityTaskData data) {
     if (data.retryState == null) {
       return RetryState.RETRY_STATE_RETRY_POLICY_NOT_SET;
     }
-    if (info.isPresent() && info.get().getNonRetryable()) {
-      return RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE;
+    Optional<ApplicationFailureInfo> info = failure.map(f -> f.getApplicationFailureInfo());
+    if (info.isPresent()) {
+      if (info.get().getNonRetryable()) {
+        return RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE;
+      }
     }
-    TestServiceRetryState nextAttempt = data.retryState.getNextAttempt();
+    TestServiceRetryState nextAttempt = data.retryState.getNextAttempt(failure);
     TestServiceRetryState.BackoffInterval backoffInterval =
         data.retryState.getBackoffIntervalInSeconds(
             info.map(i -> i.getType()), data.store.currentTime());
