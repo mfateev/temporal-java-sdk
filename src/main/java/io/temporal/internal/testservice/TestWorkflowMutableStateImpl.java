@@ -1653,7 +1653,8 @@ class TestWorkflowMutableStateImpl implements TestWorkflowMutableState {
     update(
         ctx -> {
           StateMachine<ActivityTaskData> activity = getActivity(scheduledEventId);
-          if (activity.getState() != State.STARTED) {
+          if (activity.getState() != State.STARTED
+              && activity.getState() != State.CANCELLATION_REQUESTED) {
             throw Status.NOT_FOUND
                 .withDescription("Activity is in " + activity.getState() + "  state")
                 .asRuntimeException();
