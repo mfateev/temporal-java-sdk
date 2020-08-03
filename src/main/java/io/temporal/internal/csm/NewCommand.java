@@ -98,4 +98,8 @@ public class NewCommand {
         + initialCommandEventId
         + '}';
   }
+
+  public void handleNonMatching() {
+    commands.handleNonMatching();
+  }
 }

@@ -63,6 +63,8 @@ import java.util.UUID;
 
 public final class EntityManager {
 
+  private boolean eventLoopExecuting;
+
   enum HandleEventStatus {
     OK,
     NOT_MATCHING_EVENT,
@@ -359,7 +361,12 @@ public final class EntityManager {
   }
 
   private void eventLoop() {
-    callbacks.eventLoop();
+    eventLoopExecuting = true;
+    try {
+      callbacks.eventLoop();
+    } finally {
+      eventLoopExecuting = false;
+    }
     prepareCommands();
   }
 
@@ -427,6 +434,7 @@ public final class EntityManager {
   public ActivityStateMachine newActivity(
       ScheduleActivityTaskCommandAttributes attributes,
       Functions.Proc1<HistoryEvent> completionCallback) {
+    checkEventLoopExecuting();
     return ActivityStateMachine.newInstance(attributes, completionCallback, sink);
   }
 
@@ -440,6 +448,7 @@ public final class EntityManager {
    */
   public Functions.Proc newTimer(
       StartTimerCommandAttributes attributes, Functions.Proc1<HistoryEvent> completionCallback) {
+    checkEventLoopExecuting();
     TimerStateMachine timer = TimerStateMachine.newInstance(attributes, completionCallback, sink);
     return () -> timer.cancel();
   }
@@ -460,6 +469,7 @@ public final class EntityManager {
       StartChildWorkflowExecutionCommandAttributes attributes,
       Functions.Proc1<WorkflowExecution> startedCallback,
       Functions.Proc1<HistoryEvent> completionCallback) {
+    checkEventLoopExecuting();
     ChildWorkflowStateMachine child =
         ChildWorkflowStateMachine.newInstance(
             attributes, startedCallback, completionCallback, sink);
@@ -518,6 +528,7 @@ public final class EntityManager {
   public Functions.Proc newSignalExternal(
       SignalExternalWorkflowExecutionCommandAttributes attributes,
       Functions.Proc2<HistoryEvent, Boolean> completionCallback) {
+    checkEventLoopExecuting();
     return SignalExternalStateMachine.newInstance(attributes, completionCallback, sink);
   }
 
@@ -529,28 +540,34 @@ public final class EntityManager {
   public void newCancelExternal(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
       Functions.Proc1<HistoryEvent> completionCallback) {
+    checkEventLoopExecuting();
     CancelExternalStateMachine.newInstance(attributes, completionCallback, sink);
   }
 
   public void newUpsertSearchAttributes(
       UpsertWorkflowSearchAttributesCommandAttributes attributes) {
+    checkEventLoopExecuting();
     UpsertSearchAttributesStateMachine.newInstance(attributes, sink);
   }
 
   public void newCompleteWorkflow(Optional<Payloads> workflowOutput) {
+    checkEventLoopExecuting();
     CompleteWorkflowStateMachine.newInstance(workflowOutput, sink);
   }
 
   public void newFailWorkflow(Failure failure) {
+    checkEventLoopExecuting();
     FailWorkflowStateMachine.newInstance(failure, sink);
   }
 
   public void newCancelWorkflow() {
+    checkEventLoopExecuting();
     CancelWorkflowStateMachine.newInstance(
         CancelWorkflowExecutionCommandAttributes.getDefaultInstance(), sink);
   }
 
   public void newContinueAsNewWorkflow(ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
+    checkEventLoopExecuting();
     ContinueAsNewWorkflowStateMachine.newInstance(attributes, sink);
   }
 
@@ -563,6 +580,7 @@ public final class EntityManager {
   }
 
   public UUID randomUUID() {
+    checkEventLoopExecuting();
     String runId = currentRunId;
     if (runId == null) {
       throw new Error("null currentRunId");
@@ -573,11 +591,13 @@ public final class EntityManager {
   }
 
   public Random newRandom() {
+    checkEventLoopExecuting();
     return new Random(randomUUID().getLeastSignificantBits());
   }
 
   public void sideEffect(
       Functions.Func<Optional<Payloads>> func, Functions.Proc1<Optional<Payloads>> callback) {
+    checkEventLoopExecuting();
     SideEffectStateMachine.newInstance(
         this::isReplaying,
         func,
@@ -599,6 +619,7 @@ public final class EntityManager {
       String id,
       Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
       Functions.Proc1<Optional<Payloads>> callback) {
+    checkEventLoopExecuting();
     MutableSideEffectStateMachine stateMachine =
         mutableSideEffects.computeIfAbsent(
             id,
@@ -639,12 +660,13 @@ public final class EntityManager {
       throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
     }
     commands.handleCompletion(laCompletion);
-    eventLoop();
+    prepareCommands();
   }
 
   public Functions.Proc scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback) {
+    checkEventLoopExecuting();
     String activityId = parameters.getActivityTask().getActivityId();
     if (Strings.isNullOrEmpty(activityId)) {
       throw new IllegalArgumentException("Missing activityId: " + activityId);
@@ -673,6 +695,14 @@ public final class EntityManager {
   private class WorkflowTaskCommandsListener implements WorkflowTaskStateMachine.Listener {
     @Override
     public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
+      // If some new commands are pending and there are no more command events.
+      while (true) {
+        NewCommand newCommand = newCommands.poll();
+        if (newCommand == null) {
+          break;
+        }
+        newCommand.handleNonMatching();
+      }
       EntityManager.this.currentStartedEventId = startedEventId;
       setCurrentTimeMillis(currentTimeMillis);
       eventLoop();
@@ -761,5 +791,11 @@ public final class EntityManager {
         throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
     }
     throw new IllegalStateException("unreachable");
+  }
+
+  void checkEventLoopExecuting() {
+    if (!eventLoopExecuting) {
+      throw new IllegalStateException("Operation allowed only while eventLoop is running");
+    }
   }
 }

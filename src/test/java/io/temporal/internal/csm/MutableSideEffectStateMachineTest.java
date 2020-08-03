@@ -30,6 +30,7 @@ import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.common.converter.DataConverter;
@@ -46,9 +47,12 @@ public class MutableSideEffectStateMachineTest {
   public void testOne() {
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.mutableSideEffect(
-            "id1", (p) -> converter.toPayloads("result1"), (r) -> manager.newCompleteWorkflow(r));
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Optional<Payloads>>add1(
+                (v, c) ->
+                    manager.mutableSideEffect("id1", (p) -> converter.toPayloads("result1"), c))
+            .add((r) -> manager.newCompleteWorkflow(r));
       }
     }
     /*
@@ -101,19 +105,16 @@ public class MutableSideEffectStateMachineTest {
   public void testDefaultThenRecord() {
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.mutableSideEffect(
-            "id1",
-            (p) -> Optional.empty(),
-            (r) ->
-                manager.mutableSideEffect(
-                    "id1",
-                    (pp) -> Optional.empty(),
-                    (rr) ->
-                        manager.mutableSideEffect(
-                            "id1",
-                            (ppp) -> converter.toPayloads("result1"),
-                            (rrr) -> manager.newCompleteWorkflow(rrr))));
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Optional<Payloads>>add1(
+                (v, c) -> manager.mutableSideEffect("id1", (p) -> Optional.empty(), c))
+            .<Optional<Payloads>>add1(
+                (v, c) -> manager.mutableSideEffect("id1", (p) -> Optional.empty(), c))
+            .<Optional<Payloads>>add1(
+                (v, c) ->
+                    manager.mutableSideEffect("id1", (p) -> converter.toPayloads("result1"), c))
+            .add((r) -> manager.newCompleteWorkflow(r));
       }
     }
     /*
@@ -177,37 +178,36 @@ public class MutableSideEffectStateMachineTest {
   public void testRecordAcrossMultipleWorkflowTasks() {
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.mutableSideEffect(
-            "id1",
-            (p) -> converter.toPayloads("result1"),
-            (r1) ->
-                manager.mutableSideEffect(
-                    "id1",
-                    (pp) -> Optional.empty(),
-                    (r2) ->
-                        manager.newTimer(
-                            StartTimerCommandAttributes.newBuilder()
-                                .setStartToFireTimeout(
-                                    Duration.newBuilder().setSeconds(100).build())
-                                .build(),
-                            (e1) ->
-                                manager.newTimer(
-                                    StartTimerCommandAttributes.newBuilder()
-                                        .setStartToFireTimeout(
-                                            Duration.newBuilder().setSeconds(100).build())
-                                        .build(),
-                                    (e2) ->
-                                        manager.mutableSideEffect(
-                                            "id1",
-                                            (pp) -> Optional.empty(),
-                                            (r3) ->
-                                                manager.mutableSideEffect(
-                                                    "id1",
-                                                    (ppp) -> converter.toPayloads("result2"),
-                                                    (r4) -> manager.newCompleteWorkflow(r4)))))));
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Optional<Payloads>>add1(
+                (v, c) ->
+                    manager.mutableSideEffect("id1", (p) -> converter.toPayloads("result1"), c))
+            .<Optional<Payloads>>add1(
+                (v, c) -> manager.mutableSideEffect("id1", (p) -> Optional.empty(), c))
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .<Optional<Payloads>>add1(
+                (v, c) -> manager.mutableSideEffect("id1", (p) -> Optional.empty(), c))
+            .<Optional<Payloads>>add1(
+                (v, c) ->
+                    manager.mutableSideEffect("id1", (p) -> converter.toPayloads("result2"), c))
+            .add((r) -> manager.newCompleteWorkflow(r));
       }
     }
+
     /*
       1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
       2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED

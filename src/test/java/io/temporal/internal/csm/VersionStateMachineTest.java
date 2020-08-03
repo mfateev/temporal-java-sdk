@@ -30,6 +30,7 @@ import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.common.converter.DataConverter;
@@ -47,12 +48,10 @@ public class VersionStateMachineTest {
     final int maxSupported = 12;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*
@@ -106,22 +105,14 @@ public class VersionStateMachineTest {
     final int maxSupported = 13;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) ->
-                manager.getVersion(
-                    "id1",
-                    DEFAULT_VERSION,
-                    maxSupported + 10,
-                    (v2) ->
-                        manager.getVersion(
-                            "id1",
-                            DEFAULT_VERSION,
-                            maxSupported + 100,
-                            (v3) -> manager.newCompleteWorkflow(converter.toPayloads(v3)))));
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 10, c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*
@@ -186,17 +177,12 @@ public class VersionStateMachineTest {
     final int maxSupported = 13;
     class TestListener extends TestEntityManagerListenerBase {
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) ->
-                manager.getVersion(
-                    "id1",
-                    maxSupported + 10,
-                    maxSupported + 10,
-                    (v2) -> manager.newCompleteWorkflow(converter.toPayloads(v2))));
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", maxSupported + 10, maxSupported + 10, c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*
@@ -245,34 +231,29 @@ public class VersionStateMachineTest {
       final StringBuilder trace = new StringBuilder();
 
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) -> {
-              trace.append(v1 + ", ");
-              manager.getVersion(
-                  "id1",
-                  DEFAULT_VERSION,
-                  maxSupported + 10,
-                  (v2) -> {
-                    trace.append(v2 + ", ");
-                    manager.getVersion(
-                        "id1",
-                        DEFAULT_VERSION,
-                        maxSupported + 100,
-                        (v3) -> {
-                          trace.append(v3);
-                          manager.newTimer(
-                              StartTimerCommandAttributes.newBuilder()
-                                  .setStartToFireTimeout(
-                                      Duration.newBuilder().setSeconds(100).build())
-                                  .build(),
-                              (e1) -> manager.newCompleteWorkflow(converter.toPayloads(v3)));
-                        });
-                  });
-            });
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .<Integer>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 10, c);
+                })
+            .<Integer>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c);
+                })
+            .<HistoryEvent>add1(
+                (v, c) -> {
+                  trace.append(v);
+                  manager.newTimer(
+                      StartTimerCommandAttributes.newBuilder()
+                          .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                          .build(),
+                      c);
+                })
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*
@@ -311,6 +292,51 @@ public class VersionStateMachineTest {
     }
   }
 
+  /**
+   * Tests that getVersion call returns DEFAULT version when there is no correspondent marker in the
+   * history. It happens when getVersion call was added at the workflow place that already executed.
+   * This test is different from testNewGetVersion is having two workflow tasks in a raw without any
+   * commands or events in between.
+   */
+  @Test
+  public void testNewGetVersionNoCommand() {
+    final int maxSupported = 13;
+    class TestListener extends TestEntityManagerListenerBase {
+
+      @Override
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
+      }
+    }
+    /*
+       1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+       2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+       3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+       4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+       5: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+       6: EVENT_TYPE_WORKFLOW_TASK_STARTED
+       7: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+       8: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask()
+            .addWorkflowTask()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+    {
+      System.out.println(h);
+      // Full replay
+      TestListener listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
+      assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
+      assertTrue(String.valueOf(commands), commands.isEmpty());
+    }
+  }
+
   @Test
   public void testRecordAcrossMultipleWorkflowTasks() {
     final int maxSupported = 133;
@@ -318,48 +344,42 @@ public class VersionStateMachineTest {
       final StringBuilder trace = new StringBuilder();
 
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) -> {
-              trace.append(v1 + ", ");
-              manager.getVersion(
-                  "id1",
-                  DEFAULT_VERSION,
-                  maxSupported + 10,
-                  (v2) -> {
-                    trace.append(v2 + ", ");
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .<Integer>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 10, c);
+                })
+            .<HistoryEvent>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.newTimer(
+                      StartTimerCommandAttributes.newBuilder()
+                          .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                          .build(),
+                      c);
+                })
+            .<HistoryEvent>add1(
+                (v, c) ->
                     manager.newTimer(
                         StartTimerCommandAttributes.newBuilder()
                             .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
                             .build(),
-                        (e1) ->
-                            manager.newTimer(
-                                StartTimerCommandAttributes.newBuilder()
-                                    .setStartToFireTimeout(
-                                        Duration.newBuilder().setSeconds(100).build())
-                                    .build(),
-                                (e2) ->
-                                    manager.getVersion(
-                                        "id1",
-                                        maxSupported - 3,
-                                        maxSupported + 10,
-                                        (v3) -> {
-                                          trace.append(v3 + ", ");
-                                          manager.getVersion(
-                                              "id1",
-                                              DEFAULT_VERSION,
-                                              maxSupported + 100,
-                                              (v4) -> {
-                                                trace.append(v4);
-                                                manager.newCompleteWorkflow(
-                                                    converter.toPayloads(v4));
-                                              });
-                                        })));
-                  });
-            });
+                        c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", maxSupported - 3, maxSupported + 10, c))
+            .<Integer>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c);
+                })
+            .add(
+                (v) -> {
+                  trace.append(v);
+                  manager.newCompleteWorkflow(converter.toPayloads(v));
+                });
       }
     }
     /*
@@ -464,45 +484,35 @@ public class VersionStateMachineTest {
       final StringBuilder trace = new StringBuilder();
 
       @Override
-      public void eventLoopImpl() {
-        /*
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) -> {*/
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported + 10,
-            (v2) -> {
-              trace.append(v2 + ", ");
-              manager.newTimer(
-                  StartTimerCommandAttributes.newBuilder()
-                      .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                      .build(),
-                  (e1) ->
-                      manager.newTimer(
-                          StartTimerCommandAttributes.newBuilder()
-                              .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                              .build(),
-                          (e2) ->
-                          /*
-                          manager.getVersion(
-                              "id1",
-                              maxSupported - 3,
-                              maxSupported + 10,
-                              (v3) -> */ {
-                            manager.getVersion(
-                                "id1",
-                                DEFAULT_VERSION,
-                                maxSupported + 100,
-                                (v4) -> {
-                                  trace.append(v4);
-                                  manager.newCompleteWorkflow(converter.toPayloads(v4));
-                                });
-                          }));
-            });
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            /*.<Integer>add((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))*/
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 10, c))
+            .<HistoryEvent>add1(
+                (v, c) -> {
+                  trace.append(v + ", ");
+                  manager.newTimer(
+                      StartTimerCommandAttributes.newBuilder()
+                          .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                          .build(),
+                      c);
+                })
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", maxSupported - 3, maxSupported + 10, c))
+            /*.<Integer>add((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c));*/
+            .add(
+                (v) -> {
+                  trace.append(v);
+                  manager.newCompleteWorkflow(converter.toPayloads(v));
+                });
       }
     }
     /*
@@ -573,43 +583,39 @@ public class VersionStateMachineTest {
       final StringBuilder trace = new StringBuilder();
 
       @Override
-      public void eventLoopImpl() {
-        /*
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) -> {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported - 10,
-            (v2) ->*/
-        manager.newTimer(
-            StartTimerCommandAttributes.newBuilder()
-                .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                .build(),
-            (e1) ->
-                manager.newTimer(
-                    StartTimerCommandAttributes.newBuilder()
-                        .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                        .build(),
-                    (e2) ->
-                    /*
-                    manager.getVersion(
-                        "id1",
-                        maxSupported - 3,
-                        maxSupported + 10,
-                        (v3) -> */ {
-                      manager.getVersion(
-                          "id1",
-                          DEFAULT_VERSION,
-                          maxSupported + 100,
-                          (v4) -> {
-                            trace.append(v4);
-                            manager.newCompleteWorkflow(converter.toPayloads(v4));
-                          });
-                    }));
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            /*
+            .<Integer>add((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+                .<Integer>add(
+                        (v, c) -> {
+                          trace.append(v + ", ");
+                          manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 10, c);
+                        })
+                 */
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            /*.<Integer>add(
+            (v, c) -> manager.getVersion("id1", maxSupported - 3, maxSupported + 10, c))*/
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c))
+            .add(
+                (v) -> {
+                  trace.append(v);
+                  manager.newCompleteWorkflow(converter.toPayloads(v));
+                });
       }
     }
     /*
@@ -688,23 +694,21 @@ public class VersionStateMachineTest {
   public void testAddingGetVersionExistingIdFails() {
     final int maxSupported = 133;
     class TestListener extends TestEntityManagerListenerBase {
+
       @Override
-      public void eventLoopImpl() {
-        manager.getVersion(
-            "id1",
-            DEFAULT_VERSION,
-            maxSupported,
-            (v1) ->
-                manager.newTimer(
-                    StartTimerCommandAttributes.newBuilder()
-                        .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
-                        .build(),
-                    (e1) ->
-                        manager.getVersion(
-                            "id1",
-                            DEFAULT_VERSION,
-                            maxSupported + 100,
-                            (v4) -> manager.newCompleteWorkflow(converter.toPayloads(v4)))));
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1((v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported, c))
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .<Integer>add1(
+                (v, c) -> manager.getVersion("id1", DEFAULT_VERSION, maxSupported + 100, c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
       }
     }
     /*

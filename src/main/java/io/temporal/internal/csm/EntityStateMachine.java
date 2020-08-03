@@ -27,5 +27,7 @@ public interface EntityStateMachine {
 
   EntityManager.HandleEventStatus handleEvent(HistoryEvent event);
 
+  void handleNonMatching();
+
   boolean isFinalState();
 }

@@ -29,6 +29,7 @@ import io.temporal.api.common.v1.ActivityType;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
@@ -50,15 +51,12 @@ public class LocalActivityStateMachineTest {
       Optional<Payloads> result;
 
       @Override
-      public void eventLoopImpl() {
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
         ExecuteLocalActivityParameters parameters1 =
             new ExecuteLocalActivityParameters(
                 PollActivityTaskQueueResponse.newBuilder()
                     .setActivityId("id1")
                     .setActivityType(ActivityType.newBuilder().setName("activity1")));
-        manager.scheduleLocalActivityTask(
-            parameters1, (r, f) -> manager.newCompleteWorkflow(Optional.empty()));
-
         ExecuteLocalActivityParameters parameters2 =
             new ExecuteLocalActivityParameters(
                 PollActivityTaskQueueResponse.newBuilder()
@@ -69,9 +67,18 @@ public class LocalActivityStateMachineTest {
                 PollActivityTaskQueueResponse.newBuilder()
                     .setActivityId("id3")
                     .setActivityType(ActivityType.newBuilder().setName("activity3")));
-        manager.scheduleLocalActivityTask(
-            parameters2,
-            (r, f) -> manager.scheduleLocalActivityTask(parameters3, (rr, ff) -> result = rr));
+
+        builder
+            .<Optional<Payloads>, Failure>add2(
+                (r, c) -> manager.scheduleLocalActivityTask(parameters1, c))
+            .add((r) -> manager.newCompleteWorkflow(Optional.empty()));
+
+        builder
+            .<Optional<Payloads>, Failure>add2(
+                (r, c) -> manager.scheduleLocalActivityTask(parameters2, c))
+            .<Optional<Payloads>, Failure>add2(
+                (r, c) -> manager.scheduleLocalActivityTask(parameters3, c))
+            .add((r) -> result = r.getT1());
       }
     }
 

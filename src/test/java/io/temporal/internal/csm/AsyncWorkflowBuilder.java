@@ -19,38 +19,39 @@
 
 package io.temporal.internal.csm;
 
-import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
-import java.util.ArrayDeque;
 import java.util.Queue;
 
-abstract class TestEntityManagerListenerBase implements EntityManagerListener {
+interface AsyncWorkflowBuilder<T> {
 
-  boolean invoked;
+  class Pair<T1, T2> {
+    public final T1 t1;
+    public final T2 t2;
 
-  private final Queue<Functions.Proc> callbacks = new ArrayDeque<>();
+    public Pair(T1 t1, T2 t2) {
+      this.t1 = t1;
+      this.t2 = t2;
+    }
 
-  @Override
-  public final void start(HistoryEvent startWorkflowEvent) {
-    buildWorkflow(AsyncWorkflowBuilder.newScheduler(callbacks, null));
+    public T1 getT1() {
+      return t1;
+    }
+
+    public T2 getT2() {
+      return t2;
+    }
   }
 
-  protected abstract void buildWorkflow(AsyncWorkflowBuilder<Void> builder);
+  <R> AsyncWorkflowBuilder<R> add1(Functions.Proc2<T, Functions.Proc1<R>> proc);
 
-  @Override
-  public void signal(HistoryEvent signalEvent) {}
+  <R1, R2> AsyncWorkflowBuilder<Pair<R1, R1>> add2(
+      Functions.Proc2<T, Functions.Proc2<R1, R2>> proc);
 
-  @Override
-  public void cancel(HistoryEvent cancelEvent) {}
+  void add(Functions.Proc1<T> proc);
 
-  @Override
-  public final void eventLoop() {
-    while (true) {
-      Functions.Proc callback = callbacks.poll();
-      if (callback == null) {
-        break;
-      }
-      callback.apply();
-    }
+  static <T> AsyncWorkflowBuilder newScheduler(Queue<Functions.Proc> dispatchQueue, T value) {
+    AsyncWorkflowBuilderImpl scheduler = new AsyncWorkflowBuilderImpl(dispatchQueue);
+    dispatchQueue.add(() -> scheduler.apply(value));
+    return scheduler;
   }
 }

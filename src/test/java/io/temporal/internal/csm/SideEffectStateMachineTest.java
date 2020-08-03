@@ -45,19 +45,19 @@ public class SideEffectStateMachineTest {
       Optional<Payloads> result;
 
       @Override
-      public void eventLoopImpl() {
-        manager.sideEffect(
-            () -> converter.toPayloads("m1Arg1", "m1Arg2"),
-            (r) -> {
-              result = r;
-              manager.sideEffect(
-                  () -> converter.toPayloads("m2Arg1"),
-                  (rr) -> {
-                    manager.newCompleteWorkflow(Optional.empty());
-                  });
-            });
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Optional<Payloads>>add1(
+                (v, c) -> manager.sideEffect(() -> converter.toPayloads("m1Arg1", "m1Arg2"), c))
+            .<Optional<Payloads>>add1(
+                (r, c) -> {
+                  result = r;
+                  manager.sideEffect(() -> converter.toPayloads("m2Arg1"), c);
+                })
+            .add((r) -> manager.newCompleteWorkflow(Optional.empty()));
       }
     }
+
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder().setMarkerName(SIDE_EFFECT_MARKER_NAME);
     TestHistoryBuilder h =

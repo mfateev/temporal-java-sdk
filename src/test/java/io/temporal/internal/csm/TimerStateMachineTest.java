@@ -48,16 +48,31 @@ public class TimerStateMachineTest {
     class TestTimerFireListener extends TestEntityManagerListenerBase {
 
       @Override
-      public void eventLoopImpl() {
-        manager.newTimer(
-            StartTimerCommandAttributes.newBuilder()
-                .setTimerId("timer1")
-                .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
-                .build(),
-            (firedEvent) -> manager.newCompleteWorkflow(Optional.empty()));
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setTimerId("timer1")
+                            .setStartToFireTimeout(
+                                ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
+                            .build(),
+                        c))
+            .add((firedEvent) -> manager.newCompleteWorkflow(Optional.empty()));
       }
     }
 
+    /*
+        1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+        2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        5: EVENT_TYPE_TIMER_STARTED
+        6: EVENT_TYPE_TIMER_FIRED
+        7: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        8: EVENT_TYPE_WORKFLOW_TASK_STARTED
+    */
     TestHistoryBuilder h = new TestHistoryBuilder();
     {
       TestEntityManagerListenerBase listener = new TestTimerFireListener();
@@ -71,6 +86,7 @@ public class TimerStateMachineTest {
               .setStartedEventId(timerStartedEventId)
               .setTimerId("timer1"));
       h.addWorkflowTaskScheduledAndStarted();
+      System.out.println(h);
       assertEquals(2, h.getWorkflowTaskCount());
     }
     {
@@ -96,26 +112,38 @@ public class TimerStateMachineTest {
   @Test
   public void testImmediateTimerCancellation() {
     class TestTimerImmediateCancellationListener extends TestEntityManagerListenerBase {
+      private Functions.Proc cancellationHandler;
 
       @Override
-      public void eventLoopImpl() {
-        Functions.Proc cancellationHandler =
-            manager.newTimer(
-                StartTimerCommandAttributes.newBuilder()
-                    .setTimerId("timer1")
-                    .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
-                    .build(),
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    cancellationHandler =
+                        manager.newTimer(
+                            StartTimerCommandAttributes.newBuilder()
+                                .setTimerId("timer1")
+                                .setStartToFireTimeout(
+                                    ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
+                                .build(),
+                            c))
+            .add(
                 (firedEvent) ->
                     assertEquals(EventType.EVENT_TYPE_TIMER_CANCELED, firedEvent.getEventType()));
-        manager.newTimer(
-            StartTimerCommandAttributes.newBuilder()
-                .setTimerId("timer2")
-                .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
-                .build(),
-            (firedEvent) -> manager.newCompleteWorkflow(converter.toPayloads("result1")));
+        builder
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setTimerId("timer2")
+                            .setStartToFireTimeout(
+                                ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
+                            .build(),
+                        c))
+            .add((firedEvent) -> manager.newCompleteWorkflow(converter.toPayloads("result1")));
 
         // Immediate cancellation
-        cancellationHandler.apply();
+        builder.add((v) -> cancellationHandler.apply());
       }
     }
 
@@ -158,26 +186,38 @@ public class TimerStateMachineTest {
       }
 
       @Override
-      public void eventLoopImpl() {
-        cancellationHandler =
-            manager.newTimer(
-                StartTimerCommandAttributes.newBuilder()
-                    .setTimerId("timer1")
-                    .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
-                    .build(),
+      public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    cancellationHandler =
+                        manager.newTimer(
+                            StartTimerCommandAttributes.newBuilder()
+                                .setTimerId("timer1")
+                                .setStartToFireTimeout(
+                                    ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
+                                .build(),
+                            c))
+            .add(
                 (firedEvent) -> {
                   assertEquals(EventType.EVENT_TYPE_TIMER_CANCELED, firedEvent.getEventType());
                   manager.newCompleteWorkflow(converter.toPayloads("result1"));
                 });
-        manager.newTimer(
-            StartTimerCommandAttributes.newBuilder()
-                .setTimerId("timer2")
-                .setStartToFireTimeout(ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
-                .build(),
-            (firedEvent) -> {
-              assertEquals(EventType.EVENT_TYPE_TIMER_FIRED, firedEvent.getEventType());
-              firedTimerId = firedEvent.getTimerFiredEventAttributes().getTimerId();
-            });
+        builder
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setTimerId("timer2")
+                            .setStartToFireTimeout(
+                                ProtobufTimeUtils.ToProtoDuration(Duration.ofHours(1)))
+                            .build(),
+                        c))
+            .add(
+                (firedEvent) -> {
+                  assertEquals(EventType.EVENT_TYPE_TIMER_FIRED, firedEvent.getEventType());
+                  firedTimerId = firedEvent.getTimerFiredEventAttributes().getTimerId();
+                });
       }
 
       @Override

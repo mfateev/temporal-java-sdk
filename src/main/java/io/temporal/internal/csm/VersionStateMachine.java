@@ -176,6 +176,11 @@ public final class VersionStateMachine {
       return null;
     }
 
+    @Override
+    public void handleNonMatching() {
+      action(Action.NON_MATCHING_EVENT);
+    }
+
     State createMarker() {
       State toState;
       RecordMarkerCommandAttributes markerAttributes;
