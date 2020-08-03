@@ -151,7 +151,7 @@ public final class MutableSideEffectStateMachine {
               .getMarkerName()
               .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return null;
+        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
@@ -161,11 +161,11 @@ public final class MutableSideEffectStateMachine {
             "Marker details map missing required key: " + MARKER_ID_KEY);
       }
       if (!id.equals(expectedId)) {
-        action(Action.NON_MATCHING_EVENT);
-        return null;
+        //        action(Action.NON_MATCHING_EVENT);
+        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       super.handleEvent(event);
-      return null;
+      return EntityManager.HandleEventStatus.OK;
     }
 
     State createMarker() {

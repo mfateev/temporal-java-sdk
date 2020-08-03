@@ -572,6 +572,98 @@ public class VersionStateMachineTest {
   }
 
   /**
+   * Test that the correct versions are returned after some GetVersion calls with different ids are
+   * removed.
+   */
+  @Test
+  public void testGetVersionCallsDifferentIdRemoval() {
+    final int maxSupported = 12654;
+    class TestListener extends TestEntityManagerListenerBase {
+      int versionId2;
+
+      @Override
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        builder
+            .<Integer>add1(
+                (v, c) ->
+                    manager.getVersion(
+                        "id2",
+                        DEFAULT_VERSION,
+                        maxSupported,
+                        (r) -> {
+                          versionId2 = r;
+                          c.apply(r);
+                        }))
+            .<HistoryEvent>add1(
+                (v, c) ->
+                    manager.newTimer(
+                        StartTimerCommandAttributes.newBuilder()
+                            .setStartToFireTimeout(Duration.newBuilder().setSeconds(100).build())
+                            .build(),
+                        c))
+            .add((v) -> manager.newCompleteWorkflow(converter.toPayloads(v)));
+      }
+    }
+    /*
+        1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+        2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        5: EVENT_TYPE_MARKER_RECORDED id1
+        6: EVENT_TYPE_MARKER_RECORDED id2
+        7: EVENT_TYPE_MARKER_RECORDED id3
+        8: EVENT_TYPE_TIMER_STARTED
+        9: EVENT_TYPE_TIMER_FIRED
+        10: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        11: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        12: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        13: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED}
+    */
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask()
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                MarkerRecordedEventAttributes.newBuilder()
+                    .setMarkerName(VERSION_MARKER_NAME)
+                    .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id1").get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported + 10).get())
+                    .build())
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                MarkerRecordedEventAttributes.newBuilder()
+                    .setMarkerName(VERSION_MARKER_NAME)
+                    .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id2").get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported).get())
+                    .build())
+            .add(
+                EventType.EVENT_TYPE_MARKER_RECORDED,
+                MarkerRecordedEventAttributes.newBuilder()
+                    .setMarkerName(VERSION_MARKER_NAME)
+                    .putDetails(MARKER_CHANGE_ID_KEY, converter.toPayloads("id3").get())
+                    .putDetails(MARKER_VERSION_KEY, converter.toPayloads(maxSupported + 20).get())
+                    .build());
+    long timerStartedEventId1 = h.addGetEventId(EventType.EVENT_TYPE_TIMER_STARTED);
+    h.add(
+            EventType.EVENT_TYPE_TIMER_FIRED,
+            TimerFiredEventAttributes.newBuilder()
+                .setStartedEventId(timerStartedEventId1)
+                .setTimerId("timer1"))
+        .addWorkflowTask()
+        .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
+    System.out.println(h);
+    {
+      // Full replay
+      TestListener listener = new TestListener();
+      manager = new EntityManager(listener);
+      List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
+      assertTrue(commands.isEmpty());
+      assertEquals(maxSupported, listener.versionId2);
+    }
+  }
+
+  /**
    * Test that the correct versions are returned even after some GetVersion calls removals. Based on
    * {@link #testRecordAcrossMultipleWorkflowTasks()} with some getVersion calls removed.
    */

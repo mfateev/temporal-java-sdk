@@ -203,14 +203,16 @@ public final class EntityManager {
         if (handleVersionMarker(event)) {
           return;
         }
-        throw new IllegalStateException(
-            "Event "
-                + event.getEventId()
-                + " of "
-                + event.getEventType()
-                + " does not"
-                + " match command "
-                + newCommand.getCommandType());
+        if (!newCommand.isCanceled()) {
+          throw new IllegalStateException(
+              "Event "
+                  + event.getEventId()
+                  + " of "
+                  + event.getEventType()
+                  + " does not"
+                  + " match command "
+                  + newCommand.getCommandType());
+        }
       }
       // Consume the command
       commands.poll();

@@ -159,7 +159,7 @@ public final class VersionStateMachine {
               .getMarkerName()
               .equals(VERSION_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return null;
+        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_CHANGE_ID_KEY));
@@ -169,11 +169,12 @@ public final class VersionStateMachine {
             "Marker details map missing required key: " + MARKER_CHANGE_ID_KEY);
       }
       if (!changeId.equals(expectedId)) {
-        action(Action.NON_MATCHING_EVENT);
-        return null;
+        // Do not call action(Action.NON_MATCHING_EVENT) here as the event with different changeId
+        // still can be followed by an event with our changeId.
+        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       super.handleEvent(event);
-      return null;
+      return EntityManager.HandleEventStatus.OK;
     }
 
     @Override
