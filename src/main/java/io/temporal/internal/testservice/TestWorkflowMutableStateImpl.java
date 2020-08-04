@@ -466,31 +466,34 @@ class TestWorkflowMutableStateImpl implements TestWorkflowMutableState {
                 }
               }
             }
-            if (workflowTaskStateMachine.getState() == State.INITIATED) {
-              for (ConsistentQuery query : data.queryBuffer.values()) {
-                workflowTaskStateMachine.action(Action.QUERY, ctx, query, NO_EVENT_ID);
-              }
-            } else {
-              for (ConsistentQuery consistent : data.queryBuffer.values()) {
-                QueryId queryId = new QueryId(executionId, consistent.getKey());
-                PollWorkflowTaskQueueResponse.Builder task =
-                    PollWorkflowTaskQueueResponse.newBuilder()
-                        .setTaskToken(queryId.toBytes())
-                        .setWorkflowExecution(executionId.getExecution())
-                        .setWorkflowType(startRequest.getWorkflowType())
-                        .setQuery(consistent.getRequest().getQuery())
-                        .setWorkflowExecutionTaskQueue(startRequest.getTaskQueue());
-                TestWorkflowStore.TaskQueueId taskQueueId =
-                    new TestWorkflowStore.TaskQueueId(
-                        consistent.getRequest().getNamespace(),
-                        stickyExecutionAttributes == null
-                            ? startRequest.getTaskQueue().getName()
-                            : stickyExecutionAttributes.getWorkerTaskQueue().getName());
-                store.sendQueryTask(executionId, taskQueueId, task);
-                this.queries.put(queryId.getQueryId(), consistent.getResult());
-              }
-            }
-            data.queryBuffer.clear();
+            ctx.onCommit(
+                (historySize -> {
+                  if (workflowTaskStateMachine.getState() == State.INITIATED) {
+                    for (ConsistentQuery query : data.queryBuffer.values()) {
+                      workflowTaskStateMachine.action(Action.QUERY, ctx, query, NO_EVENT_ID);
+                    }
+                  } else {
+                    for (ConsistentQuery consistent : data.queryBuffer.values()) {
+                      QueryId queryId = new QueryId(executionId, consistent.getKey());
+                      PollWorkflowTaskQueueResponse.Builder task =
+                          PollWorkflowTaskQueueResponse.newBuilder()
+                              .setTaskToken(queryId.toBytes())
+                              .setWorkflowExecution(executionId.getExecution())
+                              .setWorkflowType(startRequest.getWorkflowType())
+                              .setQuery(consistent.getRequest().getQuery())
+                              .setWorkflowExecutionTaskQueue(startRequest.getTaskQueue());
+                      TestWorkflowStore.TaskQueueId taskQueueId =
+                          new TestWorkflowStore.TaskQueueId(
+                              consistent.getRequest().getNamespace(),
+                              stickyExecutionAttributes == null
+                                  ? startRequest.getTaskQueue().getName()
+                                  : stickyExecutionAttributes.getWorkerTaskQueue().getName());
+                      store.sendQueryTask(executionId, taskQueueId, task);
+                      this.queries.put(queryId.getQueryId(), consistent.getResult());
+                    }
+                  }
+                  data.queryBuffer.clear();
+                }));
           } finally {
             ctx.unlockTimer("completeWorkflowTask");
           }

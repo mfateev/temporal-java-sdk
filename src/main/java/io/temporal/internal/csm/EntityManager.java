@@ -152,7 +152,14 @@ public final class EntityManager {
               + event.getEventId()
               + " of '"
               + event.getEventType()
-              + "' type.",
+              + "' type. IsReplayng="
+              + this.isReplaying()
+              + ", PreviousStartedEventId="
+              + this.getLastStartedEventId()
+              + ", workflowTaskStartedEventId="
+              + this.workflowTaskStartedEventId
+              + ", Currently Processing StartedEventId="
+              + this.currentStartedEventId,
           e);
     }
   }
@@ -354,7 +361,10 @@ public final class EntityManager {
     if (stateMachine == null) {
       throw new IllegalStateException("Unexpected local activity id: " + id);
     }
-    if (stateMachine.getState() != LocalActivityStateMachine.State.REQUEST_PREPARED) {
+    // RESULT_NOTIFIED state means that there is outstanding command that has to be matched
+    // using standard logic. So return false to let the handleCommand method to run its standard
+    // logic.
+    if (stateMachine.getState() == LocalActivityStateMachine.State.RESULT_NOTIFIED) {
       return false;
     }
     stateMachine.handleEvent(event);

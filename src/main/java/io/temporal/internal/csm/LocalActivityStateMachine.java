@@ -92,10 +92,12 @@ public final class LocalActivityStateMachine
     this.setCurrentTimeCallback = setCurrentTimeCallback;
     this.localActivityParameters = localActivityParameters;
     this.callback = callback;
+    action(Action.CHECK_EXECUTION_STATE);
     action(Action.SCHEDULE);
   }
 
   enum Action {
+    CHECK_EXECUTION_STATE,
     SCHEDULE,
     GET_REQUEST,
     HANDLE_RESPONSE
@@ -103,36 +105,51 @@ public final class LocalActivityStateMachine
 
   enum State {
     CREATED,
+    REPLAYING,
+    EXECUTING,
     REQUEST_PREPARED,
     REQUEST_SENT,
+    RESULT_NOTIFIED,
     MARKER_COMMAND_CREATED,
     MARKER_COMMAND_RECORDED,
+    WAITING_MARKER_EVENT,
+    RESULT_NOTIFIED_REPLAYING
   }
 
   private static StateMachine<State, Action, LocalActivityStateMachine> newStateMachine() {
     return StateMachine.<State, Action, LocalActivityStateMachine>newInstance(
             "LocalActivity", State.CREATED, State.MARKER_COMMAND_RECORDED)
-        .add(State.CREATED, Action.SCHEDULE, State.REQUEST_PREPARED)
+        .add(
+            State.CREATED,
+            Action.CHECK_EXECUTION_STATE,
+            new State[] {State.REPLAYING, State.EXECUTING},
+            LocalActivityStateMachine::getExecutionState)
+        .add(State.EXECUTING, Action.SCHEDULE, State.REQUEST_PREPARED)
         .add(State.REQUEST_PREPARED, Action.GET_REQUEST, State.REQUEST_SENT)
         .add(
             State.REQUEST_SENT,
             Action.HANDLE_RESPONSE,
             State.MARKER_COMMAND_CREATED,
-            LocalActivityStateMachine::addMarkerCommand)
+            LocalActivityStateMachine::createMarker)
         .add(
             State.MARKER_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_RECORD_MARKER,
-            State.MARKER_COMMAND_CREATED,
+            State.RESULT_NOTIFIED,
             LocalActivityStateMachine::notifyResultFromResponse)
         .add(
-            State.MARKER_COMMAND_CREATED,
+            State.RESULT_NOTIFIED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED)
+        .add(State.REPLAYING, Action.SCHEDULE, State.WAITING_MARKER_EVENT)
         .add(
-            State.REQUEST_PREPARED,
+            State.WAITING_MARKER_EVENT,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED,
             LocalActivityStateMachine::notifyResultFromEvent);
+  }
+
+  State getExecutionState() {
+    return replaying.apply() ? State.REPLAYING : State.EXECUTING;
   }
 
   public void cancel() {
@@ -150,7 +167,7 @@ public final class LocalActivityStateMachine
     action(Action.HANDLE_RESPONSE);
   }
 
-  private void addMarkerCommand() {
+  private void createMarker() {
     RecordMarkerCommandAttributes.Builder markerAttributes =
         RecordMarkerCommandAttributes.newBuilder();
     Map<String, Payloads> details = new HashMap<>();
@@ -206,6 +223,14 @@ public final class LocalActivityStateMachine
         Command.newBuilder()
             .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
             .setRecordMarkerCommandAttributes(markerAttributes.build())
+            .build());
+  }
+
+  private void createFakeCommand() {
+    addCommand(
+        Command.newBuilder()
+            .setCommandType(CommandType.COMMAND_TYPE_RECORD_MARKER)
+            .setRecordMarkerCommandAttributes(RecordMarkerCommandAttributes.getDefaultInstance())
             .build());
   }
 

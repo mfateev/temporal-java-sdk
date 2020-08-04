@@ -20,7 +20,6 @@
 package io.temporal.internal.csm;
 
 import static io.temporal.internal.csm.LocalActivityStateMachine.*;
-import static io.temporal.internal.csm.MutableSideEffectStateMachine.MARKER_DATA_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -81,7 +80,19 @@ public class LocalActivityStateMachineTest {
             .add((r) -> result = r.getT1());
       }
     }
-
+    /*
+         1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+         2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+         3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+         4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+         5: EVENT_TYPE_MARKER_RECORDED
+         6: EVENT_TYPE_MARKER_RECORDED
+         7: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+         8: EVENT_TYPE_WORKFLOW_TASK_STARTED
+         9: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+         10: EVENT_TYPE_MARKER_RECORDED
+         11: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+    */
     MarkerRecordedEventAttributes.Builder markerBuilder =
         MarkerRecordedEventAttributes.newBuilder()
             .setMarkerName(LOCAL_ACTIVITY_MARKER_NAME)

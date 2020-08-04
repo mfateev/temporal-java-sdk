@@ -376,11 +376,11 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   @Override
   public Optional<Payloads> handleQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder response, WorkflowQuery query) {
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query) {
     lock.lock();
     try {
       AtomicReference<Optional<Payloads>> result = new AtomicReference<>();
-      handleWorkflowTaskImpl(response, () -> result.set(workflow.query(query)));
+      handleWorkflowTaskImpl(workflowTask, () -> result.set(workflow.query(query)));
       return result.get();
     } finally {
       lock.unlock();

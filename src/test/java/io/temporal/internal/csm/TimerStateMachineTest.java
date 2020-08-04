@@ -86,7 +86,6 @@ public class TimerStateMachineTest {
               .setStartedEventId(timerStartedEventId)
               .setTimerId("timer1"));
       h.addWorkflowTaskScheduledAndStarted();
-      System.out.println(h);
       assertEquals(2, h.getWorkflowTaskCount());
     }
     {
@@ -266,7 +265,6 @@ public class TimerStateMachineTest {
                 .setStartedEventId(timerStartedEventId2)
                 .setTimerId("timer2"))
         .addWorkflowTaskScheduledAndStarted();
-    System.out.println(h);
     {
       TestTimerCancellationListener listener = new TestTimerCancellationListener();
       manager = new EntityManager(listener);

@@ -327,7 +327,6 @@ public class VersionStateMachineTest {
             .addWorkflowTask()
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
     {
-      System.out.println(h);
       // Full replay
       TestListener listener = new TestListener();
       manager = new EntityManager(listener);
@@ -652,7 +651,6 @@ public class VersionStateMachineTest {
                 .setTimerId("timer1"))
         .addWorkflowTask()
         .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
-    System.out.println(h);
     {
       // Full replay
       TestListener listener = new TestListener();
