@@ -175,7 +175,7 @@ class SyncWorkflow implements ReplayWorkflow {
   }
 
   @Override
-  public WorkflowExecutionException mapError(Error failure) {
+  public WorkflowExecutionException mapError(Throwable failure) {
     return POJOWorkflowImplementationFactory.mapError(failure);
   }
 }

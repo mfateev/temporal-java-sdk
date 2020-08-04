@@ -108,14 +108,12 @@ public final class TimerStateMachine
             TimerStateMachine::createCancelTimerCommand)
         .add(State.CANCEL_TIMER_COMMAND_CREATED, Action.CANCEL, State.CANCEL_TIMER_COMMAND_CREATED)
         .add(
-            State.CANCEL_TIMER_COMMAND_CREATED,
-            EventType.EVENT_TYPE_TIMER_CANCELED,
-            State.CANCELED,
-            TimerStateMachine::notifyCompletion)
+            State.CANCEL_TIMER_COMMAND_CREATED, EventType.EVENT_TYPE_TIMER_CANCELED, State.CANCELED)
         .add(
             State.CANCEL_TIMER_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_CANCEL_TIMER,
-            State.CANCEL_TIMER_COMMAND_CREATED)
+            State.CANCEL_TIMER_COMMAND_CREATED,
+            TimerStateMachine::notifyCancellation)
         .add(
             State.CANCEL_TIMER_COMMAND_CREATED,
             EventType.EVENT_TYPE_TIMER_FIRED,
@@ -138,6 +136,10 @@ public final class TimerStateMachine
 
   private void cancelStartTimerCommand() {
     cancelInitialCommand();
+    notifyCancellation();
+  }
+
+  private void notifyCancellation() {
     completionCallback.apply(
         HistoryEvent.newBuilder()
             .setEventType(EventType.EVENT_TYPE_TIMER_CANCELED)

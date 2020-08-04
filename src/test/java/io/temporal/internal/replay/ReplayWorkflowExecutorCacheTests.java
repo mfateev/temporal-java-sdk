@@ -312,7 +312,7 @@ public class ReplayWorkflowExecutorCacheTests {
           }
 
           @Override
-          public WorkflowExecutionException mapError(Error failure) {
+          public WorkflowExecutionException mapError(Throwable failure) {
             return null;
           }
 

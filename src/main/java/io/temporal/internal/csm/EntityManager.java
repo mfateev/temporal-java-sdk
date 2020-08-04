@@ -31,7 +31,6 @@ import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
@@ -45,7 +44,9 @@ import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.internal.replay.ExecuteActivityParameters;
 import io.temporal.internal.replay.ExecuteLocalActivityParameters;
+import io.temporal.internal.replay.NonDeterministicWorkflowError;
 import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
@@ -147,7 +148,7 @@ public final class EntityManager {
     try {
       handleEventImpl(event);
     } catch (RuntimeException e) {
-      throw new IllegalStateException(
+      throw new NonDeterministicWorkflowError(
           "Failure handling event "
               + event.getEventId()
               + " of '"
@@ -373,6 +374,9 @@ public final class EntityManager {
   }
 
   private void eventLoop() {
+    if (eventLoopExecuting) {
+      return;
+    }
     eventLoopExecuting = true;
     try {
       callbacks.eventLoop();
@@ -444,8 +448,7 @@ public final class EntityManager {
    * @return an instance of ActivityCommands
    */
   public ActivityStateMachine newActivity(
-      ScheduleActivityTaskCommandAttributes attributes,
-      Functions.Proc1<HistoryEvent> completionCallback) {
+      ExecuteActivityParameters attributes, Functions.Proc1<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
     return ActivityStateMachine.newInstance(attributes, completionCallback, sink);
   }
@@ -461,7 +464,16 @@ public final class EntityManager {
   public Functions.Proc newTimer(
       StartTimerCommandAttributes attributes, Functions.Proc1<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
-    TimerStateMachine timer = TimerStateMachine.newInstance(attributes, completionCallback, sink);
+    TimerStateMachine timer =
+        TimerStateMachine.newInstance(
+            attributes,
+            (event) -> {
+              completionCallback.apply(event);
+              if (event.getEventType() == EventType.EVENT_TYPE_TIMER_CANCELED) {
+                eventLoop();
+              }
+            },
+            sink);
     return () -> timer.cancel();
   }
 

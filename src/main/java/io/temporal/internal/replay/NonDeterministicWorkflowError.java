@@ -19,9 +19,9 @@
 
 package io.temporal.internal.replay;
 
-final class NonDeterminisicWorkflowError extends Error {
+public final class NonDeterministicWorkflowError extends Error {
 
-  NonDeterminisicWorkflowError(String message) {
-    super(message);
+  public NonDeterministicWorkflowError(String message, Throwable cause) {
+    super(message, cause);
   }
 }

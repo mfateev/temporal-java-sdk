@@ -86,6 +86,7 @@ import io.temporal.failure.TimeoutFailure;
 import io.temporal.internal.common.SearchAttributesUtil;
 import io.temporal.internal.common.WorkflowExecutionHistory;
 import io.temporal.internal.common.WorkflowExecutionUtils;
+import io.temporal.internal.replay.NonDeterministicWorkflowError;
 import io.temporal.internal.sync.DeterministicRunnerTest;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
@@ -556,13 +557,15 @@ public class WorkflowTest {
     tracer.setExpected(
         "interceptExecuteWorkflow " + UUID_REGEXP,
         "newThread workflow-method",
+        "currentTimeMillis",
         "executeActivity HeartbeatAndThrowIO",
         "activity HeartbeatAndThrowIO",
         "heartbeat 1",
         "activity HeartbeatAndThrowIO",
         "heartbeat 2",
         "activity HeartbeatAndThrowIO",
-        "heartbeat 3");
+        "heartbeat 3",
+        "currentTimeMillis");
   }
 
   public static class TestActivityRetryWithExpiration implements TestWorkflow1 {
@@ -1302,7 +1305,7 @@ public class WorkflowTest {
           Workflow.newActivityStub(
               TestActivities.class,
               ActivityOptions.newBuilder(newActivityOptions1(taskQueue))
-                  .setHeartbeatTimeout(Duration.ofSeconds(10))
+                  .setHeartbeatTimeout(Duration.ofSeconds(1))
                   .setCancellationType(ActivityCancellationType.TRY_CANCEL)
                   .build());
       testActivities.activityWithDelay(100000, true);
@@ -1356,11 +1359,7 @@ public class WorkflowTest {
       try {
         Workflow.sleep(Duration.ofHours(1));
       } catch (CanceledFailure e) {
-        Workflow.newDetachedCancellationScope(
-                () -> {
-                  Workflow.sleep(Duration.ofSeconds(1));
-                })
-            .run();
+        Workflow.newDetachedCancellationScope(() -> Workflow.sleep(Duration.ofSeconds(1))).run();
       }
     }
   }
@@ -1382,8 +1381,6 @@ public class WorkflowTest {
       fail("unreachable");
     } catch (CanceledFailure ignored) {
     }
-    long elapsed = currentTimeMillis() - start;
-    assertTrue(elapsed < 500);
     activitiesImpl.assertInvocations("activityWithDelay");
   }
 
@@ -1405,7 +1402,7 @@ public class WorkflowTest {
     } catch (CanceledFailure ignored) {
     }
     long elapsed = currentTimeMillis() - start;
-    assertTrue(elapsed < 500);
+    assertTrue(String.valueOf(elapsed), elapsed < 500);
     activitiesImpl.assertInvocations("activityWithDelay");
     GetWorkflowExecutionHistoryRequest request =
         GetWorkflowExecutionHistoryRequest.newBuilder()
@@ -5319,10 +5316,8 @@ public class WorkflowTest {
       // expected to fail on non deterministic error
       assertTrue(e.getCause() instanceof ApplicationFailure);
       assertEquals(
-          "io.temporal.internal.replay.NonDeterminisicWorkflowError",
+          NonDeterministicWorkflowError.class.getName(),
           ((ApplicationFailure) e.getCause()).getType());
-      String causeMsg = e.getCause().getMessage();
-      assertTrue(causeMsg, causeMsg.contains("nondeterministic"));
     }
   }
 

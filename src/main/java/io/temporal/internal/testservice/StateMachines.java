@@ -239,7 +239,7 @@ class StateMachines {
 
     long scheduledEventId = NO_EVENT_ID;
 
-    int attempt;
+    int attempt = 1;
 
     /** Query requests received during workflow task processing (after start) */
     final Map<String, TestWorkflowMutableStateImpl.ConsistentQuery> queryBuffer = new HashMap<>();
@@ -256,7 +256,7 @@ class StateMachines {
       startedEventId = NO_EVENT_ID;
       workflowTask = null;
       scheduledEventId = NO_EVENT_ID;
-      attempt = 0;
+      attempt = 1;
     }
 
     @Override
@@ -1284,11 +1284,7 @@ class StateMachines {
             .setActivityTaskStartedEventAttributes(a)
             .build();
     long startedEventId;
-    if (data.retryState == null) {
-      startedEventId = ctx.addEvent(event);
-    } else {
-      startedEventId = NO_EVENT_ID;
-    }
+    startedEventId = NO_EVENT_ID;
     ctx.onCommit(
         (historySize) -> {
           data.startedEventId = startedEventId;
@@ -1431,9 +1427,7 @@ class StateMachines {
 
   private static void completeActivityTask(
       RequestContext ctx, ActivityTaskData data, Object request, long notUsed) {
-    if (data.retryState != null) {
-      ctx.addEvent(data.startedEvent);
-    }
+    data.startedEventId = ctx.addEvent(data.startedEvent);
     if (request instanceof RespondActivityTaskCompletedRequest) {
       completeActivityTaskByTaskToken(ctx, data, (RespondActivityTaskCompletedRequest) request);
     } else if (request instanceof RespondActivityTaskCompletedByIdRequest) {
@@ -1498,23 +1492,7 @@ class StateMachines {
     if (retryState == RetryState.RETRY_STATE_IN_PROGRESS) {
       return INITIATED;
     }
-    if (data.retryState.getAttempt() > 1) {
-      ActivityTaskStartedEventAttributes.Builder a =
-          ActivityTaskStartedEventAttributes.newBuilder()
-              .setIdentity(request.getIdentity())
-              .setScheduledEventId(data.scheduledEventId)
-              .setAttempt(data.retryState.getAttempt());
-      Optional<Failure> lastFailure = data.retryState.getLastFailure();
-      if (lastFailure.isPresent()) {
-        a.setLastFailure(lastFailure.get());
-      }
-      HistoryEvent event =
-          HistoryEvent.newBuilder()
-              .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED)
-              .setActivityTaskStartedEventAttributes(a)
-              .build();
-      ctx.addEvent(event);
-    }
+    data.startedEventId = ctx.addEvent(data.startedEvent);
     ActivityTaskFailedEventAttributes.Builder a =
         ActivityTaskFailedEventAttributes.newBuilder()
             .setIdentity(request.getIdentity())
@@ -1542,23 +1520,7 @@ class StateMachines {
     if (retryState == RetryState.RETRY_STATE_IN_PROGRESS) {
       return INITIATED;
     }
-    if (data.retryState.getAttempt() > 1) {
-      ActivityTaskStartedEventAttributes.Builder a =
-          ActivityTaskStartedEventAttributes.newBuilder()
-              .setIdentity(request.getIdentity())
-              .setScheduledEventId(data.scheduledEventId)
-              .setAttempt(data.retryState.getAttempt());
-      Optional<Failure> lastFailure = data.retryState.getLastFailure();
-      if (lastFailure.isPresent()) {
-        a.setLastFailure(lastFailure.get());
-      }
-      HistoryEvent event =
-          HistoryEvent.newBuilder()
-              .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED)
-              .setActivityTaskStartedEventAttributes(a)
-              .build();
-      ctx.addEvent(event);
-    }
+    data.startedEventId = ctx.addEvent(data.startedEvent);
     ActivityTaskFailedEventAttributes.Builder a =
         ActivityTaskFailedEventAttributes.newBuilder()
             .setIdentity(request.getIdentity())
@@ -1633,7 +1595,7 @@ class StateMachines {
   private static RetryState attemptActivityRetry(
       RequestContext ctx, Optional<Failure> failure, ActivityTaskData data) {
     if (data.retryState == null) {
-      return RetryState.RETRY_STATE_RETRY_POLICY_NOT_SET;
+      throw new IllegalStateException("RetryPolicy is always present");
     }
     Optional<ApplicationFailureInfo> info = failure.map(f -> f.getApplicationFailureInfo());
     if (info.isPresent()) {
@@ -1658,7 +1620,6 @@ class StateMachines {
             task.setCurrentAttemptScheduledTime(ctx.currentTime());
           });
     } else {
-      data.startedEventId = ctx.addEvent(data.startedEvent);
       data.nextBackoffInterval = Durations.ZERO;
     }
     return backoffInterval.getRetryState();

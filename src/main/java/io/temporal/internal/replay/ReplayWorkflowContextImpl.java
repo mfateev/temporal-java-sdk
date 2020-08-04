@@ -253,7 +253,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     }
     ActivityStateMachine activity =
         entityManager.newActivity(
-            attributes.build(), (event) -> handleActivityCallback(callback, attributes, event));
+            parameters, (event) -> handleActivityCallback(callback, attributes, event));
 
     return (exception) -> activity.cancel();
   }

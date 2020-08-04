@@ -19,13 +19,14 @@
 
 package io.temporal.internal.csm;
 
+import io.temporal.activity.ActivityCancellationType;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes;
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.internal.replay.ExecuteActivityParameters;
 import io.temporal.workflow.Functions;
 
 public final class ActivityStateMachine
@@ -85,6 +86,11 @@ public final class ActivityStateMachine
             State.SCHEDULED_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED,
             State.STARTED)
+        .add(
+            State.SCHEDULED_EVENT_RECORDED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+            State.TIMED_OUT,
+            ActivityStateMachine::notifyCompletion)
         .add(
             State.STARTED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
@@ -159,33 +165,33 @@ public final class ActivityStateMachine
             State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED,
             State.CANCELED,
-            ActivityStateMachine::notifyCompletion);
+            ActivityStateMachine::notifyCancellationFromEvent);
   }
 
-  private final ScheduleActivityTaskCommandAttributes scheduleAttr;
+  private final ExecuteActivityParameters parameters;
 
   private final Functions.Proc1<HistoryEvent> completionCallback;
 
   /**
-   * @param scheduleAttr attributes used to schedule an activity
+   * @param parameters attributes used to schedule an activity
    * @param completionCallback one of ActivityTaskCompletedEvent, ActivityTaskFailedEvent,
    *     ActivityTaskTimedOutEvent, ActivityTaskCanceledEvents
    * @param commandSink sink to send commands
    * @return an instance of ActivityCommands
    */
   public static ActivityStateMachine newInstance(
-      ScheduleActivityTaskCommandAttributes scheduleAttr,
+      ExecuteActivityParameters parameters,
       Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
-    return new ActivityStateMachine(scheduleAttr, completionCallback, commandSink);
+    return new ActivityStateMachine(parameters, completionCallback, commandSink);
   }
 
   private ActivityStateMachine(
-      ScheduleActivityTaskCommandAttributes scheduleAttr,
+      ExecuteActivityParameters parameters,
       Functions.Proc1<HistoryEvent> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
-    this.scheduleAttr = scheduleAttr;
+    this.parameters = parameters;
     this.completionCallback = completionCallback;
     action(Action.SCHEDULE);
   }
@@ -194,16 +200,27 @@ public final class ActivityStateMachine
     addCommand(
         Command.newBuilder()
             .setCommandType(CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK)
-            .setScheduleActivityTaskCommandAttributes(scheduleAttr)
+            .setScheduleActivityTaskCommandAttributes(parameters.getAttributes())
             .build());
   }
 
   public void cancel() {
-    action(Action.CANCEL);
+    if (parameters.getCancellationType() != ActivityCancellationType.ABANDON) {
+      action(Action.CANCEL);
+    } else if (parameters.getCancellationType()
+        != ActivityCancellationType.WAIT_CANCELLATION_COMPLETED) {
+      notifyCanceled();
+    }
   }
 
   private void cancelScheduleCommand() {
     cancelInitialCommand();
+    if (parameters.getCancellationType() == ActivityCancellationType.WAIT_CANCELLATION_COMPLETED) {
+      notifyCanceled();
+    }
+  }
+
+  private void notifyCanceled() {
     completionCallback.apply(
         HistoryEvent.newBuilder()
             .setEventType(EventType.EVENT_TYPE_ACTIVITY_TASK_CANCELED)
@@ -214,6 +231,12 @@ public final class ActivityStateMachine
 
   private void notifyCompletion() {
     completionCallback.apply(currentEvent);
+  }
+
+  private void notifyCancellationFromEvent() {
+    if (parameters.getCancellationType() == ActivityCancellationType.WAIT_CANCELLATION_COMPLETED) {
+      completionCallback.apply(currentEvent);
+    }
   }
 
   private void cancelScheduleCommandNotifyCompletion() {

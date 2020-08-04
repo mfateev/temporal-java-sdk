@@ -206,6 +206,7 @@ final class StateMachine<State, Action, Data> {
               + transitionHistory,
           e);
     }
+    System.out.println(name + ": " + transition);
     transitionHistory.add(transition);
   }
 

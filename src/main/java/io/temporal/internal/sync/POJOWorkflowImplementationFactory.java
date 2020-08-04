@@ -362,7 +362,7 @@ final class POJOWorkflowImplementationFactory implements ReplayWorkflowFactory {
     return new WorkflowExecutionException(failure);
   }
 
-  static WorkflowExecutionException mapError(Error error) {
+  static WorkflowExecutionException mapError(Throwable error) {
     Failure failure = FailureConverter.exceptionToFailureNoUnwrapping(error);
     return new WorkflowExecutionException(failure);
   }

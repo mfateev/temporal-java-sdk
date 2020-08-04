@@ -24,9 +24,12 @@ import static io.temporal.internal.metrics.MetricsTag.METRICS_TAGS_CALL_OPTIONS_
 
 import com.uber.m3.tally.Scope;
 import com.uber.m3.util.ImmutableMap;
+import io.temporal.api.command.v1.Command;
+import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.QueryResultType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -46,6 +49,7 @@ import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.internal.worker.LocalActivityWorker;
 import io.temporal.internal.worker.SingleWorkerOptions;
+import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowTaskHandler;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.workflow.Functions;
@@ -123,6 +127,22 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       return handleWorkflowTaskImpl(workflowTask.toBuilder(), metricsScope);
     } catch (Throwable e) {
       metricsScope.counter(MetricsType.WORKFLOW_TASK_EXECUTION_FAILURE_COUNTER).inc(1);
+      // Fail workflow and not a task as FailWorkflow policy was set.
+      if (e instanceof WorkflowExecutionException) {
+        RespondWorkflowTaskCompletedRequest response =
+            RespondWorkflowTaskCompletedRequest.newBuilder()
+                .setTaskToken(workflowTask.getTaskToken())
+                .setIdentity(options.getIdentity())
+                .addCommands(
+                    Command.newBuilder()
+                        .setCommandType(CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION)
+                        .setFailWorkflowExecutionCommandAttributes(
+                            FailWorkflowExecutionCommandAttributes.newBuilder()
+                                .setFailure(((WorkflowExecutionException) e).getFailure()))
+                        .build())
+                .build();
+        return new WorkflowTaskHandler.Result(workflowType, response, null, null, null, false);
+      }
       // Only fail workflow task on the first attempt, subsequent failures of the same workflow task
       // should timeout. This is to avoid spin on the failed workflow task as the service doesn't
       // yet increase the retry interval.

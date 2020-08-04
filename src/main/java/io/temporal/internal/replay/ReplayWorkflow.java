@@ -61,7 +61,7 @@ public interface ReplayWorkflow {
    */
   WorkflowExecutionException mapUnexpectedException(Throwable failure);
 
-  WorkflowExecutionException mapError(Error failure);
+  WorkflowExecutionException mapError(Throwable failure);
 
   WorkflowImplementationOptions getWorkflowImplementationOptions();
 }

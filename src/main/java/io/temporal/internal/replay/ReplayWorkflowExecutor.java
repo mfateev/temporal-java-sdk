@@ -274,14 +274,12 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         HistoryEvent event = iterator.next();
         handleEvent(event);
       }
-    } catch (Error e) {
+    } catch (Throwable e) {
       WorkflowImplementationOptions implementationOptions =
           this.workflow.getWorkflowImplementationOptions();
       if (implementationOptions.getWorkflowErrorPolicy() == FailWorkflow) {
         // fail workflow
-        failure = workflow.mapError(e);
-        completed = true;
-        completeWorkflow();
+        throw workflow.mapError(e);
       } else {
         metricsScope.counter(MetricsType.WORKFLOW_TASK_NO_COMPLETION_COUNTER).inc(1);
         // fail workflow task, not a workflow
