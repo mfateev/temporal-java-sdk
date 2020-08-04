@@ -228,21 +228,19 @@ public class TimerStateMachineTest {
     }
 
     /*
-      1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
-      2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
-      3: EVENT_TYPE_WORKFLOW_TASK_STARTED
-      4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
-      5: EVENT_TYPE_TIMER_STARTED
-      6: EVENT_TYPE_TIMER_STARTED
-      7: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
-      8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
-      9: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
-      10: EVENT_TYPE_WORKFLOW_TASK_STARTED
-      11: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
-      12: EVENT_TYPE_TIMER_CANCELED
-      13: EVENT_TYPE_TIMER_FIRED
-      14: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
-      15: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+        2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        5: EVENT_TYPE_TIMER_STARTED
+        6: EVENT_TYPE_TIMER_STARTED
+        7: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+        8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        9: EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+        10: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        11: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        12: EVENT_TYPE_TIMER_CANCELED
+        13: EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
     */
     TestHistoryBuilder h = new TestHistoryBuilder();
     h.add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED);
@@ -278,12 +276,10 @@ public class TimerStateMachineTest {
       }
       {
         List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
-        assertCommand(CommandType.COMMAND_TYPE_CANCEL_TIMER, commands);
-      }
-      {
-        List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
-        assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
-        assertEquals("timer2", listener.getFiredTimerId());
+        assertEquals(2, commands.size());
+        assertEquals(CommandType.COMMAND_TYPE_CANCEL_TIMER, commands.get(0).getCommandType());
+        assertEquals(
+            CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands.get(1).getCommandType());
       }
     }
     {

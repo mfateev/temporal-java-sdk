@@ -469,6 +469,7 @@ public final class EntityManager {
             attributes,
             (event) -> {
               completionCallback.apply(event);
+              // Needed due to immediate cancellation
               if (event.getEventType() == EventType.EVENT_TYPE_TIMER_CANCELED) {
                 eventLoop();
               }

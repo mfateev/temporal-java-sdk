@@ -34,6 +34,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.history.v1.TimerFiredEventAttributes;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.internal.replay.NonDeterministicWorkflowError;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
@@ -847,7 +848,7 @@ public class VersionStateMachineTest {
       try {
         h.handleWorkflowTaskTakeCommands(manager);
         fail("failure expected");
-      } catch (Exception e) {
+      } catch (NonDeterministicWorkflowError e) {
         assertTrue(e.getCause().getMessage().startsWith("Version is already set"));
       }
     }

@@ -480,7 +480,7 @@ class TestHistoryBuilder {
   }
 
   static void assertCommand(CommandType type, List<Command> commands) {
-    assertEquals(1, commands.size());
+    assertEquals(String.valueOf(commands), 1, commands.size());
     assertEquals(type, commands.get(0).getCommandType());
   }
 }
