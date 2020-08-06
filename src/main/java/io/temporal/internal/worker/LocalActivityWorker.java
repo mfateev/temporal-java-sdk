@@ -37,10 +37,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LocalActivityWorker implements SuspendableWorker {
 
   private static final String POLL_THREAD_NAME_PREFIX = "Local Activity Poller taskQueue=";
+  private static final Logger log = LoggerFactory.getLogger(LocalActivityWorker.class);
 
   private SuspendableWorker poller = new NoopSuspendableWorker();
   private final ActivityTaskHandler handler;
@@ -173,6 +176,10 @@ public final class LocalActivityWorker implements SuspendableWorker {
       this.eventConsumer = eventConsumer;
       this.localRetryThreshold = localRetryThresholdMillis;
     }
+
+    public String getActivityId() {
+      return params.getActivityTask().getActivityId();
+    }
   }
 
   public BiFunction<Task, Duration, Boolean> getLocalActivityTaskPoller() {
@@ -200,6 +207,9 @@ public final class LocalActivityWorker implements SuspendableWorker {
     }
 
     private ActivityTaskHandler.Result handleLocalActivity(Task task) throws InterruptedException {
+      if (log.isTraceEnabled()) {
+        log.trace("handleLocalActivity begin" + task.getActivityId());
+      }
       ExecuteLocalActivityParameters params = task.params;
       PollActivityTaskQueueResponse.Builder activityTask = params.getActivityTask();
       Map<String, String> activityTypeTag =
@@ -220,6 +230,9 @@ public final class LocalActivityWorker implements SuspendableWorker {
       if (result.getTaskCompleted() != null
           || result.getTaskCancelled() != null
           || !activityTask.hasRetryPolicy()) {
+        if (log.isTraceEnabled()) {
+          log.trace("handleLocalActivity " + activityTask.getActivityId() + " succeeded");
+        }
         return result;
       }
 
@@ -246,6 +259,9 @@ public final class LocalActivityWorker implements SuspendableWorker {
           timeout.compareTo(Duration.ZERO) > 0 ? Optional.of(timeout) : Optional.empty();
       if (retryOptions.shouldRethrow(
           result.getTaskFailed().getFailure(), expiration, attempt, elapsedTotal, sleepMillis)) {
+        if (log.isTraceEnabled()) {
+          log.trace("handleLocalActivity failed1 ");
+        }
         return result;
       } else {
         result.setBackoff(Duration.ofMillis(sleepMillis));
@@ -256,8 +272,18 @@ public final class LocalActivityWorker implements SuspendableWorker {
       if (elapsedTask + sleepMillis < task.localRetryThreshold * 1000) {
         Thread.sleep(sleepMillis);
         activityTask.setAttempt(attempt + 1);
+        if (log.isTraceEnabled()) {
+          log.trace(
+              "handleLocalActivity "
+                  + activityTask.getActivityId()
+                  + " retrying. Attempt="
+                  + (attempt + 1));
+        }
         return handleLocalActivity(task);
       } else {
+        if (log.isTraceEnabled()) {
+          log.trace("handleLocalActivity " + activityTask.getActivityId() + " failed2: ");
+        }
         return result;
       }
     }

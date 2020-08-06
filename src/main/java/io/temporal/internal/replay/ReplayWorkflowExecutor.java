@@ -52,8 +52,8 @@ import io.temporal.internal.common.RpcRetryOptions;
 import io.temporal.internal.csm.EntityManager;
 import io.temporal.internal.csm.EntityManagerListener;
 import io.temporal.internal.metrics.MetricsType;
-import io.temporal.internal.replay.HistoryHelper.WorkflowTaskEvents;
 import io.temporal.internal.worker.ActivityTaskHandler;
+import io.temporal.internal.worker.LocalActivityWorker;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowTaskWithHistoryIterator;
@@ -67,16 +67,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implements workflow executor that relies on replay of a workflow code. An instance of this class
  * is created per cached workflow run.
  */
 class ReplayWorkflowExecutor implements WorkflowExecutor {
+
+  private static final Logger log = LoggerFactory.getLogger(ReplayWorkflowExecutor.class);
 
   private static final int MAXIMUM_PAGE_SIZE = 10000;
 
@@ -99,9 +107,17 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private final Scope metricsScope;
 
   private final Timestamp wfStartTime;
+
   private final WorkflowExecutionStartedEventAttributes startedEvent;
 
   private final Lock lock = new ReentrantLock();
+
+  private final Functions.Proc1<ActivityTaskHandler.Result> localActivityCompletionSink;
+
+  private final BlockingQueue<ActivityTaskHandler.Result> localActivityCompletionQueue =
+      new LinkedBlockingDeque<>();
+
+  private final BiFunction<LocalActivityWorker.Task, Duration, Boolean> localActivityTaskPoller;
 
   private final Map<String, WorkflowQueryResult> queryResults = new HashMap<>();
 
@@ -111,13 +127,17 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private final HistoryEvent firstEvent;
 
+  /** Number of non completed local activity tasks */
+  private int laTaskCount;
+
   ReplayWorkflowExecutor(
       WorkflowServiceStubs service,
       String namespace,
       ReplayWorkflow workflow,
       PollWorkflowTaskQueueResponse.Builder workflowTask,
       SingleWorkerOptions options,
-      Scope metricsScope) {
+      Scope metricsScope,
+      BiFunction<LocalActivityWorker.Task, Duration, Boolean> localActivityTaskPoller) {
     this.service = service;
     this.workflow = workflow;
     firstEvent = workflowTask.getHistory().getEvents(0);
@@ -130,6 +150,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     this.entityManager = new EntityManager(new EntityManagerListenerImpl());
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
+    this.localActivityTaskPoller = localActivityTaskPoller;
 
     wfStartTime = firstEvent.getEventTime();
 
@@ -142,14 +163,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
             Timestamps.toMillis(firstEvent.getEventTime()),
             options,
             metricsScope);
-  }
 
-  Lock getLock() {
-    return lock;
-  }
-
-  private void handleWorkflowExecutionStarted(HistoryEvent event) {
-    workflow.start(event, context);
+    localActivityCompletionSink = historyEvent -> localActivityCompletionQueue.add(historyEvent);
   }
 
   private void handleEvent(HistoryEvent event) {
@@ -177,12 +192,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       failure = workflow.mapUnexpectedException(e);
       completed = true;
     }
-    if (completed) {
-      completeWorkflow();
-    }
-  }
-
-  private void mayBeCompleteWorkflow() {
     if (completed) {
       completeWorkflow();
     }
@@ -235,22 +244,17 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   @Override
-  public void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
+  public WorkflowTaskResult handleWorkflowTask(
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
     lock.lock();
     try {
+      long startTime = System.currentTimeMillis();
       queryResults.clear();
-      handleWorkflowTaskImpl(workflowTask, null);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  @Override
-  public WorkflowTaskResult getResult() {
-    lock.lock();
-    try {
+      handleWorkflowTaskImpl(workflowTask);
+      processLocalActivityRequests(startTime);
       List<Command> commands = entityManager.takeCommands();
-      return new WorkflowTaskResult(commands, queryResults, completed);
+      executeQueries(workflowTask.getQueriesMap());
+      return new WorkflowTaskResult(commands, queryResults, completed, laTaskCount > 0);
     } finally {
       lock.unlock();
     }
@@ -258,8 +262,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   // Returns boolean to indicate whether we need to force create new workflow task for local
   // activity heartbeating.
-  private void handleWorkflowTaskImpl(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, Functions.Proc legacyQueryCallback) {
+  private void handleWorkflowTaskImpl(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
     boolean timerStopped = false;
     try {
@@ -289,23 +292,9 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       if (!timerStopped) {
         sw.stop();
       }
-      executeQueries(workflowTask.getQueriesMap());
-      if (legacyQueryCallback != null) {
-        legacyQueryCallback.apply();
-      }
       if (completed) {
         close();
       }
-    }
-  }
-
-  @Override
-  public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {
-    lock.lock();
-    try {
-      entityManager.handleLocalActivityCompletion(laCompletion);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -339,29 +328,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     }
   }
 
-  private Iterator<WorkflowTaskEvents> getWorkflowTaskEventsIterator(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
-    HistoryHelper historyHelper = newHistoryHelper(workflowTask);
-    Iterator<WorkflowTaskEvents> iterator = historyHelper.getIterator();
-    if (entityManager.getLastStartedEventId() > 0
-        && entityManager.getLastStartedEventId() != historyHelper.getPreviousStartedEventId()
-        && workflowTask.getHistory().getEventsCount() > 0) {
-      throw new IllegalStateException(
-          String.format(
-              "ReplayWorkflowExecutor processed up to event id %d. History's previous started event id is %d",
-              entityManager.getLastStartedEventId(), historyHelper.getPreviousStartedEventId()));
-    }
-    return iterator;
-  }
-
-  private HistoryHelper newHistoryHelper(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
-    WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
-        new WorkflowTaskWithHistoryIteratorImpl(
-            workflowTask, ProtobufTimeUtils.ToJavaDuration(startedEvent.getWorkflowTaskTimeout()));
-    return new HistoryHelper(
-        workflowTaskWithHistoryIterator, context.getReplayCurrentTimeMilliseconds());
-  }
-
   @Override
   public void close() {
     lock.lock();
@@ -378,20 +344,80 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     lock.lock();
     try {
       AtomicReference<Optional<Payloads>> result = new AtomicReference<>();
-      handleWorkflowTaskImpl(workflowTask, () -> result.set(workflow.query(query)));
+      handleWorkflowTaskImpl(workflowTask);
+      result.set(workflow.query(query));
       return result.get();
     } finally {
       lock.unlock();
     }
   }
 
-  @Override
-  public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
-    lock.lock();
-    try {
-      return entityManager.takeLocalActivityRequests();
-    } finally {
-      lock.unlock();
+  private void processLocalActivityRequests(long startTime) {
+    Duration maxProcessingTime = getWorkflowTaskTimeout().multipliedBy(4).dividedBy(5);
+    while (true) {
+      List<ExecuteLocalActivityParameters> laRequests = entityManager.takeLocalActivityRequests();
+      if (log.isTraceEnabled()) {
+        log.trace(
+            "processLocalActivityRequests taskCount="
+                + laTaskCount
+                + ", localActivityRequests="
+                + laRequests);
+      }
+      long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
+      for (ExecuteLocalActivityParameters laRequest : laRequests) {
+        // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
+        // much sense. I believe we should add ScheduleToStart timeout for the local activities
+        // as well.
+        long processingTime = Math.min(System.currentTimeMillis() - startTime, timeoutInterval);
+        boolean accepted =
+            localActivityTaskPoller.apply(
+                new LocalActivityWorker.Task(
+                    laRequest, localActivityCompletionSink, 10000 /* TODO: Configurable */),
+                Duration.ofMillis(processingTime));
+        laTaskCount++;
+        if (!accepted) {
+          throw new Error("Unable to schedule local activity for execution");
+        }
+      }
+      if (laTaskCount == 0) {
+        log.trace("processLocalActivityRequests completed taskCount=" + laTaskCount);
+        break;
+      }
+      while (true) {
+        Duration processingTime = Duration.ofMillis(System.currentTimeMillis() - startTime);
+        Duration maxWaitAllowed = maxProcessingTime.minus(processingTime);
+        if (maxWaitAllowed.isZero() || maxWaitAllowed.isNegative()) {
+          return;
+        }
+        ActivityTaskHandler.Result laCompletion;
+        // Do not wait under lock.
+        try {
+          if (log.isTraceEnabled()) {
+            log.trace(
+                "processLocalActivityRequests poll LA completion timeout="
+                    + maxWaitAllowed
+                    + ", taskCount="
+                    + laTaskCount);
+          }
+          laCompletion =
+              localActivityCompletionQueue.poll(maxWaitAllowed.toMillis(), TimeUnit.MILLISECONDS);
+          if (log.isTraceEnabled()) {
+            log.trace("processLocalActivityRequests localActivityCompletion=" + laCompletion);
+          }
+          if (laCompletion == null) {
+            // Need to force a new task
+            break;
+          }
+        } catch (InterruptedException e) {
+          // TODO(maxim): interrupt when worker shutdown is called
+          throw new IllegalStateException("interrupted", e);
+        }
+        entityManager.handleLocalActivityCompletion(laCompletion);
+        laTaskCount--;
+        if (laTaskCount == 0) {
+          break;
+        }
+      }
     }
   }
 

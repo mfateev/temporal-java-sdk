@@ -24,7 +24,6 @@ import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.query.v1.WorkflowQueryResult;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
-import io.temporal.internal.worker.ActivityTaskHandler;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -32,18 +31,18 @@ import java.util.Optional;
 
 public interface WorkflowExecutor {
 
-  void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask);
-
-  WorkflowTaskResult getResult();
+  /**
+   * Handles a single workflow task.
+   *
+   * @param workflowTask task to handle
+   * @return true if new task should be created synchronously as local activities are still running.
+   */
+  WorkflowTaskResult handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask);
 
   Optional<Payloads> handleQueryWorkflowTask(
       PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowQuery query);
 
-  List<ExecuteLocalActivityParameters> getLocalActivityRequests();
-
   void close();
-
-  void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion);
 
   Duration getWorkflowTaskTimeout();
 
@@ -52,14 +51,20 @@ public interface WorkflowExecutor {
     private final List<Command> commands;
     private final boolean finalCommand;
     private final Map<String, WorkflowQueryResult> queryResults;
+    private final boolean forceWorkflowTask;
 
     public WorkflowTaskResult(
         List<Command> commands,
         Map<String, WorkflowQueryResult> queryResults,
-        boolean finalCommand) {
+        boolean finalCommand,
+        boolean forceWorkflowTask) {
       this.commands = commands;
+      if (forceWorkflowTask && finalCommand) {
+        throw new IllegalArgumentException("both forceWorkflowTask and finalCommand are true");
+      }
       this.queryResults = queryResults;
       this.finalCommand = finalCommand;
+      this.forceWorkflowTask = forceWorkflowTask;
     }
 
     public List<Command> getCommands() {
@@ -73,6 +78,10 @@ public interface WorkflowExecutor {
     /** Is this result contain a workflow completion command */
     public boolean isFinalCommand() {
       return finalCommand;
+    }
+
+    public boolean isForceWorkflowTask() {
+      return forceWorkflowTask;
     }
   }
 }

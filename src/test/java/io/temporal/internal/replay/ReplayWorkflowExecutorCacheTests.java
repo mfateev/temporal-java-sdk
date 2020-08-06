@@ -323,6 +323,7 @@ public class ReplayWorkflowExecutorCacheTests {
         },
         response.toBuilder(),
         SingleWorkerOptions.newBuilder().build(),
-        metricsScope);
+        metricsScope,
+        (a, b) -> true);
   }
 }

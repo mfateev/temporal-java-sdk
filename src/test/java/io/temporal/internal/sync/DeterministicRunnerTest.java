@@ -39,11 +39,9 @@ import io.temporal.common.converter.DataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.metrics.MetricsType;
-import io.temporal.internal.replay.ExecuteLocalActivityParameters;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowExecutor;
 import io.temporal.internal.replay.WorkflowExecutorCache;
-import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.testUtils.HistoryUtils;
 import io.temporal.workflow.Async;
 import io.temporal.workflow.CancellationScope;
@@ -762,11 +760,9 @@ public class DeterministicRunnerTest {
     }
 
     @Override
-    public void handleWorkflowTask(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {}
-
-    @Override
-    public WorkflowTaskResult getResult() {
-      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), false);
+    public WorkflowTaskResult handleWorkflowTask(
+        PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
+      return new WorkflowTaskResult(new ArrayList<>(), Maps.newHashMap(), false, false);
     }
 
     @Override
@@ -776,17 +772,9 @@ public class DeterministicRunnerTest {
     }
 
     @Override
-    public List<ExecuteLocalActivityParameters> getLocalActivityRequests() {
-      return new ArrayList<>();
-    }
-
-    @Override
     public void close() {
       runner.close();
     }
-
-    @Override
-    public void handleLocalActivityCompletion(ActivityTaskHandler.Result laCompletion) {}
 
     @Override
     public Duration getWorkflowTaskTimeout() {

@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -79,7 +80,8 @@ public final class WorkflowExecutorCache {
     return workflowExecutorFn.call();
   }
 
-  private WorkflowExecutor getForProcessing(String runId, Scope metricsScope) throws Exception {
+  private WorkflowExecutor getForProcessing(String runId, Scope metricsScope)
+      throws ExecutionException {
     cacheLock.lock();
     try {
       WorkflowExecutor workflowExecutor = cache.get(runId);

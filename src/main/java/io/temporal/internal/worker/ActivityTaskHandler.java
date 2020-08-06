@@ -44,6 +44,25 @@ public interface ActivityTaskHandler {
     private int attempt;
     private Duration backoff;
 
+    @Override
+    public String toString() {
+      return "Result{"
+          + "activityId='"
+          + activityId
+          + '\''
+          + ", taskCompleted="
+          + taskCompleted
+          + ", taskFailed="
+          + taskFailed
+          + ", taskCancelled="
+          + taskCancelled
+          + ", attempt="
+          + attempt
+          + ", backoff="
+          + backoff
+          + '}';
+    }
+
     public static class TaskFailedResult {
       private final RespondActivityTaskFailedRequest taskFailedRequest;
       private final Throwable failure;

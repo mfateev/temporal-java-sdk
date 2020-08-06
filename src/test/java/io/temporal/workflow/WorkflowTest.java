@@ -132,6 +132,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -1709,7 +1710,6 @@ public class WorkflowTest {
       uuids.add(Workflow.randomUUID());
       List<UUID> uuidsResult = Async.function(testActivities::activityUUIDList, uuids).get();
       assertEquals(uuids, uuidsResult);
-      Workflow.sleep(Duration.ofSeconds(1));
       return "workflow";
     }
   }
@@ -2468,7 +2468,7 @@ public class WorkflowTest {
       timer1.get();
       long slept = Workflow.currentTimeMillis() - time;
       // Also checks that rounding up to a second works.
-      assertTrue(String.valueOf(slept), slept >= timeout1.toMillis());
+      assertTrue(slept + "<" + timeout1.toMillis(), slept >= timeout1.toMillis());
       timer2.get();
       slept = Workflow.currentTimeMillis() - time;
       assertTrue(String.valueOf(slept), slept >= timeout2.toMillis());
@@ -3206,8 +3206,7 @@ public class WorkflowTest {
       Promise<String> r1 = Async.function(child1::execute, "Hello ", 0);
       String r2 = child2.execute("World!");
       assertEquals(child2Id, Workflow.getWorkflowExecution(child2).get().getWorkflowId());
-      String result = r1.get() + r2;
-      return result;
+      return r1.get() + r2;
     }
   }
 
@@ -5215,7 +5214,7 @@ public class WorkflowTest {
       // Catching error from getVersion is only for unit test purpose.
       // Do not ever do it in production code.
       try {
-        version = Workflow.getVersion("test_change", 2, 3);
+        Workflow.getVersion("test_change", 2, 3);
       } catch (Error e) {
         throw Workflow.wrap(new Exception("unsupported change version"));
       }
@@ -5318,63 +5317,6 @@ public class WorkflowTest {
       assertEquals(
           NonDeterministicWorkflowError.class.getName(),
           ((ApplicationFailure) e.getCause()).getType());
-    }
-  }
-
-  private static class TracingWorkflowInterceptor implements WorkflowInterceptor {
-
-    private final FilteredTrace trace;
-    private List<String> expected;
-
-    private TracingWorkflowInterceptor(FilteredTrace trace) {
-      this.trace = trace;
-    }
-
-    public String getTrace() {
-      return String.join("\n", trace.getImpl());
-    }
-
-    public void setExpected(String... expected) {
-
-      this.expected = Arrays.asList(expected);
-    }
-
-    public void assertExpected() {
-      if (expected != null) {
-        List<String> traceElements = trace.getImpl();
-        for (int i = 0; i < traceElements.size(); i++) {
-          String t = traceElements.get(i);
-          String expectedRegExp;
-          if (expected.size() <= i) {
-            expectedRegExp = "";
-          } else {
-            expectedRegExp = expected.get(i);
-          }
-          assertTrue(
-              t
-                  + " doesn't match "
-                  + expectedRegExp
-                  + ": \n expected=\n"
-                  + String.join("\n", expected)
-                  + "\n actual=\n"
-                  + String.join("\n", traceElements)
-                  + "\n",
-              t.matches(expectedRegExp));
-        }
-      }
-    }
-
-    @Override
-    public WorkflowInboundCallsInterceptor interceptWorkflow(WorkflowInboundCallsInterceptor next) {
-      if (!Workflow.isReplaying()) {
-        trace.add("interceptExecuteWorkflow " + Workflow.getInfo().getWorkflowId());
-      }
-      return new WorkflowInboundCallsInterceptorBase(next) {
-        @Override
-        public void init(WorkflowOutboundCallsInterceptor outboundCalls) {
-          next.init(new TracingWorkflowOutboundCallsInterceptor(trace, outboundCalls));
-        }
-      };
     }
   }
 
@@ -5827,18 +5769,27 @@ public class WorkflowTest {
   }
 
   @Test
-  public void testLocalActivitiesWorkflowTaskHeartbeat() {
+  public void testLocalActivitiesWorkflowTaskHeartbeat()
+      throws ExecutionException, InterruptedException {
     startWorkerFor(TestLocalActivitiesWorkflowTaskHeartbeatWorkflowImpl.class);
     WorkflowOptions options =
         WorkflowOptions.newBuilder()
             .setWorkflowRunTimeout(Duration.ofMinutes(5))
-            .setWorkflowTaskTimeout(Duration.ofSeconds(10))
+            .setWorkflowTaskTimeout(Duration.ofSeconds(4))
             .setTaskQueue(taskQueue)
             .build();
-    TestWorkflow1 workflowStub = workflowClient.newWorkflowStub(TestWorkflow1.class, options);
-    String result = workflowStub.execute(taskQueue);
-    assertEquals("sleepActivity0sleepActivity1sleepActivity2sleepActivity3sleepActivity4", result);
-    assertEquals(activitiesImpl.toString(), 5, activitiesImpl.invocations.size());
+    int count = 5;
+    Future<String>[] result = new Future[count];
+    for (int i = 0; i < count; i++) {
+      TestWorkflow1 workflowStub = workflowClient.newWorkflowStub(TestWorkflow1.class, options);
+      result[i] = WorkflowClient.execute(workflowStub::execute, taskQueue);
+    }
+    for (int i = 0; i < count; i++) {
+      assertEquals(
+          "sleepActivity0sleepActivity1sleepActivity2sleepActivity3sleepActivity4",
+          result[i].get());
+    }
+    assertEquals(activitiesImpl.toString(), 5 * count, activitiesImpl.invocations.size());
   }
 
   public static class TestLongLocalActivityWorkflowTaskHeartbeatWorkflowImpl
@@ -5947,7 +5898,8 @@ public class WorkflowTest {
     startWorkerFor(TestLocalActivityAndQueryWorkflow.class);
     WorkflowOptions options =
         WorkflowOptions.newBuilder()
-            .setWorkflowRunTimeout(Duration.ofMinutes(5))
+            .setWorkflowRunTimeout(Duration.ofMinutes(30))
+            // Large workflow task timeout to avoid workflow task heartbeating
             .setWorkflowTaskTimeout(Duration.ofSeconds(30))
             .setTaskQueue(taskQueue)
             .build();
@@ -6501,6 +6453,63 @@ public class WorkflowTest {
     }
   }
 
+  private static class TracingWorkflowInterceptor implements WorkflowInterceptor {
+
+    private final FilteredTrace trace;
+    private List<String> expected;
+
+    private TracingWorkflowInterceptor(FilteredTrace trace) {
+      this.trace = trace;
+    }
+
+    public String getTrace() {
+      return String.join("\n", trace.getImpl());
+    }
+
+    public void setExpected(String... expected) {
+
+      this.expected = Arrays.asList(expected);
+    }
+
+    public void assertExpected() {
+      if (expected != null) {
+        List<String> traceElements = trace.getImpl();
+        for (int i = 0; i < traceElements.size(); i++) {
+          String t = traceElements.get(i);
+          String expectedRegExp;
+          if (expected.size() <= i) {
+            expectedRegExp = "";
+          } else {
+            expectedRegExp = expected.get(i);
+          }
+          assertTrue(
+              t
+                  + " doesn't match "
+                  + expectedRegExp
+                  + ": \n expected=\n"
+                  + String.join("\n", expected)
+                  + "\n actual=\n"
+                  + String.join("\n", traceElements)
+                  + "\n",
+              t.matches(expectedRegExp));
+        }
+      }
+    }
+
+    @Override
+    public WorkflowInboundCallsInterceptor interceptWorkflow(WorkflowInboundCallsInterceptor next) {
+      if (!Workflow.isReplaying()) {
+        trace.add("interceptExecuteWorkflow " + Workflow.getInfo().getWorkflowId());
+      }
+      return new WorkflowInboundCallsInterceptorBase(next) {
+        @Override
+        public void init(WorkflowOutboundCallsInterceptor outboundCalls) {
+          next.init(new TracingWorkflowOutboundCallsInterceptor(trace, outboundCalls));
+        }
+      };
+    }
+  }
+
   private static class TracingWorkflowOutboundCallsInterceptor
       implements WorkflowOutboundCallsInterceptor {
 
@@ -6654,7 +6663,20 @@ public class WorkflowTest {
       if (!Workflow.isReplaying()) {
         trace.add("registerQuery " + queryType);
       }
-      next.registerQuery(queryType, argTypes, genericArgTypes, callback);
+      next.registerQuery(
+          queryType,
+          argTypes,
+          genericArgTypes,
+          (args) -> {
+            Object result = callback.apply(args);
+            if (!Workflow.isReplaying()) {
+              if (queryType.equals("query")) {
+                log.trace("query", new Throwable());
+              }
+              trace.add("query " + queryType);
+            }
+            return result;
+          });
     }
 
     @Override

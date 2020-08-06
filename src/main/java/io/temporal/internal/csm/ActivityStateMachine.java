@@ -114,7 +114,8 @@ public final class ActivityStateMachine
         .add(
             State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED)
+            State.SCHEDULED_ACTIVITY_CANCEL_EVENT_RECORDED,
+            ActivityStateMachine::notifyCanceledIfTryCancel)
         .add(
             State.SCHEDULED_ACTIVITY_CANCEL_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK,
@@ -135,7 +136,8 @@ public final class ActivityStateMachine
         .add(
             State.STARTED_ACTIVITY_CANCEL_COMMAND_CREATED,
             EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
-            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED)
+            State.STARTED_ACTIVITY_CANCEL_EVENT_RECORDED,
+            ActivityStateMachine::notifyCanceledIfTryCancel)
         .add(
             State.STARTED,
             Action.CANCEL,
@@ -205,17 +207,22 @@ public final class ActivityStateMachine
   }
 
   public void cancel() {
-    if (parameters.getCancellationType() != ActivityCancellationType.ABANDON) {
-      action(Action.CANCEL);
-    } else if (parameters.getCancellationType()
-        != ActivityCancellationType.WAIT_CANCELLATION_COMPLETED) {
+    if (parameters.getCancellationType() == ActivityCancellationType.ABANDON) {
       notifyCanceled();
+    } else {
+      action(Action.CANCEL);
     }
   }
 
   private void cancelScheduleCommand() {
     cancelInitialCommand();
-    if (parameters.getCancellationType() == ActivityCancellationType.WAIT_CANCELLATION_COMPLETED) {
+    if (parameters.getCancellationType() != ActivityCancellationType.ABANDON) {
+      notifyCanceled();
+    }
+  }
+
+  private void notifyCanceledIfTryCancel() {
+    if (parameters.getCancellationType() == ActivityCancellationType.TRY_CANCEL) {
       notifyCanceled();
     }
   }

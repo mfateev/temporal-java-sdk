@@ -115,6 +115,7 @@ public final class TestActivityEnvironmentInternal implements TestActivityEnviro
             WorkflowServiceStubsOptions.newBuilder()
                 .setChannel(channel)
                 .setMetricsScope(options.getMetricsScope())
+                .setQueryRpcTimeout(600000)
                 .build());
     activityTaskHandler =
         new POJOActivityTaskHandler(

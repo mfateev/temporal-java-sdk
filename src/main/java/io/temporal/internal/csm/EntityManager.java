@@ -61,8 +61,12 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class EntityManager {
+
+  private static final Logger log = LoggerFactory.getLogger(EntityManager.class);
 
   private boolean eventLoopExecuting;
 
@@ -676,6 +680,9 @@ public final class EntityManager {
   public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
     List<ExecuteLocalActivityParameters> result = localActivityRequests;
     localActivityRequests = new ArrayList<>();
+    if (log.isTraceEnabled()) {
+      log.trace("takeLocalActivityRequests: " + result);
+    }
     return result;
   }
 
@@ -683,6 +690,9 @@ public final class EntityManager {
     LocalActivityStateMachine commands = localActivityMap.get(laCompletion.getActivityId());
     if (commands == null) {
       throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
+    }
+    if (log.isTraceEnabled()) {
+      log.trace("handleLocalActivityCompletion: " + laCompletion);
     }
     commands.handleCompletion(laCompletion);
     prepareCommands();
