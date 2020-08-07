@@ -19,14 +19,12 @@
 
 package io.temporal.internal.replay;
 
-import static io.temporal.failure.FailureConverter.JAVA_SDK;
 import static io.temporal.internal.common.OptionsUtils.roundUpToSeconds;
 
 import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributesOrBuilder;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
@@ -37,13 +35,7 @@ import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.RetryState;
 import io.temporal.api.enums.v1.TimeoutType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
-import io.temporal.api.failure.v1.ActivityFailureInfo;
-import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.api.history.v1.ActivityTaskCanceledEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskCompletedEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskFailedEventAttributes;
-import io.temporal.api.history.v1.ActivityTaskTimedOutEventAttributes;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes;
 import io.temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes;
@@ -252,80 +244,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       attributes.setActivityId(workflowStateMachines.randomUUID().toString());
     }
     Functions.Proc cancellationHandler =
-        workflowStateMachines.scheduleActivityTask(
-            parameters, (event) -> handleActivityCallback(callback, attributes, event));
+        workflowStateMachines.scheduleActivityTask(parameters, callback);
     return (exception) -> cancellationHandler.apply();
-  }
-
-  private void handleActivityCallback(
-      BiConsumer<Optional<Payloads>, Failure> callback,
-      ScheduleActivityTaskCommandAttributesOrBuilder scheduleAttr,
-      HistoryEvent event) {
-    switch (event.getEventType()) {
-      case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
-        ActivityTaskCompletedEventAttributes completedAttr =
-            event.getActivityTaskCompletedEventAttributes();
-        Optional<Payloads> result =
-            completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
-        callback.accept(result, null);
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_FAILED:
-        {
-          ActivityTaskFailedEventAttributes failed = event.getActivityTaskFailedEventAttributes();
-          ActivityFailureInfo failureInfo =
-              ActivityFailureInfo.newBuilder()
-                  .setActivityId(scheduleAttr.getActivityId())
-                  .setActivityType(scheduleAttr.getActivityType())
-                  .setIdentity(failed.getIdentity())
-                  .setRetryState(failed.getRetryState())
-                  .setScheduledEventId(failed.getScheduledEventId())
-                  .setStartedEventId(failed.getStartedEventId())
-                  .build();
-          Failure failure =
-              Failure.newBuilder()
-                  .setActivityFailureInfo(failureInfo)
-                  .setCause(failed.getFailure())
-                  .setMessage("Activity task failed")
-                  .build();
-          callback.accept(Optional.empty(), failure);
-        }
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
-        {
-          ActivityTaskTimedOutEventAttributes timedOut =
-              event.getActivityTaskTimedOutEventAttributes();
-
-          ActivityFailureInfo failureInfo =
-              ActivityFailureInfo.newBuilder()
-                  .setActivityId(scheduleAttr.getActivityId())
-                  .setActivityType(scheduleAttr.getActivityType())
-                  .setRetryState(timedOut.getRetryState())
-                  .setScheduledEventId(timedOut.getScheduledEventId())
-                  .setStartedEventId(timedOut.getStartedEventId())
-                  .build();
-          Failure failure =
-              Failure.newBuilder()
-                  .setActivityFailureInfo(failureInfo)
-                  .setCause(timedOut.getFailure())
-                  .setMessage("Activity task timedOut")
-                  .build();
-          callback.accept(Optional.empty(), failure);
-        }
-        break;
-      case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
-        ActivityTaskCanceledEventAttributes canceledAttr =
-            event.getActivityTaskCanceledEventAttributes();
-        Failure canceledFailure =
-            Failure.newBuilder()
-                .setSource(JAVA_SDK)
-                .setCanceledFailureInfo(
-                    CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
-                .build();
-        callback.accept(Optional.empty(), canceledFailure);
-        break;
-      default:
-        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
-    }
   }
 
   @Override
