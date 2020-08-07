@@ -63,7 +63,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 
 public final class WorkflowStateMachines {
 
@@ -461,7 +460,7 @@ public final class WorkflowStateMachines {
    * @return an instance of ActivityCommands
    */
   public Functions.Proc scheduleActivityTask(
-      ExecuteActivityParameters attributes, BiConsumer<Optional<Payloads>, Failure> callback) {
+      ExecuteActivityParameters attributes, Functions.Proc2<Optional<Payloads>, Failure> callback) {
     checkEventLoopExecuting();
     ActivityStateMachine activityStateMachine =
         ActivityStateMachine.newInstance(attributes, callback, commandSink);

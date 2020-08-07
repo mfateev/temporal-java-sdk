@@ -27,6 +27,7 @@ import io.temporal.internal.logging.LoggerTag;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowExecutorCache;
+import io.temporal.workflow.Functions;
 import io.temporal.workflow.Promise;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -39,7 +40,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -342,7 +342,7 @@ class WorkflowThreadImpl implements WorkflowThread {
    *
    * @param function Parameter is reason for current goroutine blockage.
    */
-  public void evaluateInCoroutineContext(Consumer<String> function) {
+  public void evaluateInCoroutineContext(Functions.Proc1<String> function) {
     context.evaluateInCoroutineContext(function);
   }
 

@@ -40,7 +40,6 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.internal.replay.ExecuteActivityParameters;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 
 public final class ActivityStateMachine
     extends EntityStateMachineInitialCommand<
@@ -185,7 +184,7 @@ public final class ActivityStateMachine
 
   private final ExecuteActivityParameters parameters;
 
-  private final BiConsumer<Optional<Payloads>, Failure> completionCallback;
+  private final Functions.Proc2<Optional<Payloads>, Failure> completionCallback;
 
   /**
    * @param parameters attributes used to schedule an activity
@@ -196,14 +195,14 @@ public final class ActivityStateMachine
    */
   public static ActivityStateMachine newInstance(
       ExecuteActivityParameters parameters,
-      BiConsumer<Optional<Payloads>, Failure> completionCallback,
+      Functions.Proc2<Optional<Payloads>, Failure> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     return new ActivityStateMachine(parameters, completionCallback, commandSink);
   }
 
   private ActivityStateMachine(
       ExecuteActivityParameters parameters,
-      BiConsumer<Optional<Payloads>, Failure> completionCallback,
+      Functions.Proc2<Optional<Payloads>, Failure> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.parameters = parameters;
@@ -246,7 +245,7 @@ public final class ActivityStateMachine
             .setSource(JAVA_SDK)
             .setCanceledFailureInfo(CanceledFailureInfo.getDefaultInstance())
             .build();
-    completionCallback.accept(Optional.empty(), canceledFailure);
+    completionCallback.apply(Optional.empty(), canceledFailure);
   }
 
   private void notifyCompleted() {
@@ -254,7 +253,7 @@ public final class ActivityStateMachine
         currentEvent.getActivityTaskCompletedEventAttributes();
     Optional<Payloads> result =
         completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
-    completionCallback.accept(result, null);
+    completionCallback.apply(result, null);
   }
 
   private void notifyFailed() {
@@ -275,7 +274,7 @@ public final class ActivityStateMachine
             .setCause(failed.getFailure())
             .setMessage("Activity task failed")
             .build();
-    completionCallback.accept(Optional.empty(), failure);
+    completionCallback.apply(Optional.empty(), failure);
   }
 
   private void notifyTimedOut() {
@@ -298,7 +297,7 @@ public final class ActivityStateMachine
             .setCause(timedOut.getFailure())
             .setMessage("Activity task timedOut")
             .build();
-    completionCallback.accept(Optional.empty(), failure);
+    completionCallback.apply(Optional.empty(), failure);
   }
 
   private void notifyCancellationFromEvent() {
@@ -311,12 +310,12 @@ public final class ActivityStateMachine
               .setCanceledFailureInfo(
                   CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
               .build();
-      completionCallback.accept(Optional.empty(), canceledFailure);
+      completionCallback.apply(Optional.empty(), canceledFailure);
     }
   }
 
   private void handleActivityCallback(
-      BiConsumer<Optional<Payloads>, Failure> callback,
+      Functions.Proc2<Optional<Payloads>, Failure> callback,
       ScheduleActivityTaskCommandAttributesOrBuilder scheduleAttr,
       HistoryEvent event) {
     switch (event.getEventType()) {
@@ -325,7 +324,7 @@ public final class ActivityStateMachine
             event.getActivityTaskCompletedEventAttributes();
         Optional<Payloads> result =
             completedAttr.hasResult() ? Optional.of(completedAttr.getResult()) : Optional.empty();
-        callback.accept(result, null);
+        callback.apply(result, null);
         break;
       case EVENT_TYPE_ACTIVITY_TASK_FAILED:
         {
@@ -345,7 +344,7 @@ public final class ActivityStateMachine
                   .setCause(failed.getFailure())
                   .setMessage("Activity task failed")
                   .build();
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
         }
         break;
       case EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
@@ -367,7 +366,7 @@ public final class ActivityStateMachine
                   .setCause(timedOut.getFailure())
                   .setMessage("Activity task timedOut")
                   .build();
-          callback.accept(Optional.empty(), failure);
+          callback.apply(Optional.empty(), failure);
         }
         break;
       case EVENT_TYPE_ACTIVITY_TASK_CANCELED:
@@ -379,7 +378,7 @@ public final class ActivityStateMachine
                 .setCanceledFailureInfo(
                     CanceledFailureInfo.newBuilder().setDetails(canceledAttr.getDetails()))
                 .build();
-        callback.accept(Optional.empty(), canceledFailure);
+        callback.apply(Optional.empty(), canceledFailure);
         break;
       default:
         throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());

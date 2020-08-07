@@ -48,6 +48,7 @@ import io.temporal.internal.logging.LoggerTag;
 import io.temporal.internal.metrics.MetricsTag;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.serviceclient.WorkflowServiceStubs;
+import io.temporal.workflow.Functions;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,11 +56,10 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Consumer;
 import org.slf4j.MDC;
 
 public final class WorkflowWorker
-    implements SuspendableWorker, Consumer<PollWorkflowTaskQueueResponse> {
+    implements SuspendableWorker, Functions.Proc1<PollWorkflowTaskQueueResponse> {
 
   private static final String POLL_THREAD_NAME_PREFIX = "Workflow Poller taskQueue=";
 
@@ -268,7 +268,7 @@ public final class WorkflowWorker
   }
 
   @Override
-  public void accept(PollWorkflowTaskQueueResponse pollWorkflowTaskQueueResponse) {
+  public void apply(PollWorkflowTaskQueueResponse pollWorkflowTaskQueueResponse) {
     pollTaskExecutor.process(pollWorkflowTaskQueueResponse);
   }
 

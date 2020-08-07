@@ -58,8 +58,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,8 +220,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Consumer<Exception> scheduleActivityTask(
-      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
+  public Functions.Proc1<Exception> scheduleActivityTask(
+      ExecuteActivityParameters parameters, Functions.Proc2<Optional<Payloads>, Failure> callback) {
     ScheduleActivityTaskCommandAttributes.Builder attributes = parameters.getAttributes();
     if (attributes.getActivityId().isEmpty()) {
       attributes.setActivityId(workflowStateMachines.randomUUID().toString());
@@ -251,9 +249,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Consumer<Exception> signalExternalWorkflowExecution(
+  public Functions.Proc1<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      BiConsumer<Void, Exception> callback) {
+      Functions.Proc2<Void, Exception> callback) {
     Functions.Proc cancellationHandler =
         workflowStateMachines.newSignalExternal(
             attributes.build(),
@@ -262,15 +260,15 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   private void handleSignalExternalCallback(
-      BiConsumer<Void, Exception> callback, HistoryEvent event, boolean canceled) {
+      Functions.Proc2<Void, Exception> callback, HistoryEvent event, boolean canceled) {
     if (canceled) {
       CanceledFailure failure = new CanceledFailure("Signal external workflow execution canceled");
-      callback.accept(null, failure);
+      callback.apply(null, failure);
       return;
     }
     switch (event.getEventType()) {
       case EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED:
-        callback.accept(null, null);
+        callback.apply(null, null);
         return;
       case EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
         {
@@ -282,7 +280,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
                   .setRunId(attributes.getWorkflowExecution().getRunId())
                   .build();
           RuntimeException failure = new SignalExternalWorkflowException(signaledExecution, null);
-          callback.accept(null, failure);
+          callback.apply(null, failure);
           return;
         }
       default:

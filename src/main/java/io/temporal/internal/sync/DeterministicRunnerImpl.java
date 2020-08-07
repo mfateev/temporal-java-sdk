@@ -69,8 +69,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -630,8 +628,9 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Consumer<Exception> scheduleActivityTask(
-        ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
+    public Functions.Proc1<Exception> scheduleActivityTask(
+        ExecuteActivityParameters parameters,
+        Functions.Proc2<Optional<Payloads>, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -651,9 +650,9 @@ class DeterministicRunnerImpl implements DeterministicRunner {
     }
 
     @Override
-    public Consumer<Exception> signalExternalWorkflowExecution(
+    public Functions.Proc1<Exception> signalExternalWorkflowExecution(
         SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-        BiConsumer<Void, Exception> callback) {
+        Functions.Proc2<Void, Exception> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 

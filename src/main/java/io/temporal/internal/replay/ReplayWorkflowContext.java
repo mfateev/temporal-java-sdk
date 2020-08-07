@@ -33,14 +33,13 @@ import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import io.temporal.workflow.Promise;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
  * Represents the context for workflow. Should only be used within the scope of workflow definition
@@ -105,10 +104,11 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param parameters An object which encapsulates all the information required to schedule an
    *     activity for execution
    * @param callback Callback that is called upon activity completion or failure.
-   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel activity task.
+   * @return cancellation handle. Invoke {@link Functions.Proc1#apply(Object)} to cancel activity
+   *     task.
    */
-  Consumer<Exception> scheduleActivityTask(
-      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback);
+  Functions.Proc1<Exception> scheduleActivityTask(
+      ExecuteActivityParameters parameters, Functions.Proc2<Optional<Payloads>, Failure> callback);
 
   Functions.Proc scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
@@ -120,16 +120,17 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param parameters An object which encapsulates all the information required to schedule a child
    *     workflow for execution
    * @param callback Callback that is called upon child workflow completion or failure.
-   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel activity task.
+   * @return cancellation handle. Invoke {@link Functions.Proc1#apply(Object)} to cancel activity
+   *     task.
    */
   Functions.Proc1<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
       Functions.Proc1<WorkflowExecution> executionCallback,
       Functions.Proc2<Optional<Payloads>, Exception> callback);
 
-  Consumer<Exception> signalExternalWorkflowExecution(
+  Functions.Proc1<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      BiConsumer<Void, Exception> callback);
+      Functions.Proc2<Void, Exception> callback);
 
   Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution);
 
@@ -147,7 +148,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param delay time-interval after which the Value becomes ready.
    * @param callback Callback that is called with null parameter after the specified delay.
    *     CanceledException is passed as a parameter in case of a cancellation.
-   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel timer.
+   * @return cancellation handle. Invoke {@link Functions.Proc1#apply(Object)} to cancel timer.
    */
   Functions.Proc1<RuntimeException> newTimer(
       Duration delay, Functions.Proc1<RuntimeException> callback);

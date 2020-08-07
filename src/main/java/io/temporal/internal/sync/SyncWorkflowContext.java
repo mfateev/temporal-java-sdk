@@ -84,7 +84,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -181,13 +180,13 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
       String name, ActivityOptions options, Optional<Payloads> input) {
     ActivityCallback callback = new ActivityCallback();
     ExecuteActivityParameters params = constructExecuteActivityParameters(name, options, input);
-    Consumer<Exception> cancellationCallback =
+    Functions.Proc1<Exception> cancellationCallback =
         context.scheduleActivityTask(params, callback::invoke);
     CancellationScope.current()
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              cancellationCallback.accept(new CanceledFailure(reason));
+              cancellationCallback.apply(new CanceledFailure(reason));
               return null;
             });
     return callback.result;
@@ -733,7 +732,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
       attributes.setInput(input.get());
     }
     CompletablePromise<Void> result = Workflow.newPromise();
-    Consumer<Exception> cancellationCallback =
+    Functions.Proc1<Exception> cancellationCallback =
         context.signalExternalWorkflowExecution(
             attributes,
             (output, failure) -> {
@@ -750,7 +749,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              cancellationCallback.accept(new CanceledFailure(reason));
+              cancellationCallback.apply(new CanceledFailure(reason));
               return null;
             });
     return result;

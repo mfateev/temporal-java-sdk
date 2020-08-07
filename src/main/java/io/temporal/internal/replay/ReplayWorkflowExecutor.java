@@ -74,7 +74,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,7 +101,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private long wakeUpTime;
 
-  private Consumer<Exception> timerCancellationHandler;
+  private Functions.Proc1<Exception> timerCancellationHandler;
 
   private final Scope metricsScope;
 
