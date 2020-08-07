@@ -115,7 +115,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   private final List<WorkflowThread> threadsToAdd = Collections.synchronizedList(new ArrayList<>());
   private int addedThreads;
   private final List<NamedRunnable> toExecuteInWorkflowThread = new ArrayList<>();
-  private WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache cache;
   private boolean inRunUntilAllBlocked;
   private boolean closeRequested;
   private boolean closed;
@@ -155,7 +155,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
    * Used to check for failedPromises that contain an error, but never where accessed. It is to
    * avoid failure swallowing by failedPromises which is very hard to troubleshoot.
    */
-  private Set<Promise> failedPromises = new HashSet<>();
+  private final Set<Promise> failedPromises = new HashSet<>();
 
   private boolean exitRequested;
   private Object exitValue;

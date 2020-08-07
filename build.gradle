@@ -170,8 +170,8 @@ protobuf {
 
 idea {
     module {
-        sourceDirs += file("$buildDir/generated/main/java");
-        sourceDirs += file("$buildDir/generated/main/grpc");
+        sourceDirs += file("$buildDir/generated/main/java")
+        sourceDirs += file("$buildDir/generated/main/grpc")
     }
 }
 

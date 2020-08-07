@@ -60,9 +60,9 @@ class WorkflowThreadImpl implements WorkflowThread {
     private final ReplayWorkflowContext replayWorkflowContext;
     private String originalName;
     private String name;
-    private CancellationScopeImpl cancellationScope;
-    private List<ContextPropagator> contextPropagators;
-    private Map<String, Object> propagatedContexts;
+    private final CancellationScopeImpl cancellationScope;
+    private final List<ContextPropagator> contextPropagators;
+    private final Map<String, Object> propagatedContexts;
 
     RunnableWrapper(
         WorkflowThreadContext threadContext,

@@ -128,8 +128,8 @@ public final class MutableSideEffectStateMachine {
   private class InvocationStateMachine
       extends EntityStateMachineInitialCommand<State, Action, InvocationStateMachine> {
 
-    private Functions.Proc1<Optional<Payloads>> resultCallback;
-    private Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;
+    private final Functions.Proc1<Optional<Payloads>> resultCallback;
+    private final Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;
 
     InvocationStateMachine(
         Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
@@ -144,7 +144,7 @@ public final class MutableSideEffectStateMachine {
     }
 
     @Override
-    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
+    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
@@ -164,7 +164,7 @@ public final class MutableSideEffectStateMachine {
         //        action(Action.NON_MATCHING_EVENT);
         return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
-      super.handleEvent(event);
+      super.handleEvent(event, hasNextEvent);
       return EntityManager.HandleEventStatus.OK;
     }
 

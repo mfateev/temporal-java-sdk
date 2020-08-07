@@ -89,7 +89,7 @@ public final class EntityManager {
   private final EntityManagerListener callbacks;
 
   /** Callback to send new commands to. */
-  private Functions.Proc1<NewCommand> sink;
+  private final Functions.Proc1<NewCommand> commandSink;
 
   /**
    * currentRunId is used as seed by Workflow.newRandom and randomUUID. It allows to generate them
@@ -133,13 +133,16 @@ public final class EntityManager {
   private final Map<String, VersionStateMachine> vesions = new HashMap<>();
 
   /** Map of local activities by their id. */
-  private Map<String, LocalActivityStateMachine> localActivityMap = new HashMap<>();
+  private final Map<String, LocalActivityStateMachine> localActivityMap = new HashMap<>();
 
   private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
 
+  private final Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink;
+
   public EntityManager(EntityManagerListener callbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
-    sink = (command) -> newCommands.add(command);
+    commandSink = (command) -> newCommands.add(command);
+    localActivityRequestSink = (request) -> localActivityRequests.add(request);
   }
 
   public void setStartedIds(long previousStartedEventId, long workflowTaskStartedEventId) {
@@ -148,9 +151,9 @@ public final class EntityManager {
     replaying = previousStartedEventId > 0;
   }
 
-  public final void handleEvent(HistoryEvent event) {
+  public final void handleEvent(HistoryEvent event, boolean hasNextEvent) {
     try {
-      handleEventImpl(event);
+      handleEventImpl(event, hasNextEvent);
     } catch (RuntimeException e) {
       throw new NonDeterministicWorkflowError(
           "Failure handling event "
@@ -169,7 +172,7 @@ public final class EntityManager {
     }
   }
 
-  private void handleEventImpl(HistoryEvent event) {
+  private void handleEventImpl(HistoryEvent event, boolean hasNextEvent) {
     if (isCommandEvent(event)) {
       handleCommand(event);
       return;
@@ -182,7 +185,7 @@ public final class EntityManager {
     Long initialCommandEventId = getInitialCommandEventId(event);
     EntityStateMachine c = stateMachines.get(initialCommandEventId);
     if (c != null) {
-      c.handleEvent(event);
+      c.handleEvent(event, hasNextEvent);
       if (c.isFinalState()) {
         stateMachines.remove(initialCommandEventId);
       }
@@ -210,7 +213,7 @@ public final class EntityManager {
       }
       // Note that handleEvent can cause a command cancellation in case
       // of MutableSideEffect
-      HandleEventStatus status = newCommand.handleEvent(event);
+      HandleEventStatus status = newCommand.handleEvent(event, true);
       if (status == HandleEventStatus.NOT_MATCHING_EVENT) {
         if (handleVersionMarker(event)) {
           return;
@@ -265,7 +268,7 @@ public final class EntityManager {
     VersionStateMachine versionStateMachine =
         vesions.computeIfAbsent(
             changeId,
-            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, sink));
+            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, commandSink));
     versionStateMachine.handleNonMatchingEvent(event);
     return true;
   }
@@ -372,7 +375,7 @@ public final class EntityManager {
     if (stateMachine.getState() == LocalActivityStateMachine.State.RESULT_NOTIFIED) {
       return false;
     }
-    stateMachine.handleEvent(event);
+    stateMachine.handleEvent(event, true);
     eventLoop();
     return true;
   }
@@ -454,7 +457,7 @@ public final class EntityManager {
   public ActivityStateMachine newActivity(
       ExecuteActivityParameters attributes, Functions.Proc1<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
-    return ActivityStateMachine.newInstance(attributes, completionCallback, sink);
+    return ActivityStateMachine.newInstance(attributes, completionCallback, commandSink);
   }
 
   /**
@@ -478,7 +481,7 @@ public final class EntityManager {
                 eventLoop();
               }
             },
-            sink);
+            commandSink);
     return () -> timer.cancel();
   }
 
@@ -501,7 +504,7 @@ public final class EntityManager {
     checkEventLoopExecuting();
     ChildWorkflowStateMachine child =
         ChildWorkflowStateMachine.newInstance(
-            attributes, startedCallback, completionCallback, sink);
+            attributes, startedCallback, completionCallback, commandSink);
     return (cancellationType) -> {
       // The only time child can be cancelled directly is before its start command
       // was sent out to the service. After that RequestCancelExternal should be used.
@@ -558,7 +561,7 @@ public final class EntityManager {
       SignalExternalWorkflowExecutionCommandAttributes attributes,
       Functions.Proc2<HistoryEvent, Boolean> completionCallback) {
     checkEventLoopExecuting();
-    return SignalExternalStateMachine.newInstance(attributes, completionCallback, sink);
+    return SignalExternalStateMachine.newInstance(attributes, completionCallback, commandSink);
   }
 
   /**
@@ -570,34 +573,34 @@ public final class EntityManager {
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
       Functions.Proc1<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
-    CancelExternalStateMachine.newInstance(attributes, completionCallback, sink);
+    CancelExternalStateMachine.newInstance(attributes, completionCallback, commandSink);
   }
 
   public void newUpsertSearchAttributes(
       UpsertWorkflowSearchAttributesCommandAttributes attributes) {
     checkEventLoopExecuting();
-    UpsertSearchAttributesStateMachine.newInstance(attributes, sink);
+    UpsertSearchAttributesStateMachine.newInstance(attributes, commandSink);
   }
 
   public void newCompleteWorkflow(Optional<Payloads> workflowOutput) {
     checkEventLoopExecuting();
-    CompleteWorkflowStateMachine.newInstance(workflowOutput, sink);
+    CompleteWorkflowStateMachine.newInstance(workflowOutput, commandSink);
   }
 
   public void newFailWorkflow(Failure failure) {
     checkEventLoopExecuting();
-    FailWorkflowStateMachine.newInstance(failure, sink);
+    FailWorkflowStateMachine.newInstance(failure, commandSink);
   }
 
   public void newCancelWorkflow() {
     checkEventLoopExecuting();
     CancelWorkflowStateMachine.newInstance(
-        CancelWorkflowExecutionCommandAttributes.getDefaultInstance(), sink);
+        CancelWorkflowExecutionCommandAttributes.getDefaultInstance(), commandSink);
   }
 
   public void newContinueAsNewWorkflow(ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
     checkEventLoopExecuting();
-    ContinueAsNewWorkflowStateMachine.newInstance(attributes, sink);
+    ContinueAsNewWorkflowStateMachine.newInstance(attributes, commandSink);
   }
 
   public boolean isReplaying() {
@@ -635,7 +638,7 @@ public final class EntityManager {
           // callback unblocked sideEffect call. Give workflow code chance to make progress.
           eventLoop();
         },
-        sink);
+        commandSink);
   }
 
   /**
@@ -652,7 +655,8 @@ public final class EntityManager {
     MutableSideEffectStateMachine stateMachine =
         mutableSideEffects.computeIfAbsent(
             id,
-            (idKey) -> MutableSideEffectStateMachine.newInstance(idKey, this::isReplaying, sink));
+            (idKey) ->
+                MutableSideEffectStateMachine.newInstance(idKey, this::isReplaying, commandSink));
     stateMachine.mutableSideEffect(
         func,
         (r) -> {
@@ -667,7 +671,7 @@ public final class EntityManager {
     VersionStateMachine stateMachine =
         vesions.computeIfAbsent(
             changeId,
-            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, sink));
+            (idKey) -> VersionStateMachine.newInstance(changeId, this::isReplaying, commandSink));
     stateMachine.getVersion(
         minSupported,
         maxSupported,
@@ -680,8 +684,10 @@ public final class EntityManager {
   public List<ExecuteLocalActivityParameters> takeLocalActivityRequests() {
     List<ExecuteLocalActivityParameters> result = localActivityRequests;
     localActivityRequests = new ArrayList<>();
-    if (log.isTraceEnabled()) {
-      log.trace("takeLocalActivityRequests: " + result);
+    for (ExecuteLocalActivityParameters parameters : result) {
+      LocalActivityStateMachine stateMachine =
+          localActivityMap.get(parameters.getActivityTask().getActivityId());
+      stateMachine.requestSent();
     }
     return result;
   }
@@ -690,9 +696,6 @@ public final class EntityManager {
     LocalActivityStateMachine commands = localActivityMap.get(laCompletion.getActivityId());
     if (commands == null) {
       throw new IllegalStateException("Unknown local activity: " + laCompletion.getActivityId());
-    }
-    if (log.isTraceEnabled()) {
-      log.trace("handleLocalActivityCompletion: " + laCompletion);
     }
     commands.handleCompletion(laCompletion);
     prepareCommands();
@@ -719,23 +722,30 @@ public final class EntityManager {
               // callback unblocked local activity call. Give workflow code chance to make progress.
               eventLoop();
             },
-            sink);
+            localActivityRequestSink,
+            commandSink);
     localActivityMap.put(activityId, commands);
-    if (!isReplaying()) {
-      localActivityRequests.add(commands.getRequest());
-    }
     return () -> commands.cancel();
   }
 
   private class WorkflowTaskCommandsListener implements WorkflowTaskStateMachine.Listener {
     @Override
-    public void workflowTaskStarted(long startedEventId, long currentTimeMillis) {
+    public void workflowTaskStarted(
+        long startedEventId, long currentTimeMillis, boolean nonProcessedWorkflowTask) {
       // If some new commands are pending and there are no more command events.
       for (NewCommand newCommand : commands) {
         if (newCommand == null) {
           break;
         }
         newCommand.handleWorkflowTaskStarted();
+      }
+      // Give local activities a chance to recreate their requests if they were lost due
+      // to the last workflow task failure. The loss could happen only the last workflow task
+      // was forcibly created by setting forceCreate on RespondWorkflowTaskCompletedRequest.
+      if (nonProcessedWorkflowTask) {
+        for (LocalActivityStateMachine value : localActivityMap.values()) {
+          value.nonReplayWorkflowTaskStarted();
+        }
       }
       EntityManager.this.currentStartedEventId = startedEventId;
       setCurrentTimeMillis(currentTimeMillis);

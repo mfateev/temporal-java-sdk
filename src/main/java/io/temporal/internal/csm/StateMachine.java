@@ -206,7 +206,6 @@ final class StateMachine<State, Action, Data> {
               + transitionHistory,
           e);
     }
-    System.out.println(name + ": " + transition);
     transitionHistory.add(transition);
   }
 
@@ -238,5 +237,18 @@ final class StateMachine<State, Action, Data> {
 
   public String getHistory() {
     return transitionHistory.toString();
+  }
+
+  @Override
+  public String toString() {
+    return "StateMachine{"
+        + "name='"
+        + name
+        + '\''
+        + ", state="
+        + state
+        + ", transitionHistory="
+        + transitionHistory
+        + '}';
   }
 }

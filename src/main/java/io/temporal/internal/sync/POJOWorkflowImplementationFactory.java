@@ -65,20 +65,20 @@ final class POJOWorkflowImplementationFactory implements ReplayWorkflowFactory {
   private final WorkflowInterceptor[] workflowInterceptors;
 
   private DataConverter dataConverter;
-  private List<ContextPropagator> contextPropagators;
+  private final List<ContextPropagator> contextPropagators;
 
   /** Key: workflow type name, Value: function that creates SyncWorkflowDefinition instance. */
   private final Map<String, Functions.Func<SyncWorkflowDefinition>> workflowDefinitions =
       Collections.synchronizedMap(new HashMap<>());
 
-  private Map<String, WorkflowImplementationOptions> implementationOptions =
+  private final Map<String, WorkflowImplementationOptions> implementationOptions =
       Collections.synchronizedMap(new HashMap<>());
 
   private final Map<Class<?>, Functions.Func<?>> workflowImplementationFactories =
       Collections.synchronizedMap(new HashMap<>());
 
   private final ExecutorService threadPool;
-  private WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache cache;
 
   POJOWorkflowImplementationFactory(
       DataConverter dataConverter,

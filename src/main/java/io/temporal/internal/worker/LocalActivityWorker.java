@@ -207,9 +207,6 @@ public final class LocalActivityWorker implements SuspendableWorker {
     }
 
     private ActivityTaskHandler.Result handleLocalActivity(Task task) throws InterruptedException {
-      if (log.isTraceEnabled()) {
-        log.trace("handleLocalActivity begin" + task.getActivityId());
-      }
       ExecuteLocalActivityParameters params = task.params;
       PollActivityTaskQueueResponse.Builder activityTask = params.getActivityTask();
       Map<String, String> activityTypeTag =
@@ -230,9 +227,6 @@ public final class LocalActivityWorker implements SuspendableWorker {
       if (result.getTaskCompleted() != null
           || result.getTaskCancelled() != null
           || !activityTask.hasRetryPolicy()) {
-        if (log.isTraceEnabled()) {
-          log.trace("handleLocalActivity " + activityTask.getActivityId() + " succeeded");
-        }
         return result;
       }
 
@@ -259,9 +253,6 @@ public final class LocalActivityWorker implements SuspendableWorker {
           timeout.compareTo(Duration.ZERO) > 0 ? Optional.of(timeout) : Optional.empty();
       if (retryOptions.shouldRethrow(
           result.getTaskFailed().getFailure(), expiration, attempt, elapsedTotal, sleepMillis)) {
-        if (log.isTraceEnabled()) {
-          log.trace("handleLocalActivity failed1 ");
-        }
         return result;
       } else {
         result.setBackoff(Duration.ofMillis(sleepMillis));
@@ -272,18 +263,8 @@ public final class LocalActivityWorker implements SuspendableWorker {
       if (elapsedTask + sleepMillis < task.localRetryThreshold * 1000) {
         Thread.sleep(sleepMillis);
         activityTask.setAttempt(attempt + 1);
-        if (log.isTraceEnabled()) {
-          log.trace(
-              "handleLocalActivity "
-                  + activityTask.getActivityId()
-                  + " retrying. Attempt="
-                  + (attempt + 1));
-        }
         return handleLocalActivity(task);
       } else {
-        if (log.isTraceEnabled()) {
-          log.trace("handleLocalActivity " + activityTask.getActivityId() + " failed2: ");
-        }
         return result;
       }
     }

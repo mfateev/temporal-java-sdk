@@ -51,7 +51,7 @@ public class PollWorkflowTaskDispatcherTests {
 
   private TestWorkflowService testService;
   private WorkflowServiceStubs service;
-  private Scope metricsScope = new NoopScope();
+  private final Scope metricsScope = new NoopScope();
 
   @Before
   public void setUp() {

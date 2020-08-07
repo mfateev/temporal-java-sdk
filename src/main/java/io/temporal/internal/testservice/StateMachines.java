@@ -1312,13 +1312,6 @@ class StateMachines {
     ctx.addEvent(event);
     ctx.onCommit(
         (historySize) -> {
-          if (log.isTraceEnabled()) {
-            log.trace(
-                "completeWorkflowTask commit workflowId="
-                    + data.startRequest.getWorkflowId()
-                    + ", lastSuccessfulStartedEventId="
-                    + data.startedEventId);
-          }
           data.lastSuccessfulStartedEventId = data.startedEventId;
           data.clear();
         });

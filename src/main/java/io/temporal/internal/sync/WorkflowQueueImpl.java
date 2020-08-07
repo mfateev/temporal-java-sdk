@@ -152,7 +152,7 @@ final class WorkflowQueueImpl<E> implements WorkflowQueue<E> {
 
   private static class MappedQueueConsumer<R, E> implements QueueConsumer<R> {
 
-    private QueueConsumer<E> source;
+    private final QueueConsumer<E> source;
     private final Functions.Func1<? super E, ? extends R> mapper;
 
     public MappedQueueConsumer(

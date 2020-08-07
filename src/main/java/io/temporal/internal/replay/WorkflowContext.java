@@ -40,14 +40,14 @@ final class WorkflowContext {
   private final long runStartedTimestampMillis;
   private boolean cancelRequested;
   private ContinueAsNewWorkflowExecutionCommandAttributes continueAsNewOnCompletion;
-  private WorkflowExecutionStartedEventAttributes startedAttributes;
+  private final WorkflowExecutionStartedEventAttributes startedAttributes;
   private final String namespace;
   // RunId can change when reset happens. This remembers the actual runId that is used
   // as in this particular part of the history.
   private String currentRunId;
   private SearchAttributes.Builder searchAttributes;
-  private List<ContextPropagator> contextPropagators;
-  private WorkflowExecution workflowExecution;
+  private final List<ContextPropagator> contextPropagators;
+  private final WorkflowExecution workflowExecution;
 
   WorkflowContext(
       String namespace,

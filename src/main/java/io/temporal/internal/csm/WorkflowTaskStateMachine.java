@@ -30,7 +30,19 @@ public final class WorkflowTaskStateMachine
         WorkflowTaskStateMachine.State, WorkflowTaskStateMachine.Action, WorkflowTaskStateMachine> {
 
   public interface Listener {
-    void workflowTaskStarted(long startEventId, long currentTimeMillis);
+    /**
+     * Called for each WorkflowTaskStarted event.
+     *
+     * @param startEventId eventId of the WorkflowTaskStarted event.
+     * @param currentTimeMillis time of the workflow taken from the WorkflowTaskStarted event
+     *     timestamp.
+     * @param nonProcessedWorkflowTask true if the task is the task that wasn't processed. During
+     *     workflow execution this is the last event in the history. During replay (due to query for
+     *     example) the last workflow task still can return false if it is followed by other events
+     *     like WorkflowExecutionCompleted.
+     */
+    void workflowTaskStarted(
+        long startEventId, long currentTimeMillis, boolean nonProcessedWorkflowTask);
 
     void updateRunId(String currentRunId);
   }
@@ -91,14 +103,16 @@ public final class WorkflowTaskStateMachine
     currentTimeMillis = Timestamps.toMillis(currentEvent.getEventTime());
     startedEventId = currentEvent.getEventId();
     // The last started event in the history. So no completed is expected.
-    if (currentEvent.getEventId() >= workflowTaskStartedEventId) {
+    if (currentEvent.getEventId() >= workflowTaskStartedEventId && !hasNextEvent) {
       handleCompleted();
     }
   }
 
   /** Only update current time if a decision task has completed successfully. */
   private void handleCompleted() {
-    listener.workflowTaskStarted(startedEventId, currentTimeMillis);
+    boolean lastTaskInHistory =
+        currentEvent.getEventId() >= workflowTaskStartedEventId && !hasNextEvent;
+    listener.workflowTaskStarted(startedEventId, currentTimeMillis, lastTaskInHistory);
   }
 
   private void handleFailed() {

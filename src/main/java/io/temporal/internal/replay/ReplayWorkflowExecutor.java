@@ -167,8 +167,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     localActivityCompletionSink = historyEvent -> localActivityCompletionQueue.add(historyEvent);
   }
 
-  private void handleEvent(HistoryEvent event) {
-    entityManager.handleEvent(event);
+  private void handleEvent(HistoryEvent event, boolean hasNextEvent) {
+    entityManager.handleEvent(event, hasNextEvent);
   }
 
   private void eventLoop() {
@@ -275,7 +275,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       Iterator<HistoryEvent> iterator = workflowTaskWithHistoryIterator.getHistory();
       while (iterator.hasNext()) {
         HistoryEvent event = iterator.next();
-        handleEvent(event);
+        handleEvent(event, iterator.hasNext());
       }
     } catch (Throwable e) {
       WorkflowImplementationOptions implementationOptions =
@@ -356,13 +356,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     Duration maxProcessingTime = getWorkflowTaskTimeout().multipliedBy(4).dividedBy(5);
     while (true) {
       List<ExecuteLocalActivityParameters> laRequests = entityManager.takeLocalActivityRequests();
-      if (log.isTraceEnabled()) {
-        log.trace(
-            "processLocalActivityRequests taskCount="
-                + laTaskCount
-                + ", localActivityRequests="
-                + laRequests);
-      }
       long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
       for (ExecuteLocalActivityParameters laRequest : laRequests) {
         // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
@@ -380,7 +373,6 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         }
       }
       if (laTaskCount == 0) {
-        log.trace("processLocalActivityRequests completed taskCount=" + laTaskCount);
         break;
       }
       while (true) {
@@ -392,18 +384,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
         ActivityTaskHandler.Result laCompletion;
         // Do not wait under lock.
         try {
-          if (log.isTraceEnabled()) {
-            log.trace(
-                "processLocalActivityRequests poll LA completion timeout="
-                    + maxWaitAllowed
-                    + ", taskCount="
-                    + laTaskCount);
-          }
           laCompletion =
               localActivityCompletionQueue.poll(maxWaitAllowed.toMillis(), TimeUnit.MILLISECONDS);
-          if (log.isTraceEnabled()) {
-            log.trace("processLocalActivityRequests localActivityCompletion=" + laCompletion);
-          }
           if (laCompletion == null) {
             // Need to force a new task
             break;
@@ -426,7 +408,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     private final Duration retryServiceOperationInitialInterval = Duration.ofMillis(200);
     private final Duration retryServiceOperationMaxInterval = Duration.ofSeconds(4);
     private final Duration paginationStart = Duration.ofMillis(System.currentTimeMillis());
-    private Duration workflowTaskTimeout;
+    private final Duration workflowTaskTimeout;
 
     private final PollWorkflowTaskQueueResponseOrBuilder task;
     private Iterator<HistoryEvent> current;

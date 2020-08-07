@@ -36,9 +36,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public final class WorkflowExecutorCache {
   private final Scope metricsScope;
-  private LoadingCache<String, WorkflowExecutor> cache;
-  private Lock cacheLock = new ReentrantLock();
-  private Set<String> inProcessing = new HashSet<>();
+  private final LoadingCache<String, WorkflowExecutor> cache;
+  private final Lock cacheLock = new ReentrantLock();
+  private final Set<String> inProcessing = new HashSet<>();
 
   public WorkflowExecutorCache(int workflowCacheSize, Scope scope) {
     Preconditions.checkArgument(workflowCacheSize > 0, "Max cache size must be greater than 0");

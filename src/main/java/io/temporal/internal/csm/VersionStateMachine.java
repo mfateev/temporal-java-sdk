@@ -125,7 +125,7 @@ public final class VersionStateMachine {
     private final int minSupported;
     private final int maxSupported;
 
-    private Functions.Proc1<Integer> resultCallback;
+    private final Functions.Proc1<Integer> resultCallback;
 
     InvocationStateMachine(int minSupported, int maxSupported, Functions.Proc1<Integer> callback) {
       super(newInvocationStateMachine(), VersionStateMachine.this.commandSink);
@@ -152,7 +152,7 @@ public final class VersionStateMachine {
     }
 
     @Override
-    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
+    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
@@ -173,7 +173,7 @@ public final class VersionStateMachine {
         // still can be followed by an event with our changeId.
         return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
       }
-      super.handleEvent(event);
+      super.handleEvent(event, hasNextEvent);
       return EntityManager.HandleEventStatus.OK;
     }
 

@@ -53,7 +53,7 @@ class SyncWorkflow implements ReplayWorkflow {
   private final ExecutorService threadPool;
   private final SyncWorkflowDefinition workflow;
   WorkflowImplementationOptions workflowImplementationOptions;
-  private WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache cache;
   private WorkflowExecuteRunnable workflowProc;
   private DeterministicRunner runner;
 

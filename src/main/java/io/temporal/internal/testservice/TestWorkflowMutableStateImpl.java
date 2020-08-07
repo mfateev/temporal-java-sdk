@@ -147,7 +147,7 @@ class TestWorkflowMutableStateImpl implements TestWorkflowMutableState {
   private final Map<String, StateMachine<SignalExternalData>> externalSignals = new HashMap<>();
   private final Map<String, StateMachine<CancelExternalData>> externalCancellations =
       new HashMap<>();
-  private StateMachine<WorkflowData> workflow;
+  private final StateMachine<WorkflowData> workflow;
   /** A single workflow task state machine is used for the whole workflow lifecycle. */
   private final StateMachine<WorkflowTaskData> workflowTaskStateMachine;
 

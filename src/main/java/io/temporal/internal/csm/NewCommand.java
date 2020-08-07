@@ -76,11 +76,11 @@ public class NewCommand {
     }
   }
 
-  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
+  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
     if (canceled) {
       return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
     }
-    EntityManager.HandleEventStatus result = commands.handleEvent(event);
+    EntityManager.HandleEventStatus result = commands.handleEvent(event, hasNextEvent);
     if (result == EntityManager.HandleEventStatus.OK) {
       initialCommandEventId = Optional.of(event.getEventId());
     }

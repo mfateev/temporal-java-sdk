@@ -33,7 +33,7 @@ final class LocalActivityPollTask
   private static final Logger log = LoggerFactory.getLogger(LocalActivityPollTask.class);
 
   private static final int QUEUE_SIZE = 1000;
-  private BlockingQueue<LocalActivityWorker.Task> pendingTasks =
+  private final BlockingQueue<LocalActivityWorker.Task> pendingTasks =
       new ArrayBlockingQueue<>(QUEUE_SIZE);
 
   @Override

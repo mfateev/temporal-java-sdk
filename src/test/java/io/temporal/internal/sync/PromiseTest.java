@@ -604,9 +604,7 @@ public class PromiseTest {
             () -> {
               trace.add("root begin");
               {
-                Promise all =
-                    Promise.anyOf(
-                        new Promise[] {Workflow.newPromise(), Workflow.newPromise("bar")});
+                Promise all = Promise.anyOf(Workflow.newPromise(), Workflow.newPromise("bar"));
                 trace.add("root array isCompleted=" + all.isCompleted());
               }
               {

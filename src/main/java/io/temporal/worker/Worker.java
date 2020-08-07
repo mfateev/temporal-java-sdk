@@ -64,7 +64,7 @@ public final class Worker implements Suspendable {
   private final WorkflowExecutorCache cache;
   private final String stickyTaskQueueName;
   private final Scope metricsScope;
-  private ThreadPoolExecutor threadPoolExecutor;
+  private final ThreadPoolExecutor threadPoolExecutor;
 
   /**
    * Creates worker that connects to an instance of the Temporal Service.

@@ -30,6 +30,7 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
   protected final Functions.Proc1<NewCommand> commandSink;
 
   protected HistoryEvent currentEvent;
+  protected boolean hasNextEvent;
 
   public EntityStateMachineBase(
       StateMachine<State, Action, Data> stateMachine, Functions.Proc1<NewCommand> commandSink) {
@@ -48,11 +49,12 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
   }
 
   @Override
-  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event) {
+  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
     if (!stateMachine.getValidEventTypes().contains(event.getEventType())) {
       return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
     }
     this.currentEvent = event;
+    this.hasNextEvent = hasNextEvent;
     try {
       stateMachine.handleEvent(event.getEventType(), (Data) this);
     } finally {
@@ -75,5 +77,10 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
 
   protected State getState() {
     return stateMachine.getState();
+  }
+
+  @Override
+  public String toString() {
+    return this.getClass().getSimpleName() + "{" + "state=" + stateMachine + '}';
   }
 }

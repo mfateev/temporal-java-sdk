@@ -44,10 +44,10 @@ public final class PollWorkflowTaskDispatcher
   private final Map<String, Consumer<PollWorkflowTaskQueueResponse>> subscribers =
       new ConcurrentHashMap<>();
   private final Scope metricsScope;
-  private WorkflowServiceStubs service;
+  private final WorkflowServiceStubs service;
   private Thread.UncaughtExceptionHandler uncaughtExceptionHandler =
       (t, e) -> log.error("uncaught exception", e);
-  private AtomicBoolean shutdown = new AtomicBoolean();
+  private final AtomicBoolean shutdown = new AtomicBoolean();
 
   public PollWorkflowTaskDispatcher(WorkflowServiceStubs service, Scope metricsScope) {
     this.service = Objects.requireNonNull(service);

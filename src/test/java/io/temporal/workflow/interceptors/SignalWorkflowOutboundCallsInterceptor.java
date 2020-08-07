@@ -40,8 +40,8 @@ import java.util.function.Supplier;
 
 public class SignalWorkflowOutboundCallsInterceptor implements WorkflowOutboundCallsInterceptor {
 
-  private Function<Object[], Object[]> overrideArgs;
-  private Function<String, String> overrideSignalName;
+  private final Function<Object[], Object[]> overrideArgs;
+  private final Function<String, String> overrideSignalName;
   private final WorkflowOutboundCallsInterceptor next;
 
   public SignalWorkflowOutboundCallsInterceptor(

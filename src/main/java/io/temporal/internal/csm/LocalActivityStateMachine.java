@@ -54,7 +54,9 @@ public final class LocalActivityStateMachine
 
   private final DataConverter dataConverter = DataConverter.getDefaultInstance();
 
+  private final Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink;
   private final Functions.Proc2<Optional<Payloads>, Failure> callback;
+
   private final ExecuteLocalActivityParameters localActivityParameters;
   private final Functions.Func<Boolean> replaying;
   /** Accepts proposed current time. Returns accepted current time. */
@@ -76,9 +78,15 @@ public final class LocalActivityStateMachine
       Functions.Func1<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback,
+      Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink,
       Functions.Proc1<NewCommand> commandSink) {
     return new LocalActivityStateMachine(
-        replaying, setCurrentTimeCallback, localActivityParameters, callback, commandSink);
+        replaying,
+        setCurrentTimeCallback,
+        localActivityParameters,
+        callback,
+        localActivityRequestSink,
+        commandSink);
   }
 
   private LocalActivityStateMachine(
@@ -86,11 +94,13 @@ public final class LocalActivityStateMachine
       Functions.Func1<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       Functions.Proc2<Optional<Payloads>, Failure> callback,
+      Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.replaying = replaying;
     this.setCurrentTimeCallback = setCurrentTimeCallback;
     this.localActivityParameters = localActivityParameters;
+    this.localActivityRequestSink = localActivityRequestSink;
     this.callback = callback;
     action(Action.CHECK_EXECUTION_STATE);
     action(Action.SCHEDULE);
@@ -100,7 +110,8 @@ public final class LocalActivityStateMachine
     CHECK_EXECUTION_STATE,
     SCHEDULE,
     GET_REQUEST,
-    HANDLE_RESPONSE
+    HANDLE_RESPONSE,
+    NON_REPLAY_WORKFLOW_TASK_STARTED
   }
 
   enum State {
@@ -124,18 +135,27 @@ public final class LocalActivityStateMachine
             Action.CHECK_EXECUTION_STATE,
             new State[] {State.REPLAYING, State.EXECUTING},
             LocalActivityStateMachine::getExecutionState)
-        .add(State.EXECUTING, Action.SCHEDULE, State.REQUEST_PREPARED)
+        .add(
+            State.EXECUTING,
+            Action.SCHEDULE,
+            State.REQUEST_PREPARED,
+            LocalActivityStateMachine::sendRequest)
         .add(State.REQUEST_PREPARED, Action.GET_REQUEST, State.REQUEST_SENT)
         .add(
             State.REQUEST_SENT,
             Action.HANDLE_RESPONSE,
             State.MARKER_COMMAND_CREATED,
             LocalActivityStateMachine::createMarker)
+        .add(State.REQUEST_SENT, Action.NON_REPLAY_WORKFLOW_TASK_STARTED, State.REQUEST_SENT)
         .add(
             State.MARKER_COMMAND_CREATED,
             CommandType.COMMAND_TYPE_RECORD_MARKER,
             State.RESULT_NOTIFIED,
             LocalActivityStateMachine::notifyResultFromResponse)
+        .add(
+            State.MARKER_COMMAND_CREATED,
+            Action.NON_REPLAY_WORKFLOW_TASK_STARTED,
+            State.MARKER_COMMAND_CREATED)
         .add(
             State.RESULT_NOTIFIED,
             EventType.EVENT_TYPE_MARKER_RECORDED,
@@ -145,7 +165,20 @@ public final class LocalActivityStateMachine
             State.WAITING_MARKER_EVENT,
             EventType.EVENT_TYPE_MARKER_RECORDED,
             State.MARKER_COMMAND_RECORDED,
-            LocalActivityStateMachine::notifyResultFromEvent);
+            LocalActivityStateMachine::notifyResultFromEvent)
+        .add(
+            // This is to cover the following edge case:
+            // 1. WorkflowTaskStarted
+            // 2. Local activity scheduled
+            // 3. Local activity taken and started execution
+            // 4. Forced workflow task is started
+            // 5. Workflow task fails or worker crashes
+            // When replaying the above sequence without this state transition the local activity
+            // scheduled at step 2 is going to be lost.
+            State.WAITING_MARKER_EVENT,
+            Action.NON_REPLAY_WORKFLOW_TASK_STARTED,
+            State.REQUEST_PREPARED,
+            LocalActivityStateMachine::sendRequest);
   }
 
   State getExecutionState() {
@@ -157,14 +190,21 @@ public final class LocalActivityStateMachine
     //    action(Action.CANCEL);
   }
 
-  public ExecuteLocalActivityParameters getRequest() {
+  public void sendRequest() {
+    localActivityRequestSink.apply(localActivityParameters);
+  }
+
+  public void requestSent() {
     action(Action.GET_REQUEST);
-    return localActivityParameters;
   }
 
   public void handleCompletion(ActivityTaskHandler.Result result) {
     this.result = result;
     action(Action.HANDLE_RESPONSE);
+  }
+
+  public void nonReplayWorkflowTaskStarted() {
+    action(Action.NON_REPLAY_WORKFLOW_TASK_STARTED);
   }
 
   private void createMarker() {

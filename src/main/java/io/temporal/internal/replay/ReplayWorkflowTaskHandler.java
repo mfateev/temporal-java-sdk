@@ -73,8 +73,8 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
   private final SingleWorkerOptions options;
   private final Duration stickyTaskQueueScheduleToStartTimeout;
   private final Functions.Func<Boolean> shutdownFn;
-  private WorkflowServiceStubs service;
-  private String stickyTaskQueueName;
+  private final WorkflowServiceStubs service;
+  private final String stickyTaskQueueName;
   private final BiFunction<LocalActivityWorker.Task, Duration, Boolean> localActivityTaskPoller;
 
   public ReplayWorkflowTaskHandler(

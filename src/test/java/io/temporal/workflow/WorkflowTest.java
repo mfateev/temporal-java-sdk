@@ -175,7 +175,7 @@ public class WorkflowTest {
   private static final String serviceAddress = System.getenv("TEMPORAL_SERVICE_ADDRESS");
   // Enable to regenerate JsonFiles used for replay testing.
   // Only enable when USE_DOCKER_SERVICE is true
-  private static boolean regenerateJsonFiles = false;
+  private static final boolean regenerateJsonFiles = false;
 
   @Rule public TestName testName = new TestName();
 
@@ -198,7 +198,7 @@ public class WorkflowTest {
   public static final String NAMESPACE = "UnitTest";
   private static final Logger log = LoggerFactory.getLogger(WorkflowTest.class);
 
-  private static String UUID_REGEXP =
+  private static final String UUID_REGEXP =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
   private String taskQueue;
@@ -209,8 +209,8 @@ public class WorkflowTest {
   private WorkflowClient workflowClient;
   private TestWorkflowEnvironment testEnvironment;
   private ScheduledExecutorService scheduledExecutor;
-  private List<ScheduledFuture<?>> delayedCallbacks = new ArrayList<>();
-  private AtomicReference<String> lastStartedWorkflowType = new AtomicReference<>();
+  private final List<ScheduledFuture<?>> delayedCallbacks = new ArrayList<>();
+  private final AtomicReference<String> lastStartedWorkflowType = new AtomicReference<>();
   private static WorkflowServiceStubs service;
 
   @BeforeClass()
@@ -1266,7 +1266,6 @@ public class WorkflowTest {
         Workflow.newDetachedCancellationScope(
                 () -> assertEquals("a12", testActivities.activity2("a1", 2)))
             .run();
-        ;
       }
       try {
         Workflow.newTimer(Duration.ofHours(1)).get();
@@ -1275,7 +1274,6 @@ public class WorkflowTest {
         Workflow.newDetachedCancellationScope(
                 () -> assertEquals("a123", testActivities.activity3("a1", 2, 3)))
             .run();
-        ;
       }
       return "result";
     }
@@ -3317,7 +3315,7 @@ public class WorkflowTest {
     assertEquals("foo", client.execute("not empty"));
   }
 
-  private static String childReexecuteId = UUID.randomUUID().toString();
+  private static final String childReexecuteId = UUID.randomUUID().toString();
 
   @WorkflowInterface
   public interface WorkflowIdReusePolicyParent {
@@ -3872,7 +3870,7 @@ public class WorkflowTest {
     assertEquals(" awoken i=1 loop i=1 awoken i=2 loop i=2 awoken i=3", result);
   }
 
-  private static Map<String, AtomicInteger> retryCount = new ConcurrentHashMap<>();
+  private static final Map<String, AtomicInteger> retryCount = new ConcurrentHashMap<>();
 
   @WorkflowInterface
   public interface TestWorkflowRetry {
@@ -5817,6 +5815,43 @@ public class WorkflowTest {
     assertEquals(activitiesImpl.toString(), 1, activitiesImpl.invocations.size());
   }
 
+  public static class TestLongLocalActivityWorkflowTaskHeartbeatFailureWorkflowImpl
+      implements TestWorkflow1 {
+
+    static boolean invoked;
+
+    @Override
+    public String execute(String taskQueue) {
+      TestActivities localActivities =
+          Workflow.newLocalActivityStub(TestActivities.class, newLocalActivityOptions1());
+      String result = localActivities.sleepActivity(5000, 123);
+      if (!invoked) {
+        invoked = true;
+        throw new Error("Simulate decision failure to force replay");
+      }
+      return result;
+    }
+  }
+
+  /**
+   * Test that local activity is not lost during replay if it was started before forced
+   * WorkflowTask.
+   */
+  @Test
+  public void testLongLocalActivityWorkflowTaskHeartbeatFailure() {
+    startWorkerFor(TestLongLocalActivityWorkflowTaskHeartbeatFailureWorkflowImpl.class);
+    WorkflowOptions options =
+        WorkflowOptions.newBuilder()
+            .setWorkflowRunTimeout(Duration.ofMinutes(5))
+            .setWorkflowTaskTimeout(Duration.ofSeconds(2))
+            .setTaskQueue(taskQueue)
+            .build();
+    TestWorkflow1 workflowStub = workflowClient.newWorkflowStub(TestWorkflow1.class, options);
+    String result = workflowStub.execute(taskQueue);
+    assertEquals("sleepActivity123", result);
+    assertEquals(activitiesImpl.toString(), 2, activitiesImpl.invocations.size());
+  }
+
   public static class TestParallelLocalActivityExecutionWorkflowImpl implements TestWorkflow1 {
     @Override
     public String execute(String taskQueue) {
@@ -5942,7 +5977,7 @@ public class WorkflowTest {
   }
 
   public static class SignalOrderingWorkflowImpl implements SignalOrderingWorkflow {
-    private List<String> signals = new ArrayList<>();
+    private final List<String> signals = new ArrayList<>();
 
     @Override
     public List<String> run() {
@@ -6144,7 +6179,7 @@ public class WorkflowTest {
   }
 
   public static class TestSignalExceptionWorkflowImpl implements TestWorkflowSignaled {
-    private boolean signaled = false;
+    private final boolean signaled = false;
 
     @Override
     public String execute() {
@@ -6397,7 +6432,7 @@ public class WorkflowTest {
       implements TestSignalAndQueryListenerWorkflow {
 
     private boolean register;
-    private List<String> signals = new ArrayList<>();
+    private final List<String> signals = new ArrayList<>();
 
     @Override
     public void execute() {

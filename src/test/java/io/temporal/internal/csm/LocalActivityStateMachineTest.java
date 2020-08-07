@@ -118,7 +118,6 @@ public class LocalActivityStateMachineTest {
                     .putDetails(MARKER_ACTIVITY_ID_KEY, converter.toPayloads("id1").get())
                     .build())
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
-
     assertEquals(new TestHistoryBuilder.HistoryInfo(0, 3), h.getHistoryInfo(1));
     assertEquals(new TestHistoryBuilder.HistoryInfo(3, 8), h.getHistoryInfo(2));
     assertEquals(new TestHistoryBuilder.HistoryInfo(3, 8), h.getHistoryInfo());
@@ -222,5 +221,66 @@ public class LocalActivityStateMachineTest {
       List<Command> commands = manager.takeCommands();
       assertTrue(commands.isEmpty());
     }
+  }
+
+  @Test
+  public void testLocalActivityStateMachineForcedWorkflowTaskFailure() {
+    class TestListener extends TestEntityManagerListenerBase {
+      Optional<Payloads> result;
+
+      @Override
+      protected void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
+        ExecuteLocalActivityParameters parameters1 =
+            new ExecuteLocalActivityParameters(
+                PollActivityTaskQueueResponse.newBuilder()
+                    .setActivityId("id1")
+                    .setActivityType(ActivityType.newBuilder().setName("activity1")));
+        builder
+            .<Optional<Payloads>, Failure>add2(
+                (r, c) -> manager.scheduleLocalActivityTask(parameters1, c))
+            .add((r) -> manager.newCompleteWorkflow(Optional.empty()));
+      }
+    }
+    /*
+        1: EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+        2: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        3: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        4: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        5: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        6: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        7: EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        8: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        9: EVENT_TYPE_WORKFLOW_TASK_STARTED
+        10: EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT
+        11: EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+        12: EVENT_TYPE_WORKFLOW_TASK_STARTED
+    */
+    MarkerRecordedEventAttributes.Builder markerBuilder =
+        MarkerRecordedEventAttributes.newBuilder()
+            .setMarkerName(LOCAL_ACTIVITY_MARKER_NAME)
+            .putDetails(MARKER_TIME_KEY, converter.toPayloads(System.currentTimeMillis()).get());
+    TestHistoryBuilder h =
+        new TestHistoryBuilder()
+            .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED)
+            .addWorkflowTask() // forced due to long running local activity
+            .addWorkflowTask() // forced due to long running local activity
+            .addWorkflowTaskScheduled()
+            .addWorkflowTaskStarted()
+            .addWorkflowTaskTimedOut()
+            .addWorkflowTaskScheduled()
+            .addWorkflowTaskStarted();
+    assertEquals(new TestHistoryBuilder.HistoryInfo(0, 3), h.getHistoryInfo(1));
+    assertEquals(new TestHistoryBuilder.HistoryInfo(3, 6), h.getHistoryInfo(2));
+    assertEquals(new TestHistoryBuilder.HistoryInfo(6, 12), h.getHistoryInfo());
+
+    TestListener listener = new TestListener();
+    manager = new EntityManager(listener);
+
+    h.handleWorkflowTask(manager);
+    List<ExecuteLocalActivityParameters> requests = manager.takeLocalActivityRequests();
+    assertEquals(1, requests.size());
+    assertEquals("id1", requests.get(0).getActivityTask().getActivityId());
+    List<Command> commands = manager.takeCommands();
+    assertTrue(commands.isEmpty());
   }
 }

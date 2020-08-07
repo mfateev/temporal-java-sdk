@@ -64,7 +64,7 @@ class POJOActivityTaskHandler implements ActivityTaskHandler {
   private final ScheduledExecutorService heartbeatExecutor;
   private final Map<String, ActivityTaskExecutor> activities =
       Collections.synchronizedMap(new HashMap<>());
-  private WorkflowServiceStubs service;
+  private final WorkflowServiceStubs service;
   private final String namespace;
   private final ActivityInterceptor[] interceptors;
 

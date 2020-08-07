@@ -96,7 +96,7 @@ public class WorkflowExecutionUtils {
 
   private static final Logger log = LoggerFactory.getLogger(WorkflowExecutionUtils.class);
 
-  private static RpcRetryOptions retryParameters =
+  private static final RpcRetryOptions retryParameters =
       RpcRetryOptions.newBuilder()
           .setBackoffCoefficient(2)
           .setInitialInterval(Duration.ofMillis(500))

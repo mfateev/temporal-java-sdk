@@ -37,8 +37,10 @@ import io.temporal.api.history.v1.WorkflowExecutionCompletedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskCompletedEventAttributes;
+import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskScheduledEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskStartedEventAttributes;
+import io.temporal.api.history.v1.WorkflowTaskTimedOutEventAttributes;
 import io.temporal.internal.common.WorkflowExecutionUtils;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +96,11 @@ class TestHistoryBuilder {
 
   TestHistoryBuilder addWorkflowTaskStarted() {
     add(EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED, workflowTaskScheduledEventId);
+    return this;
+  }
+
+  TestHistoryBuilder addWorkflowTaskTimedOut() {
+    add(EventType.EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT, workflowTaskScheduledEventId);
     return this;
   }
 
@@ -276,7 +283,7 @@ class TestHistoryBuilder {
           started = event.getEventId();
           count++;
           if (count == toTaskIndex || !history.hasNext()) {
-            manager.handleEvent(event);
+            manager.handleEvent(event, false);
             return;
           }
         } else if (history.hasNext()
@@ -287,7 +294,7 @@ class TestHistoryBuilder {
                   + history.peek().getEventId());
         }
       }
-      manager.handleEvent(event);
+      manager.handleEvent(event, history.hasNext());
     }
   }
 
@@ -312,12 +319,14 @@ class TestHistoryBuilder {
         return MarkerRecordedEventAttributes.getDefaultInstance();
       case EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
         return WorkflowExecutionCompletedEventAttributes.getDefaultInstance();
+      case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
+        return WorkflowTaskTimedOutEventAttributes.newBuilder().setScheduledEventId(initialEventId);
+      case EVENT_TYPE_WORKFLOW_TASK_FAILED:
+        return WorkflowTaskFailedEventAttributes.newBuilder().setScheduledEventId(initialEventId);
 
       case EVENT_TYPE_UNSPECIFIED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
       case EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
-      case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
-      case EVENT_TYPE_WORKFLOW_TASK_FAILED:
       case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
       case EVENT_TYPE_ACTIVITY_TASK_STARTED:
       case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
@@ -402,12 +411,18 @@ class TestHistoryBuilder {
           result.setWorkflowExecutionCompletedEventAttributes(
               (WorkflowExecutionCompletedEventAttributes) attributes);
           break;
+        case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
+          result.setWorkflowTaskTimedOutEventAttributes(
+              (WorkflowTaskTimedOutEventAttributes) attributes);
+          break;
+        case EVENT_TYPE_WORKFLOW_TASK_FAILED:
+          result.setWorkflowTaskFailedEventAttributes(
+              (WorkflowTaskFailedEventAttributes) attributes);
+          break;
 
         case EVENT_TYPE_UNSPECIFIED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
         case EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
-        case EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT:
-        case EVENT_TYPE_WORKFLOW_TASK_FAILED:
         case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
         case EVENT_TYPE_ACTIVITY_TASK_STARTED:
         case EVENT_TYPE_ACTIVITY_TASK_COMPLETED:

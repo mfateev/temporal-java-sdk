@@ -194,7 +194,7 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
   }
 
   private class ActivityCallback {
-    private CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
+    private final CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
 
     public void invoke(Optional<Payloads> output, Failure failure) {
       if (failure != null) {

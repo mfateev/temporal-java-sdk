@@ -87,10 +87,10 @@ public final class TestActivityEnvironmentInternal implements TestActivityEnviro
   private ClassConsumerPair<Object> activityHeartbetListener;
   private static final ScheduledExecutorService heartbeatExecutor =
       Executors.newScheduledThreadPool(20);
-  private WorkflowServiceStubs workflowServiceStubs;
-  private Server mockServer;
-  private AtomicBoolean cancellationRequested = new AtomicBoolean();
-  private ManagedChannel channel;
+  private final WorkflowServiceStubs workflowServiceStubs;
+  private final Server mockServer;
+  private final AtomicBoolean cancellationRequested = new AtomicBoolean();
+  private final ManagedChannel channel;
 
   public TestActivityEnvironmentInternal(TestEnvironmentOptions options) {
     this.testEnvironmentOptions =
