@@ -21,9 +21,10 @@ package io.temporal.internal.statemachines;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.workflow.CancelExternalWorkflowException;
 import io.temporal.workflow.Functions;
 
 final class CancelExternalStateMachine
@@ -34,7 +35,7 @@ final class CancelExternalStateMachine
 
   private final RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes;
 
-  private final Functions.Proc1<HistoryEvent> completionCallback;
+  private final Functions.Proc2<Void, RuntimeException> completionCallback;
 
   /**
    * @param attributes attributes to use to cancel external worklfow
@@ -44,14 +45,14 @@ final class CancelExternalStateMachine
    */
   public static void newInstance(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc1<HistoryEvent> completionCallback,
+      Functions.Proc2<Void, RuntimeException> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     new CancelExternalStateMachine(attributes, completionCallback, commandSink);
   }
 
   private CancelExternalStateMachine(
       RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes,
-      Functions.Proc1<HistoryEvent> completionCallback,
+      Functions.Proc2<Void, RuntimeException> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.requestCancelAttributes = requestCancelAttributes;
@@ -91,12 +92,12 @@ final class CancelExternalStateMachine
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
             State.CANCEL_REQUESTED,
-            CancelExternalStateMachine::notifyCompletion)
+            CancelExternalStateMachine::notifyCompleted)
         .add(
             State.REQUEST_CANCEL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
             State.REQUEST_CANCEL_FAILED,
-            CancelExternalStateMachine::notifyCompletion);
+            CancelExternalStateMachine::notifyFailed);
   }
 
   private void createCancelExternalCommand() {
@@ -107,8 +108,17 @@ final class CancelExternalStateMachine
             .build());
   }
 
-  private void notifyCompletion() {
-    completionCallback.apply(currentEvent);
+  private void notifyCompleted() {
+    completionCallback.apply(null, null);
+  }
+
+  private void notifyFailed() {
+    WorkflowExecution execution =
+        WorkflowExecution.newBuilder()
+            .setWorkflowId(requestCancelAttributes.getWorkflowId())
+            .setRunId(requestCancelAttributes.getRunId())
+            .build();
+    completionCallback.apply(null, new CancelExternalWorkflowException(execution, "", null));
   }
 
   public static String asPlantUMLStateDiagram() {

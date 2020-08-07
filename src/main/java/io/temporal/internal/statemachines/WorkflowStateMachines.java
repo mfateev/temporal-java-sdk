@@ -527,7 +527,7 @@ public final class WorkflowStateMachines {
                 .setWorkflowId(attributes.getWorkflowId())
                 .setNamespace(attributes.getNamespace())
                 .build(),
-            (event) -> {
+            (r, e) -> { // TODO(maxim): Decide what to do if an error is passed to the callback.
               if (cancellationType == ChildWorkflowCancellationType.WAIT_CANCELLATION_REQUESTED) {
                 notifyChildCancelled(attributes, completionCallback);
               }
@@ -550,11 +550,10 @@ public final class WorkflowStateMachines {
   /**
    * @param attributes
    * @param completionCallback invoked when signal delivery completes of fails. The following types
-   *     of events can be passed to the callback: ExternalWorkflowExecutionSignaledEvent,
    */
   public Functions.Proc signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc2<Void, Exception> completionCallback) {
+      Functions.Proc2<Void, Failure> completionCallback) {
     checkEventLoopExecuting();
     return SignalExternalStateMachine.newInstance(attributes, completionCallback, commandSink);
   }
@@ -562,11 +561,10 @@ public final class WorkflowStateMachines {
   /**
    * @param attributes attributes to use to cancel external worklfow
    * @param completionCallback one of ExternalWorkflowExecutionCancelRequestedEvent,
-   *     RequestCancelExternalWorkflowExecutionFailedEvent
    */
   public void requestCancelExternalWorkflowExecution(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc1<HistoryEvent> completionCallback) {
+      Functions.Proc2<Void, RuntimeException> completionCallback) {
     checkEventLoopExecuting();
     CancelExternalStateMachine.newInstance(attributes, completionCallback, commandSink);
   }

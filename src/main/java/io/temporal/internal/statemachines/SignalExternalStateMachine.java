@@ -21,13 +21,13 @@ package io.temporal.internal.statemachines;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
-import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.failure.v1.ApplicationFailureInfo;
+import io.temporal.api.failure.v1.CanceledFailureInfo;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
-import io.temporal.failure.CanceledFailure;
 import io.temporal.workflow.Functions;
-import io.temporal.workflow.SignalExternalWorkflowException;
 
 final class SignalExternalStateMachine
     extends EntityStateMachineInitialCommand<
@@ -37,7 +37,7 @@ final class SignalExternalStateMachine
 
   private final SignalExternalWorkflowExecutionCommandAttributes signalAttributes;
 
-  private final Functions.Proc2<Void, Exception> completionCallback;
+  private final Functions.Proc2<Void, Failure> completionCallback;
 
   /**
    * Register new instance of the signal commands
@@ -51,7 +51,7 @@ final class SignalExternalStateMachine
    */
   public static Functions.Proc newInstance(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<Void, Exception> completionCallback,
+      Functions.Proc2<Void, Failure> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     SignalExternalStateMachine commands =
         new SignalExternalStateMachine(signalAttributes, completionCallback, commandSink);
@@ -60,7 +60,7 @@ final class SignalExternalStateMachine
 
   private SignalExternalStateMachine(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<Void, Exception> completionCallback,
+      Functions.Proc2<Void, Failure> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.signalAttributes = signalAttributes;
@@ -138,18 +138,22 @@ final class SignalExternalStateMachine
   private void notifyFailed() {
     SignalExternalWorkflowExecutionFailedEventAttributes attributes =
         currentEvent.getSignalExternalWorkflowExecutionFailedEventAttributes();
-    WorkflowExecution signaledExecution =
-        WorkflowExecution.newBuilder()
-            .setWorkflowId(attributes.getWorkflowExecution().getWorkflowId())
-            .setRunId(attributes.getWorkflowExecution().getRunId())
+    // TODO(maxim): Special failure type
+    Failure failure =
+        Failure.newBuilder()
+            .setApplicationFailureInfo(ApplicationFailureInfo.newBuilder().build())
+            .setMessage("SignalExternalWorkflowExecution failed: " + attributes.getCause())
             .build();
-    RuntimeException failure = new SignalExternalWorkflowException(signaledExecution, null);
     completionCallback.apply(null, failure);
   }
 
   private void cancelSignalExternalCommand() {
     cancelInitialCommand();
-    CanceledFailure failure = new CanceledFailure("Signal external workflow execution canceled");
+    Failure failure =
+        Failure.newBuilder()
+            .setMessage("Signal external workflow execution canceled")
+            .setCanceledFailureInfo(CanceledFailureInfo.newBuilder().build())
+            .build();
     completionCallback.apply(null, failure);
   }
 

@@ -68,7 +68,6 @@ import io.temporal.workflow.ContinueAsNewOptions;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Promise;
-import io.temporal.workflow.SignalExternalWorkflowException;
 import io.temporal.workflow.Workflow;
 import java.lang.reflect.Type;
 import java.time.Duration;
@@ -739,7 +738,9 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
               if (failure != null) {
                 runner.executeInWorkflowThread(
                     "child workflow failure callback",
-                    () -> result.completeExceptionally(mapSignalWorkflowException(failure)));
+                    () ->
+                        result.completeExceptionally(
+                            FailureConverter.failureToException(failure, getDataConverter())));
               } else {
                 runner.executeInWorkflowThread(
                     "child workflow completion callback", () -> result.complete(output));
@@ -813,21 +814,17 @@ final class SyncWorkflowContext implements WorkflowOutboundCallsInterceptor {
 
   @Override
   public Promise<Void> cancelWorkflow(WorkflowExecution execution) {
-    return context.requestCancelExternalWorkflowExecution(execution);
-  }
-
-  private RuntimeException mapSignalWorkflowException(Exception failure) {
-    if (failure == null) {
-      return null;
-    }
-    if (failure instanceof CanceledFailure) {
-      return (CanceledFailure) failure;
-    }
-
-    if (!(failure instanceof SignalExternalWorkflowException)) {
-      return new IllegalArgumentException("Unexpected exception type: ", failure);
-    }
-    return (SignalExternalWorkflowException) failure;
+    CompletablePromise<Void> result = Workflow.newPromise();
+    context.requestCancelExternalWorkflowExecution(
+        execution,
+        (r, exception) -> {
+          if (exception == null) {
+            result.complete(null);
+          } else {
+            result.completeExceptionally(exception);
+          }
+        });
+    return result;
   }
 
   public Scope getMetricsScope() {

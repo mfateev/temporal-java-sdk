@@ -32,7 +32,6 @@ import io.temporal.common.context.ContextPropagator;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
-import io.temporal.workflow.Promise;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +42,8 @@ import java.util.UUID;
 /**
  * Represents the context for workflow. Should only be used within the scope of workflow definition
  * code, meaning any code which is not part of activity implementations.
+ *
+ * <p>TODO(maxim): Get rid of any Exceptions in the callbacks. They should only return Failure.
  */
 public interface ReplayWorkflowContext extends ReplayAware {
 
@@ -129,9 +130,10 @@ public interface ReplayWorkflowContext extends ReplayAware {
 
   Functions.Proc1<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      Functions.Proc2<Void, Exception> callback);
+      Functions.Proc2<Void, Failure> callback);
 
-  Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution);
+  void requestCancelExternalWorkflowExecution(
+      WorkflowExecution execution, Functions.Proc2<Void, RuntimeException> callback);
 
   void continueAsNewOnCompletion(ContinueAsNewWorkflowExecutionCommandAttributes attributes);
 

@@ -34,7 +34,6 @@ import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
-import io.temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import io.temporal.common.context.ContextPropagator;
@@ -43,13 +42,9 @@ import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.metrics.ReplayAwareScope;
 import io.temporal.internal.statemachines.WorkflowStateMachines;
 import io.temporal.internal.worker.SingleWorkerOptions;
-import io.temporal.workflow.CancelExternalWorkflowException;
-import io.temporal.workflow.CompletablePromise;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
-import io.temporal.workflow.Promise;
-import io.temporal.workflow.Workflow;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -245,41 +240,21 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public Functions.Proc1<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      Functions.Proc2<Void, Exception> callback) {
+      Functions.Proc2<Void, Failure> callback) {
     Functions.Proc cancellationHandler =
         workflowStateMachines.signalExternalWorkflowExecution(attributes.build(), callback);
     return (e) -> cancellationHandler.apply();
   }
 
   @Override
-  public Promise<Void> requestCancelExternalWorkflowExecution(WorkflowExecution execution) {
+  public void requestCancelExternalWorkflowExecution(
+      WorkflowExecution execution, Functions.Proc2<Void, RuntimeException> callback) {
     RequestCancelExternalWorkflowExecutionCommandAttributes attributes =
         RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
             .setWorkflowId(execution.getWorkflowId())
             .setRunId(execution.getRunId())
             .build();
-    CompletablePromise<Void> result = Workflow.newPromise();
-    workflowStateMachines.requestCancelExternalWorkflowExecution(
-        attributes, event -> handleCancelExternalCallback(result, event));
-    return result;
-  }
-
-  private void handleCancelExternalCallback(CompletablePromise<Void> result, HistoryEvent event) {
-    switch (event.getEventType()) {
-      case EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED:
-        result.complete(null);
-        return;
-      case EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED:
-        {
-          RequestCancelExternalWorkflowExecutionFailedEventAttributes attributes =
-              event.getRequestCancelExternalWorkflowExecutionFailedEventAttributes();
-          result.completeExceptionally(
-              new CancelExternalWorkflowException(attributes.getWorkflowExecution(), "", null));
-          return;
-        }
-      default:
-        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
-    }
+    workflowStateMachines.requestCancelExternalWorkflowExecution(attributes, callback);
   }
 
   @Override
