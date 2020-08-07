@@ -33,7 +33,6 @@ import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import io.temporal.workflow.Promise;
-
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
