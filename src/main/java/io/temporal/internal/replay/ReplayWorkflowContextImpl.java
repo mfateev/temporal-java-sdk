@@ -26,40 +26,25 @@ import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttribute
 import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
-import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.StartTimerCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
-import io.temporal.api.enums.v1.RetryState;
-import io.temporal.api.enums.v1.TimeoutType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes;
-import io.temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes;
 import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
-import io.temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
-import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.context.ContextPropagator;
-import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.CanceledFailure;
-import io.temporal.failure.ChildWorkflowFailure;
-import io.temporal.failure.TerminatedFailure;
-import io.temporal.failure.TimeoutFailure;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.csm.WorkflowStateMachines;
 import io.temporal.internal.metrics.ReplayAwareScope;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.workflow.CancelExternalWorkflowException;
-import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.CompletablePromise;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
@@ -260,110 +245,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       StartChildWorkflowExecutionParameters parameters,
       Functions.Proc1<WorkflowExecution> executionCallback,
       Functions.Proc2<Optional<Payloads>, Exception> callback) {
-    StartChildWorkflowExecutionCommandAttributes startAttributes = parameters.getRequest().build();
-    Functions.Proc1<ChildWorkflowCancellationType> cancellationHandler =
-        workflowStateMachines.newChildWorkflow(
-            startAttributes,
-            executionCallback,
-            event -> handleChildWorkflowCallback(callback, startAttributes, event));
-    return (exception) -> cancellationHandler.apply(parameters.getCancellationType());
-  }
-
-  private void handleChildWorkflowCallback(
-      Functions.Proc2<Optional<Payloads>, Exception> callback,
-      StartChildWorkflowExecutionCommandAttributes startAttributes,
-      HistoryEvent event) {
-    switch (event.getEventType()) {
-      case EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED:
-        {
-          StartChildWorkflowExecutionFailedEventAttributes attributes =
-              event.getStartChildWorkflowExecutionFailedEventAttributes();
-          Exception failure =
-              new ChildWorkflowTaskFailedException(
-                  event.getEventId(),
-                  WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId()).build(),
-                  attributes.getWorkflowType(),
-                  RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
-                  null);
-          failure.initCause(
-              new WorkflowExecutionAlreadyStarted(
-                  WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId()).build(),
-                  attributes.getWorkflowType().getName(),
-                  null));
-          callback.apply(Optional.empty(), failure);
-          return;
-        }
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED:
-        {
-          ChildWorkflowExecutionCompletedEventAttributes attributes =
-              event.getChildWorkflowExecutionCompletedEventAttributes();
-          Optional<Payloads> result =
-              attributes.hasResult() ? Optional.of(attributes.getResult()) : Optional.empty();
-          callback.apply(result, null);
-          return;
-        }
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED:
-        {
-          ChildWorkflowExecutionFailedEventAttributes attributes =
-              event.getChildWorkflowExecutionFailedEventAttributes();
-          RuntimeException failure =
-              new ChildWorkflowTaskFailedException(
-                  event.getEventId(),
-                  attributes.getWorkflowExecution(),
-                  attributes.getWorkflowType(),
-                  attributes.getRetryState(),
-                  attributes.getFailure());
-          callback.apply(Optional.empty(), failure);
-          return;
-        }
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT:
-        {
-          ChildWorkflowExecutionTimedOutEventAttributes attributes =
-              event.getChildWorkflowExecutionTimedOutEventAttributes();
-          TimeoutFailure timeoutFailure =
-              new TimeoutFailure(null, null, TimeoutType.TIMEOUT_TYPE_START_TO_CLOSE);
-          timeoutFailure.setStackTrace(new StackTraceElement[0]);
-          RuntimeException failure =
-              new ChildWorkflowFailure(
-                  attributes.getInitiatedEventId(),
-                  attributes.getStartedEventId(),
-                  attributes.getWorkflowType().getName(),
-                  attributes.getWorkflowExecution(),
-                  attributes.getNamespace(),
-                  attributes.getRetryState(),
-                  timeoutFailure);
-          callback.apply(Optional.empty(), failure);
-          return;
-        }
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED:
-        {
-          ChildWorkflowExecutionCanceledEventAttributes attributes =
-              event.getChildWorkflowExecutionCanceledEventAttributes();
-          CanceledFailure failure =
-              new CanceledFailure(
-                  "Child canceled", new EncodedValues(attributes.getDetails()), null);
-          callback.apply(Optional.empty(), failure);
-          return;
-        }
-      case EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED:
-        {
-          ChildWorkflowExecutionTerminatedEventAttributes attributes =
-              event.getChildWorkflowExecutionTerminatedEventAttributes();
-          RuntimeException failure =
-              new ChildWorkflowFailure(
-                  attributes.getInitiatedEventId(),
-                  attributes.getStartedEventId(),
-                  attributes.getWorkflowType().getName(),
-                  attributes.getWorkflowExecution(),
-                  attributes.getNamespace(),
-                  RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
-                  new TerminatedFailure(null, null));
-          callback.apply(Optional.empty(), failure);
-          return;
-        }
-      default:
-        throw new IllegalArgumentException("Unexpected event type: " + event.getEventType());
-    }
+    Functions.Proc cancellationHandler =
+        workflowStateMachines.startChildWorkflow(parameters, executionCallback, callback);
+    return (exception) -> cancellationHandler.apply();
   }
 
   @Override

@@ -40,13 +40,15 @@ import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.common.converter.DataConverter;
+import io.temporal.common.converter.EncodedValues;
+import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.replay.ExecuteActivityParameters;
 import io.temporal.internal.replay.ExecuteLocalActivityParameters;
 import io.temporal.internal.replay.NonDeterministicWorkflowError;
+import io.temporal.internal.replay.StartChildWorkflowExecutionParameters;
 import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.Functions;
@@ -455,8 +457,7 @@ public final class WorkflowStateMachines {
 
   /**
    * @param attributes attributes used to schedule an activity
-   * @param completionCallback one of ActivityTaskCompletedEvent, ActivityTaskFailedEvent,
-   *     ActivityTaskTimedOutEvent, ActivityTaskCanceledEvents
+   * @param callback completion callback
    * @return an instance of ActivityCommands
    */
   public Functions.Proc scheduleActivityTask(
@@ -495,37 +496,33 @@ public final class WorkflowStateMachines {
   /**
    * Creates a new child state machine
    *
-   * @param attributes child workflow start command attributes
+   * @param parameters child workflow start command parameters.
    * @param startedCallback callback that is notified about child start
-   * @param completionCallback invoked when child reports completion or failure. The following types
-   *     of events can be passed to the callback: StartChildWorkflowExecutionFailedEvent,
-   *     ChildWorkflowExecutionCompletedEvent, ChildWorkflowExecutionFailedEvent,
-   *     ChildWorkflowExecutionTimedOutEvent, ChildWorkflowExecutionCanceledEvent,
-   *     ChildWorkflowExecutionTerminatedEvent.
+   * @param completionCallback invoked when child reports completion or failure.
    * @return cancellation callback that should be invoked to cancel the child
    */
-  public Functions.Proc1<ChildWorkflowCancellationType> newChildWorkflow(
-      StartChildWorkflowExecutionCommandAttributes attributes,
+  public Functions.Proc startChildWorkflow(
+      StartChildWorkflowExecutionParameters parameters,
       Functions.Proc1<WorkflowExecution> startedCallback,
-      Functions.Proc1<HistoryEvent> completionCallback) {
+      Functions.Proc2<Optional<Payloads>, Exception> completionCallback) {
     checkEventLoopExecuting();
+    StartChildWorkflowExecutionCommandAttributes attributes = parameters.getRequest().build();
+    ChildWorkflowCancellationType cancellationType = parameters.getCancellationType();
     ChildWorkflowStateMachine child =
         ChildWorkflowStateMachine.newInstance(
             attributes, startedCallback, completionCallback, commandSink);
-    return (cancellationType) -> {
+    return () -> {
+      if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
+        notifyChildCancelled(attributes, completionCallback);
+        return;
+      }
       // The only time child can be cancelled directly is before its start command
       // was sent out to the service. After that RequestCancelExternal should be used.
       if (child.isCancellable()) {
-        if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
-          notifyChildCancelled(attributes, completionCallback);
-          return;
-        }
         child.cancel();
-      } else if (!child.isFinalState()) {
-        if (cancellationType == ChildWorkflowCancellationType.ABANDON) {
-          notifyChildCancelled(attributes, completionCallback);
-          return;
-        }
+        return;
+      }
+      if (!child.isFinalState()) {
         newCancelExternal(
             RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
                 .setWorkflowId(attributes.getWorkflowId())
@@ -545,17 +542,10 @@ public final class WorkflowStateMachines {
 
   private static void notifyChildCancelled(
       StartChildWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc1<HistoryEvent> completionCallback) {
-    completionCallback.apply(
-        HistoryEvent.newBuilder()
-            .setEventType(EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED)
-            .setChildWorkflowExecutionCanceledEventAttributes(
-                ChildWorkflowExecutionCanceledEventAttributes.newBuilder()
-                    .setWorkflowType(attributes.getWorkflowType())
-                    .setNamespace(attributes.getNamespace())
-                    .setWorkflowExecution(
-                        WorkflowExecution.newBuilder().setWorkflowId(attributes.getWorkflowId())))
-            .build());
+      Functions.Proc2<Optional<Payloads>, Exception> completionCallback) {
+    CanceledFailure failure =
+        new CanceledFailure("Child canceled", new EncodedValues(Optional.empty()), null);
+    completionCallback.apply(Optional.empty(), failure);
   }
 
   /**
