@@ -43,7 +43,7 @@ import io.temporal.internal.replay.ChildWorkflowTaskFailedException;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
 
-public final class ChildWorkflowStateMachine
+final class ChildWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
         ChildWorkflowStateMachine.State,
         ChildWorkflowStateMachine.Action,

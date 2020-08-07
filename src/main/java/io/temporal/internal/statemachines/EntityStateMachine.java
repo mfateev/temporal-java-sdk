@@ -22,7 +22,7 @@ package io.temporal.internal.statemachines;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.history.v1.HistoryEvent;
 
-public interface EntityStateMachine {
+interface EntityStateMachine {
   void handleCommand(CommandType commandType);
 
   WorkflowStateMachines.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent);

@@ -23,7 +23,7 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
-public class EntityStateMachineBase<State, Action, Data> implements EntityStateMachine {
+class EntityStateMachineBase<State, Action, Data> implements EntityStateMachine {
 
   private final StateMachine<State, Action, Data> stateMachine;
 

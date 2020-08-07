@@ -26,7 +26,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.workflow.Functions;
 
-public final class FailWorkflowStateMachine
+final class FailWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
         FailWorkflowStateMachine.State, FailWorkflowStateMachine.Action, FailWorkflowStateMachine> {
 

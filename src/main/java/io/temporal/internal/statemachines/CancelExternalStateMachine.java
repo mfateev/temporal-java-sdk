@@ -26,7 +26,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.workflow.Functions;
 
-public final class CancelExternalStateMachine
+final class CancelExternalStateMachine
     extends EntityStateMachineInitialCommand<
         CancelExternalStateMachine.State,
         CancelExternalStateMachine.Action,

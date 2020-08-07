@@ -25,7 +25,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 import java.util.Objects;
 import java.util.Optional;
 
-public class NewCommand {
+class NewCommand {
 
   private final Command command;
   private final EntityStateMachine commands;

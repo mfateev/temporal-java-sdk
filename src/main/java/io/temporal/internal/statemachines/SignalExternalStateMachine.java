@@ -21,12 +21,15 @@ package io.temporal.internal.statemachines;
 
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
+import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
+import io.temporal.failure.CanceledFailure;
 import io.temporal.workflow.Functions;
+import io.temporal.workflow.SignalExternalWorkflowException;
 
-public final class SignalExternalStateMachine
+final class SignalExternalStateMachine
     extends EntityStateMachineInitialCommand<
         SignalExternalStateMachine.State,
         SignalExternalStateMachine.Action,
@@ -34,7 +37,7 @@ public final class SignalExternalStateMachine
 
   private final SignalExternalWorkflowExecutionCommandAttributes signalAttributes;
 
-  private final Functions.Proc2<HistoryEvent, Boolean> completionCallback;
+  private final Functions.Proc2<Void, Exception> completionCallback;
 
   /**
    * Register new instance of the signal commands
@@ -48,7 +51,7 @@ public final class SignalExternalStateMachine
    */
   public static Functions.Proc newInstance(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<HistoryEvent, Boolean> completionCallback,
+      Functions.Proc2<Void, Exception> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     SignalExternalStateMachine commands =
         new SignalExternalStateMachine(signalAttributes, completionCallback, commandSink);
@@ -57,7 +60,7 @@ public final class SignalExternalStateMachine
 
   private SignalExternalStateMachine(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<HistoryEvent, Boolean> completionCallback,
+      Functions.Proc2<Void, Exception> completionCallback,
       Functions.Proc1<NewCommand> commandSink) {
     super(newStateMachine(), commandSink);
     this.signalAttributes = signalAttributes;
@@ -104,7 +107,7 @@ public final class SignalExternalStateMachine
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED,
             State.SIGNALED,
-            SignalExternalStateMachine::notifyCompletion)
+            SignalExternalStateMachine::notifyCompleted)
         .add(
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
             Action.CANCEL,
@@ -113,7 +116,7 @@ public final class SignalExternalStateMachine
             State.SIGNAL_EXTERNAL_COMMAND_RECORDED,
             EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
             State.FAILED,
-            SignalExternalStateMachine::notifyCompletion);
+            SignalExternalStateMachine::notifyFailed);
   }
 
   private void createSignalExternalCommand() {
@@ -128,13 +131,26 @@ public final class SignalExternalStateMachine
     action(Action.CANCEL);
   }
 
-  private void notifyCompletion() {
-    completionCallback.apply(currentEvent, false);
+  private void notifyCompleted() {
+    completionCallback.apply(null, null);
+  }
+
+  private void notifyFailed() {
+    SignalExternalWorkflowExecutionFailedEventAttributes attributes =
+        currentEvent.getSignalExternalWorkflowExecutionFailedEventAttributes();
+    WorkflowExecution signaledExecution =
+        WorkflowExecution.newBuilder()
+            .setWorkflowId(attributes.getWorkflowExecution().getWorkflowId())
+            .setRunId(attributes.getWorkflowExecution().getRunId())
+            .build();
+    RuntimeException failure = new SignalExternalWorkflowException(signaledExecution, null);
+    completionCallback.apply(null, failure);
   }
 
   private void cancelSignalExternalCommand() {
     cancelInitialCommand();
-    completionCallback.apply(null, true);
+    CanceledFailure failure = new CanceledFailure("Signal external workflow execution canceled");
+    completionCallback.apply(null, failure);
   }
 
   public static String asPlantUMLStateDiagram() {

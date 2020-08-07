@@ -25,7 +25,7 @@ import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.history.v1.WorkflowTaskFailedEventAttributes;
 import java.util.Objects;
 
-public final class WorkflowTaskStateMachine
+final class WorkflowTaskStateMachine
     extends EntityStateMachineInitialCommand<
         WorkflowTaskStateMachine.State, WorkflowTaskStateMachine.Action, WorkflowTaskStateMachine> {
 

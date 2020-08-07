@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class MutableSideEffectStateMachine {
+final class MutableSideEffectStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
   static final String MARKER_DATA_KEY = "data";

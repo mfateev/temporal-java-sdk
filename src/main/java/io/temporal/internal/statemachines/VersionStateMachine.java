@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class VersionStateMachine {
+final class VersionStateMachine {
 
   private static final String MARKER_HEADER_KEY = "header";
   static final String MARKER_VERSION_KEY = "version";

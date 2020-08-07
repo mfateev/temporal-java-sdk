@@ -30,7 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public final class SideEffectStateMachine
+final class SideEffectStateMachine
     extends EntityStateMachineInitialCommand<
         SideEffectStateMachine.State, SideEffectStateMachine.Action, SideEffectStateMachine> {
 

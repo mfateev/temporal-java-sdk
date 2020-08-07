@@ -25,7 +25,7 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 
-public final class ContinueAsNewWorkflowStateMachine
+final class ContinueAsNewWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
         ContinueAsNewWorkflowStateMachine.State,
         ContinueAsNewWorkflowStateMachine.Action,

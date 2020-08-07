@@ -27,7 +27,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
 
-public final class CompleteWorkflowStateMachine
+final class CompleteWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
         CompleteWorkflowStateMachine.State,
         CompleteWorkflowStateMachine.Action,

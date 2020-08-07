@@ -39,7 +39,7 @@ import io.temporal.internal.replay.ExecuteActivityParameters;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
 
-public final class ActivityStateMachine
+final class ActivityStateMachine
     extends EntityStateMachineInitialCommand<
         ActivityStateMachine.State, ActivityStateMachine.Action, ActivityStateMachine> {
 

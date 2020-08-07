@@ -24,7 +24,7 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.workflow.Functions;
 import java.util.Optional;
 
-public class EntityStateMachineInitialCommand<State, Action, Data>
+class EntityStateMachineInitialCommand<State, Action, Data>
     extends EntityStateMachineBase<State, Action, Data> {
 
   private NewCommand initialCommand;
