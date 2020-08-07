@@ -42,7 +42,7 @@ import org.junit.Test;
 public class LocalActivityStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
-  private EntityManager manager;
+  private WorkflowStateMachines manager;
 
   @Test
   public void testLocalActivityStateMachine() {
@@ -123,7 +123,7 @@ public class LocalActivityStateMachineTest {
     assertEquals(new TestHistoryBuilder.HistoryInfo(3, 8), h.getHistoryInfo());
 
     TestListener listener = new TestListener();
-    manager = new EntityManager(listener);
+    manager = new WorkflowStateMachines(listener);
 
     {
       h.handleWorkflowTask(manager, 1);
@@ -214,7 +214,7 @@ public class LocalActivityStateMachineTest {
     // Test full replay
     {
       listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
 
       h.handleWorkflowTask(manager);
 
@@ -274,7 +274,7 @@ public class LocalActivityStateMachineTest {
     assertEquals(new TestHistoryBuilder.HistoryInfo(6, 12), h.getHistoryInfo());
 
     TestListener listener = new TestListener();
-    manager = new EntityManager(listener);
+    manager = new WorkflowStateMachines(listener);
 
     h.handleWorkflowTask(manager);
     List<ExecuteLocalActivityParameters> requests = manager.takeLocalActivityRequests();

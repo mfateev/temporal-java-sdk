@@ -76,12 +76,13 @@ public class NewCommand {
     }
   }
 
-  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
+  public WorkflowStateMachines.HandleEventStatus handleEvent(
+      HistoryEvent event, boolean hasNextEvent) {
     if (canceled) {
-      return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+      return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
     }
-    EntityManager.HandleEventStatus result = commands.handleEvent(event, hasNextEvent);
-    if (result == EntityManager.HandleEventStatus.OK) {
+    WorkflowStateMachines.HandleEventStatus result = commands.handleEvent(event, hasNextEvent);
+    if (result == WorkflowStateMachines.HandleEventStatus.OK) {
       initialCommandEventId = Optional.of(event.getEventId());
     }
     return result;

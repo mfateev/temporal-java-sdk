@@ -49,9 +49,10 @@ public class EntityStateMachineBase<State, Action, Data> implements EntityStateM
   }
 
   @Override
-  public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
+  public WorkflowStateMachines.HandleEventStatus handleEvent(
+      HistoryEvent event, boolean hasNextEvent) {
     if (!stateMachine.getValidEventTypes().contains(event.getEventType())) {
-      return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+      return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
     }
     this.currentEvent = event;
     this.hasNextEvent = hasNextEvent;

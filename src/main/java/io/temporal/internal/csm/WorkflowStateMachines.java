@@ -61,14 +61,8 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public final class EntityManager {
-
-  private static final Logger log = LoggerFactory.getLogger(EntityManager.class);
-
-  private boolean eventLoopExecuting;
+public final class WorkflowStateMachines {
 
   enum HandleEventStatus {
     OK,
@@ -100,6 +94,7 @@ public final class EntityManager {
   /** Used Workflow.newRandom and randomUUID together with currentRunId. */
   private long idCounter;
 
+  /** Current workflow time. */
   private long currentTimeMillis = -1;
 
   private long replayTimeUpdatedAtMillis;
@@ -117,7 +112,11 @@ public final class EntityManager {
   /** EventId of the last handled WorkflowTaskStartedEvent. */
   private long currentStartedEventId;
 
+  /** Is workflow executing new code or replaying from the history. */
   private boolean replaying;
+
+  /** Used to ensure that event loop is not executed recursively. */
+  private boolean eventLoopExecuting;
 
   /**
    * Used to avoid recursive calls to {@link #prepareCommands()}.
@@ -139,7 +138,7 @@ public final class EntityManager {
 
   private final Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink;
 
-  public EntityManager(EntityManagerListener callbacks) {
+  public WorkflowStateMachines(EntityManagerListener callbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
     commandSink = (command) -> newCommands.add(command);
     localActivityRequestSink = (request) -> localActivityRequests.add(request);
@@ -151,6 +150,12 @@ public final class EntityManager {
     replaying = previousStartedEventId > 0;
   }
 
+  /**
+   * Handle a single event from the workflow history.
+   *
+   * @param event event from the history.
+   * @param hasNextEvent false if this is the last event in the history.
+   */
   public final void handleEvent(HistoryEvent event, boolean hasNextEvent) {
     try {
       handleEventImpl(event, hasNextEvent);
@@ -195,9 +200,11 @@ public final class EntityManager {
   }
 
   /**
-   * Handles command event
+   * Handles command event. Command event is an event which is generated from a command emitted by a
+   * past decision. Each command has a correspondent event. For example ScheduleActivityTaskCommand
+   * is recorded to the history as ActivityTaskScheduledEvent.
    *
-   * @param event
+   * <p>Command events always follow WorkflowTaskCompletedEvent.
    */
   public void handleCommand(HistoryEvent event) {
     if (handleLocalActivityMarker(event)) {
@@ -207,6 +214,7 @@ public final class EntityManager {
     while (true) {
       // handleVersionMarker can skip a marker event if the getVersion call was removed.
       // In this case we don't want to consume a command.
+      // That's why peek is used instead of poll.
       newCommand = commands.peek();
       if (newCommand == null) {
         break;
@@ -216,6 +224,7 @@ public final class EntityManager {
       HandleEventStatus status = newCommand.handleEvent(event, true);
       if (status == HandleEventStatus.NOT_MATCHING_EVENT) {
         if (handleVersionMarker(event)) {
+          // return without consuming the command
           return;
         }
         if (!newCommand.isCanceled()) {
@@ -234,6 +243,8 @@ public final class EntityManager {
       if (!newCommand.isCanceled()) {
         break;
       }
+      // Marker is the only command processing of which can cause workflow code execution and
+      // generation of new commands.
       if (newCommand.getCommandType() == CommandType.COMMAND_TYPE_RECORD_MARKER) {
         prepareCommands();
       }
@@ -434,18 +445,11 @@ public final class EntityManager {
 
   /** Validates that command matches the event during replay. */
   private void validateCommand(Command command, HistoryEvent event) {
-    if (!equals(command.getCommandType(), event.getEventType())) {
+    // TODO(maxim): Add more thorough validation logic. For example check if activity IDs are
+    // matching.
+    if (getEventTypeForCommand(command.getCommandType()) != event.getEventType()) {
       throw new IllegalStateException(command + " doesn't match " + event);
     }
-  }
-
-  /**
-   * Compares command to its correpsonding event.
-   *
-   * @return true if matches
-   */
-  private boolean equals(CommandType commandType, EventType eventType) {
-    return getEventTypeForCommand(commandType) == eventType;
   }
 
   /**
@@ -454,10 +458,12 @@ public final class EntityManager {
    *     ActivityTaskTimedOutEvent, ActivityTaskCanceledEvents
    * @return an instance of ActivityCommands
    */
-  public ActivityStateMachine newActivity(
+  public Functions.Proc scheduleActivityTask(
       ExecuteActivityParameters attributes, Functions.Proc1<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
-    return ActivityStateMachine.newInstance(attributes, completionCallback, commandSink);
+    ActivityStateMachine activityStateMachine =
+        ActivityStateMachine.newInstance(attributes, completionCallback, commandSink);
+    return () -> activityStateMachine.cancel();
   }
 
   /**
@@ -747,14 +753,14 @@ public final class EntityManager {
           value.nonReplayWorkflowTaskStarted();
         }
       }
-      EntityManager.this.currentStartedEventId = startedEventId;
+      WorkflowStateMachines.this.currentStartedEventId = startedEventId;
       setCurrentTimeMillis(currentTimeMillis);
       eventLoop();
     }
 
     @Override
     public void updateRunId(String currentRunId) {
-      EntityManager.this.currentRunId = currentRunId;
+      WorkflowStateMachines.this.currentRunId = currentRunId;
     }
   }
 
@@ -812,6 +818,7 @@ public final class EntityManager {
         return event.getWorkflowTaskTimedOutEventAttributes().getScheduledEventId();
       case EVENT_TYPE_WORKFLOW_TASK_FAILED:
         return event.getWorkflowTaskFailedEventAttributes().getScheduledEventId();
+
       case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
       case EVENT_TYPE_TIMER_STARTED:
       case EVENT_TYPE_MARKER_RECORDED:

@@ -25,7 +25,7 @@ import io.temporal.api.history.v1.HistoryEvent;
 public interface EntityStateMachine {
   void handleCommand(CommandType commandType);
 
-  EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent);
+  WorkflowStateMachines.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent);
 
   void handleWorkflowTaskStarted();
 

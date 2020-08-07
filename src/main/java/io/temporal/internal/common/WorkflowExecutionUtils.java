@@ -813,6 +813,7 @@ public class WorkflowExecutionUtils {
     return result;
   }
 
+  /** Returns event that corresponds to a command. */
   public static EventType getEventTypeForCommand(CommandType commandType) {
     switch (commandType) {
       case COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK:

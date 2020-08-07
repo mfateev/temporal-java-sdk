@@ -144,14 +144,15 @@ public final class MutableSideEffectStateMachine {
     }
 
     @Override
-    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
+    public WorkflowStateMachines.HandleEventStatus handleEvent(
+        HistoryEvent event, boolean hasNextEvent) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
               .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+        return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
@@ -162,10 +163,10 @@ public final class MutableSideEffectStateMachine {
       }
       if (!id.equals(expectedId)) {
         //        action(Action.NON_MATCHING_EVENT);
-        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+        return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       super.handleEvent(event, hasNextEvent);
-      return EntityManager.HandleEventStatus.OK;
+      return WorkflowStateMachines.HandleEventStatus.OK;
     }
 
     State createMarker() {

@@ -203,6 +203,7 @@ public final class LocalActivityStateMachine
     action(Action.HANDLE_RESPONSE);
   }
 
+  /** Called once per workflow task for the last WorkflowTaskStarted event in the history. */
   public void nonReplayWorkflowTaskStarted() {
     action(Action.NON_REPLAY_WORKFLOW_TASK_STARTED);
   }

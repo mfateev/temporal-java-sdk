@@ -49,8 +49,8 @@ import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.GrpcRetryer;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.RpcRetryOptions;
-import io.temporal.internal.csm.EntityManager;
 import io.temporal.internal.csm.EntityManagerListener;
+import io.temporal.internal.csm.WorkflowStateMachines;
 import io.temporal.internal.metrics.MetricsType;
 import io.temporal.internal.worker.ActivityTaskHandler;
 import io.temporal.internal.worker.LocalActivityWorker;
@@ -123,7 +123,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private final DataConverter converter;
 
-  private final EntityManager entityManager;
+  private final WorkflowStateMachines workflowStateMachines;
 
   private final HistoryEvent firstEvent;
 
@@ -147,7 +147,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           "First event in the history is not WorkflowExecutionStarted");
     }
     startedEvent = firstEvent.getWorkflowExecutionStartedEventAttributes();
-    this.entityManager = new EntityManager(new EntityManagerListenerImpl());
+    this.workflowStateMachines = new WorkflowStateMachines(new EntityManagerListenerImpl());
     this.metricsScope = metricsScope;
     this.converter = options.getDataConverter();
     this.localActivityTaskPoller = localActivityTaskPoller;
@@ -156,7 +156,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
     context =
         new ReplayWorkflowContextImpl(
-            entityManager,
+            workflowStateMachines,
             namespace,
             startedEvent,
             workflowTask.getWorkflowExecution(),
@@ -168,7 +168,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   }
 
   private void handleEvent(HistoryEvent event, boolean hasNextEvent) {
-    entityManager.handleEvent(event, hasNextEvent);
+    workflowStateMachines.handleEvent(event, hasNextEvent);
   }
 
   private void eventLoop() {
@@ -199,20 +199,20 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
 
   private void completeWorkflow() {
     if (failure != null) {
-      entityManager.newFailWorkflow(failure.getFailure());
+      workflowStateMachines.newFailWorkflow(failure.getFailure());
       metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
     } else if (cancelRequested) {
-      entityManager.newCancelWorkflow();
+      workflowStateMachines.newCancelWorkflow();
       metricsScope.counter(MetricsType.WORKFLOW_CANCELLED_COUNTER).inc(1);
     } else {
       ContinueAsNewWorkflowExecutionCommandAttributes attributes =
           context.getContinueAsNewOnCompletion();
       if (attributes != null) {
-        entityManager.newContinueAsNewWorkflow(attributes);
+        workflowStateMachines.newContinueAsNewWorkflow(attributes);
         metricsScope.counter(MetricsType.WORKFLOW_CONTINUE_AS_NEW_COUNTER).inc(1);
       } else {
         Optional<Payloads> workflowOutput = workflow.getOutput();
-        entityManager.newCompleteWorkflow(workflowOutput);
+        workflowStateMachines.newCompleteWorkflow(workflowOutput);
         metricsScope.counter(MetricsType.WORKFLOW_COMPLETED_COUNTER).inc(1);
       }
     }
@@ -252,7 +252,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
       queryResults.clear();
       handleWorkflowTaskImpl(workflowTask);
       processLocalActivityRequests(startTime);
-      List<Command> commands = entityManager.takeCommands();
+      List<Command> commands = workflowStateMachines.takeCommands();
       executeQueries(workflowTask.getQueriesMap());
       return new WorkflowTaskResult(commands, queryResults, completed, laTaskCount > 0);
     } finally {
@@ -266,7 +266,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
     Stopwatch sw = metricsScope.timer(MetricsType.WORKFLOW_TASK_REPLAY_LATENCY).start();
     boolean timerStopped = false;
     try {
-      entityManager.setStartedIds(
+      workflowStateMachines.setStartedIds(
           workflowTask.getPreviousStartedEventId(), workflowTask.getStartedEventId());
       WorkflowTaskWithHistoryIterator workflowTaskWithHistoryIterator =
           new WorkflowTaskWithHistoryIteratorImpl(
@@ -355,7 +355,8 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
   private void processLocalActivityRequests(long startTime) {
     Duration maxProcessingTime = getWorkflowTaskTimeout().multipliedBy(4).dividedBy(5);
     while (true) {
-      List<ExecuteLocalActivityParameters> laRequests = entityManager.takeLocalActivityRequests();
+      List<ExecuteLocalActivityParameters> laRequests =
+          workflowStateMachines.takeLocalActivityRequests();
       long timeoutInterval = (long) ((System.currentTimeMillis() - startTime) * 0.5);
       for (ExecuteLocalActivityParameters laRequest : laRequests) {
         // TODO(maxim): In the presence of workflow task heartbeat this timeout doesn't make
@@ -394,7 +395,7 @@ class ReplayWorkflowExecutor implements WorkflowExecutor {
           // TODO(maxim): interrupt when worker shutdown is called
           throw new IllegalStateException("interrupted", e);
         }
-        entityManager.handleLocalActivityCompletion(laCompletion);
+        workflowStateMachines.handleLocalActivityCompletion(laCompletion);
         laTaskCount--;
         if (laTaskCount == 0) {
           break;

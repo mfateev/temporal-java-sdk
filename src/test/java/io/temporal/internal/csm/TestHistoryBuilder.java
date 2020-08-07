@@ -240,20 +240,21 @@ class TestHistoryBuilder {
     }
   }
 
-  List<Command> handleWorkflowTaskTakeCommands(EntityManager manager) {
+  List<Command> handleWorkflowTaskTakeCommands(WorkflowStateMachines manager) {
     return handleWorkflowTaskTakeCommands(manager, Integer.MAX_VALUE);
   }
 
-  public List<Command> handleWorkflowTaskTakeCommands(EntityManager manager, int toTaskIndex) {
+  public List<Command> handleWorkflowTaskTakeCommands(
+      WorkflowStateMachines manager, int toTaskIndex) {
     handleWorkflowTask(manager, toTaskIndex);
     return manager.takeCommands();
   }
 
-  public void handleWorkflowTask(EntityManager manager) {
+  public void handleWorkflowTask(WorkflowStateMachines manager) {
     handleWorkflowTask(manager, Integer.MAX_VALUE);
   }
 
-  public void handleWorkflowTask(EntityManager manager, int toTaskIndex) {
+  public void handleWorkflowTask(WorkflowStateMachines manager, int toTaskIndex) {
     List<HistoryEvent> events =
         this.events.subList((int) manager.getLastStartedEventId(), this.events.size());
     PeekingIterator<HistoryEvent> history = Iterators.peekingIterator(events.iterator());

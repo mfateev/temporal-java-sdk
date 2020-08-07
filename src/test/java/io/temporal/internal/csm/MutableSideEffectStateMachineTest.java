@@ -41,7 +41,7 @@ import org.junit.Test;
 public class MutableSideEffectStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
-  private EntityManager manager;
+  private WorkflowStateMachines manager;
 
   @Test
   public void testOne() {
@@ -81,7 +81,7 @@ public class MutableSideEffectStateMachineTest {
 
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -95,7 +95,7 @@ public class MutableSideEffectStateMachineTest {
     {
       // Full replay
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.toString(), commands.isEmpty());
     }
@@ -143,7 +143,7 @@ public class MutableSideEffectStateMachineTest {
 
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -168,7 +168,7 @@ public class MutableSideEffectStateMachineTest {
     {
       // Full replay
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
     }
@@ -264,7 +264,7 @@ public class MutableSideEffectStateMachineTest {
         .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -311,7 +311,7 @@ public class MutableSideEffectStateMachineTest {
     {
       // Full replay
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
     }

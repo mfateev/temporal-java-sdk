@@ -37,7 +37,7 @@ import org.junit.Test;
 public class SideEffectStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
-  private EntityManager manager;
+  private WorkflowStateMachines manager;
 
   @Test
   public void testSideEffectStateMachine() {
@@ -78,7 +78,7 @@ public class SideEffectStateMachineTest {
 
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
       assertEquals(3, commands.size());
       assertEquals(CommandType.COMMAND_TYPE_RECORD_MARKER, commands.get(0).getCommandType());
@@ -107,7 +107,7 @@ public class SideEffectStateMachineTest {
     }
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
     }

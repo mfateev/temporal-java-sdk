@@ -152,14 +152,15 @@ public final class VersionStateMachine {
     }
 
     @Override
-    public EntityManager.HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
+    public WorkflowStateMachines.HandleEventStatus handleEvent(
+        HistoryEvent event, boolean hasNextEvent) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
               .equals(VERSION_MARKER_NAME)) {
         action(Action.NON_MATCHING_EVENT);
-        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+        return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_CHANGE_ID_KEY));
@@ -171,10 +172,10 @@ public final class VersionStateMachine {
       if (!changeId.equals(expectedId)) {
         // Do not call action(Action.NON_MATCHING_EVENT) here as the event with different changeId
         // still can be followed by an event with our changeId.
-        return EntityManager.HandleEventStatus.NOT_MATCHING_EVENT;
+        return WorkflowStateMachines.HandleEventStatus.NOT_MATCHING_EVENT;
       }
       super.handleEvent(event, hasNextEvent);
-      return EntityManager.HandleEventStatus.OK;
+      return WorkflowStateMachines.HandleEventStatus.OK;
     }
 
     @Override

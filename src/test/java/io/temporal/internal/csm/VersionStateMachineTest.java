@@ -42,7 +42,7 @@ import org.junit.Test;
 public class VersionStateMachineTest {
 
   private final DataConverter converter = DataConverter.getDefaultInstance();
-  private EntityManager manager;
+  private WorkflowStateMachines manager;
 
   @Test
   public void testOne() {
@@ -80,7 +80,7 @@ public class VersionStateMachineTest {
 
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -95,7 +95,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.toString(), commands.isEmpty());
     }
@@ -141,7 +141,7 @@ public class VersionStateMachineTest {
 
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -167,7 +167,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
     }
@@ -210,7 +210,7 @@ public class VersionStateMachineTest {
             .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
 
     TestEntityManagerListenerBase listener = new TestListener();
-    manager = new EntityManager(listener);
+    manager = new WorkflowStateMachines(listener);
     try {
       h.handleWorkflowTaskTakeCommands(manager);
       fail("failure expected");
@@ -284,7 +284,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(
@@ -330,7 +330,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, commands);
     }
@@ -430,7 +430,7 @@ public class VersionStateMachineTest {
         .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 1);
 
       assertEquals(2, commands.size());
@@ -463,7 +463,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(
@@ -564,7 +564,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(maxSupported + ", " + maxSupported, listener.trace.toString());
@@ -655,7 +655,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(maxSupported, listener.versionId2);
@@ -757,7 +757,7 @@ public class VersionStateMachineTest {
         .add(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED);
     {
       TestEntityManagerListenerBase listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager, 2);
       assertCommand(CommandType.COMMAND_TYPE_START_TIMER, commands);
     }
@@ -772,7 +772,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       List<Command> commands = h.handleWorkflowTaskTakeCommands(manager);
       assertTrue(commands.isEmpty());
       assertEquals(String.valueOf(maxSupported), listener.trace.toString());
@@ -844,7 +844,7 @@ public class VersionStateMachineTest {
     {
       // Full replay
       TestListener listener = new TestListener();
-      manager = new EntityManager(listener);
+      manager = new WorkflowStateMachines(listener);
       try {
         h.handleWorkflowTaskTakeCommands(manager);
         fail("failure expected");
