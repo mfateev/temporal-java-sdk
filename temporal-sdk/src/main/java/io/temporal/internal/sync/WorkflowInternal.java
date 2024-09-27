@@ -63,6 +63,9 @@ import org.slf4j.LoggerFactory;
  * Never reference directly. It is public only because Java doesn't have internal package support.
  */
 public final class WorkflowInternal {
+
+  private static final Logger log = LoggerFactory.getLogger(WorkflowInternal.class);
+
   public static final int DEFAULT_VERSION = -1;
 
   public static @Nonnull WorkflowThread newWorkflowMethodThread(Runnable runnable, String name) {
@@ -517,6 +520,22 @@ public final class WorkflowInternal {
   public static int getVersion(String changeId, int minSupported, int maxSupported) {
     assertNotReadOnly("get version");
     return getWorkflowOutboundInterceptor().getVersion(changeId, minSupported, maxSupported);
+  }
+
+  public static void reset(@Nonnull String changeId, @Nonnull String resetReason) {
+    Objects.nonNull(changeId);
+    Objects.nonNull(resetReason);
+    getRootWorkflowContext().reset(changeId, resetReason);
+
+    if (!getRootWorkflowContext().isInsideResetWorkflowTask()) {
+      // Don't reset if the reset statement is first called outside of replay.
+      // Use getVersion to avoid resetting during later replay.
+      if (getVersion(changeId, DEFAULT_VERSION, 1) == DEFAULT_VERSION) {
+        //        getRootWorkflowContext()
+      }
+    } else {
+      log.info("I'm already reset at this task");
+    }
   }
 
   public static <V> Promise<Void> promiseAllOf(Iterable<Promise<V>> promises) {

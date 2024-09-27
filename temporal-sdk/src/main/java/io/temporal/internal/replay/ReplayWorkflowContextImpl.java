@@ -330,6 +330,11 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
+  public boolean isInsideResetWorkflowTask() {
+    return workflowStateMachines.isInsideResetWorkflowTask();
+  }
+
+  @Override
   public void upsertSearchAttributes(@Nonnull SearchAttributes searchAttributes) {
     workflowStateMachines.upsertSearchAttributes(searchAttributes);
     mutableState.upsertSearchAttributes(searchAttributes);
@@ -431,5 +436,15 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public void failWorkflowTask(Throwable failure) {
     mutableState.failWorkflowTask(failure);
+  }
+
+  @Override
+  public void reset(String resetReason) {
+    mutableState.reset(resetReason);
+  }
+
+  @Override
+  public String getResetReason() {
+    return mutableState.getResetReason();
   }
 }

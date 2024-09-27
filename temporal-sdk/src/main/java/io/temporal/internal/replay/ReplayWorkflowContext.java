@@ -53,6 +53,8 @@ import javax.annotation.Nullable;
  */
 public interface ReplayWorkflowContext extends ReplayAware {
 
+  String getResetReason();
+
   class ScheduleActivityTaskOutput {
     private final String activityId;
     private final Functions.Proc1<Exception> cancellationHandle;
@@ -398,6 +400,8 @@ public interface ReplayWorkflowContext extends ReplayAware {
   @Nullable
   SearchAttributes getSearchAttributes();
 
+  boolean isInsideResetWorkflowTask();
+
   /** Updates or inserts search attributes used to index workflows. */
   void upsertSearchAttributes(@Nonnull SearchAttributes searchAttributes);
 
@@ -417,4 +421,6 @@ public interface ReplayWorkflowContext extends ReplayAware {
    *     branching.
    */
   Optional<String> getCurrentBuildId();
+
+  void reset(String reason);
 }

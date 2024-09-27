@@ -101,9 +101,12 @@ public final class WorkflowStateMachines {
 
   /**
    * currentRunId is used as seed by Workflow.newRandom and randomUUID. It allows to generate them
-   * deterministically.
+   * deterministically. It changes every time workflow is reset.
    */
   private String currentRunId;
+
+  /** The current workflow task failed due to reset. */
+  private boolean insideResetWorkflowTask;
 
   /** Used Workflow.newRandom and randomUUID together with currentRunId. */
   private long idCounter;
@@ -957,6 +960,10 @@ public final class WorkflowStateMachines {
     return currentTimeMillis;
   }
 
+  public boolean isInsideResetWorkflowTask() {
+    return insideResetWorkflowTask;
+  }
+
   public UUID randomUUID() {
     checkEventLoopExecuting();
     String runId = currentRunId;
@@ -1249,7 +1256,7 @@ public final class WorkflowStateMachines {
     }
 
     @Override
-    public void updateRunId(String currentRunId) {
+    public void notifyResetPoint(String currentRunId) {
       WorkflowStateMachines.this.currentRunId = currentRunId;
     }
   }

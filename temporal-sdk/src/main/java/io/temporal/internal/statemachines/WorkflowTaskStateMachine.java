@@ -54,7 +54,7 @@ final class WorkflowTaskStateMachine
         long historySize,
         boolean isContinueAsNewSuggested);
 
-    void updateRunId(String currentRunId);
+    void notifyResetPoint(String currentRunId);
   }
 
   private final long workflowTaskStartedEventId;
@@ -151,7 +151,7 @@ final class WorkflowTaskStateMachine
     // ensure that the new random and UUID are generated form this point.
     WorkflowTaskFailedEventAttributes attr = currentEvent.getWorkflowTaskFailedEventAttributes();
     if (attr.getCause() == WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_RESET_WORKFLOW) {
-      this.listener.updateRunId(attr.getNewRunId());
+      this.listener.notifyResetPoint(attr.getNewRunId());
     }
   }
 }

@@ -35,6 +35,7 @@ class WorkflowMutableState {
   private Throwable workflowTaskFailureThrowable;
   private SearchAttributes.Builder searchAttributes;
   private Memo.Builder memo;
+  private String resetReason;
 
   WorkflowMutableState(WorkflowExecutionStartedEventAttributes startedAttributes) {
     if (startedAttributes.hasSearchAttributes()) {
@@ -101,5 +102,13 @@ class WorkflowMutableState {
 
   public void upsertMemo(@Nonnull Memo memo) {
     this.memo.putAllFields(memo.getFieldsMap());
+  }
+
+  public void reset(String resetReason) {
+    this.resetReason = resetReason;
+  }
+
+  public String getResetReason() {
+    return resetReason;
   }
 }

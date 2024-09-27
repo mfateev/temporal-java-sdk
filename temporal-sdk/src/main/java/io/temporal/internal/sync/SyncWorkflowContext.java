@@ -1004,6 +1004,24 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
   }
 
   @Override
+  public boolean isInsideResetWorkflowTask() {
+    return replayContext.isInsideResetWorkflowTask();
+  }
+
+  @Override
+  public void reset(String resetId, String reason) {
+    if (!isInsideResetWorkflowTask()) {
+      // Don't reset if the reset statement is first called outside of replay.
+      // Use getVersion to avoid resetting during later replay.
+      if (getVersion(resetId, DEFAULT_VERSION, 1) == DEFAULT_VERSION) {
+        replayContext.reset(reason);
+      }
+    } else {
+      log.info("I'm already reset at this task");
+    }
+  }
+
+  @Override
   public Random newRandom() {
     return replayContext.newRandom();
   }

@@ -69,7 +69,11 @@ public interface WorkflowContext {
    */
   Map<String, Object> getPropagatedContexts();
 
-  Map<Long, SignalHandlerInfo> getRunningSignalHandlers();
+    boolean isInsideResetWorkflowTask();
+
+    void reset(String resetId, String reason);
+
+    Map<Long, SignalHandlerInfo> getRunningSignalHandlers();
 
   Map<String, UpdateHandlerInfo> getRunningUpdateHandlers();
 }

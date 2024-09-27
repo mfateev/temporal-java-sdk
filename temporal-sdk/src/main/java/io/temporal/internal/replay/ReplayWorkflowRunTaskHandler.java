@@ -179,6 +179,10 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
       if (context.getWorkflowTaskFailure() != null) {
         throw context.getWorkflowTaskFailure();
       }
+      if (context.getResetReason() != null) {
+        throw new ResetWorkflowTaskError(
+            context.getResetReason(), this.workflowStateMachines.getLastWFTStartedEventId() + 1);
+      }
       Map<String, WorkflowQueryResult> queryResults = executeQueries(workflowTask.getQueriesMap());
       return WorkflowTaskResult.newBuilder()
           .setCommands(commands)

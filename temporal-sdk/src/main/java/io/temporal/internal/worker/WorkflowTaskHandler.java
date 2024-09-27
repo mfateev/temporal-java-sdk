@@ -20,10 +20,7 @@
 
 package io.temporal.internal.worker;
 
-import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
-import io.temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest;
-import io.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest;
-import io.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest;
+import io.temporal.api.workflowservice.v1.*;
 import io.temporal.serviceclient.RpcRetryOptions;
 import io.temporal.workflow.Functions;
 
@@ -39,6 +36,7 @@ public interface WorkflowTaskHandler {
     private final RespondWorkflowTaskCompletedRequest taskCompleted;
     private final RespondWorkflowTaskFailedRequest taskFailed;
     private final RespondQueryTaskCompletedRequest queryCompleted;
+    private final ResetWorkflowExecutionRequest resetWorkflow;
     private final RpcRetryOptions requestRetryOptions;
     private final boolean completionCommand;
     private final Functions.Proc1<Long> resetEventIdHandle;
@@ -48,6 +46,7 @@ public interface WorkflowTaskHandler {
         RespondWorkflowTaskCompletedRequest taskCompleted,
         RespondWorkflowTaskFailedRequest taskFailed,
         RespondQueryTaskCompletedRequest queryCompleted,
+        ResetWorkflowExecutionRequest resetWorkflow,
         RpcRetryOptions requestRetryOptions,
         boolean completionCommand,
         Functions.Proc1<Long> resetEventIdHandle) {
@@ -55,6 +54,7 @@ public interface WorkflowTaskHandler {
       this.taskCompleted = taskCompleted;
       this.taskFailed = taskFailed;
       this.queryCompleted = queryCompleted;
+      this.resetWorkflow = resetWorkflow;
       this.requestRetryOptions = requestRetryOptions;
       this.completionCommand = completionCommand;
       this.resetEventIdHandle = resetEventIdHandle;

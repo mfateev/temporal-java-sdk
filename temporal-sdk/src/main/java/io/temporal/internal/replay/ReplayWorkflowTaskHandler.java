@@ -32,6 +32,7 @@ import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.QueryResultType;
+import io.temporal.api.enums.v1.ResetReapplyType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -54,6 +55,7 @@ import java.io.StringWriter;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -256,6 +258,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
         null,
         null,
         null,
+        null,
         result.isFinalCommand(),
         eventIdSetHandle);
   }
@@ -280,9 +283,24 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
                               .setFailure(((WorkflowExecutionException) e).getFailure()))
                       .build())
               .build();
-      return new WorkflowTaskHandler.Result(workflowType, response, null, null, null, false, null);
+      return new WorkflowTaskHandler.Result(
+          workflowType, response, null, null, null, null, false, null);
     }
-
+    if (e instanceof ResetWorkflowTaskError) {
+      ResetWorkflowTaskError resetError = (ResetWorkflowTaskError) e;
+      ResetWorkflowExecutionRequest response =
+          ResetWorkflowExecutionRequest.newBuilder()
+              .setRequestId(UUID.randomUUID().toString())
+              .setNamespace(namespace)
+              .setWorkflowExecution(workflowTask.getWorkflowExecution())
+              .setWorkflowTaskFinishEventId(resetError.getWorkflowTaskFinishEventId())
+              .setReason("Workflow.reset reason: " + resetError.getResetReason())
+              // TODO(maxim): Should this be an argument?
+              .setResetReapplyType(ResetReapplyType.RESET_REAPPLY_TYPE_ALL_ELIGIBLE)
+              .build();
+      return new WorkflowTaskHandler.Result(
+          workflowType, null, null, null, response, null, false, null);
+    }
     WorkflowExecution execution = workflowTask.getWorkflowExecution();
     log.warn(
         "Workflow task processing failure. startedEventId={}, WorkflowId={}, RunId={}. If seen continuously the workflow might be stuck.",
@@ -317,7 +335,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_NON_DETERMINISTIC_ERROR);
     }
     return new WorkflowTaskHandler.Result(
-        workflowType, null, failedRequest.build(), null, null, false, null);
+        workflowType, null, failedRequest.build(), null, null, null, false, null);
   }
 
   private Result createDirectQueryResult(
@@ -345,6 +363,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
         null,
         null,
         queryCompletedRequest.build(),
+        null,
         null,
         false,
         null);
