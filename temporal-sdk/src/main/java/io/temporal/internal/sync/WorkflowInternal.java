@@ -549,19 +549,9 @@ public final class WorkflowInternal {
   }
 
   public static void reset(@Nonnull String changeId, @Nonnull String resetReason) {
-    Objects.nonNull(changeId);
-    Objects.nonNull(resetReason);
+    Objects.requireNonNull(changeId);
+    Objects.requireNonNull(resetReason);
     getRootWorkflowContext().reset(changeId, resetReason);
-
-    if (!getRootWorkflowContext().isInsideResetWorkflowTask()) {
-      // Don't reset if the reset statement is first called outside of replay.
-      // Use getVersion to avoid resetting during later replay.
-      if (getVersion(changeId, DEFAULT_VERSION, 1) == DEFAULT_VERSION) {
-        //        getRootWorkflowContext()
-      }
-    } else {
-      log.info("I'm already reset at this task");
-    }
   }
 
   public static <V> Promise<Void> promiseAllOf(Iterable<Promise<V>> promises) {

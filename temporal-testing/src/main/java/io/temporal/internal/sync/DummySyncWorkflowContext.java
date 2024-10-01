@@ -72,6 +72,11 @@ public class DummySyncWorkflowContext {
     private final Timer timer = new Timer();
 
     @Override
+    public String getResetReason() {
+      throw new UnsupportedOperationException("not implemented");
+    }
+
+    @Override
     public WorkflowExecution getWorkflowExecution() {
       throw new UnsupportedOperationException("not implemented");
     }
@@ -184,6 +189,11 @@ public class DummySyncWorkflowContext {
     @Override
     @Nullable
     public SearchAttributes getSearchAttributes() {
+      throw new UnsupportedOperationException("not implemented");
+    }
+
+    @Override
+    public boolean isInsideResetWorkflowTask() {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -324,6 +334,11 @@ public class DummySyncWorkflowContext {
     @Override
     public Optional<String> getCurrentBuildId() {
       return Optional.empty();
+    }
+
+    @Override
+    public void reset(String reason) {
+      throw new UnsupportedOperationException("not implemented");
     }
 
     @Override

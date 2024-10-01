@@ -1302,6 +1302,10 @@ public final class Workflow {
     return WorkflowInternal.isEveryHandlerFinished();
   }
 
+  public static void reset(@Nonnull String changeId, @Nonnull String resetReason) {
+    WorkflowInternal.reset(changeId, resetReason);
+  }
+
   /** Prohibit instantiation. */
   private Workflow() {}
 }

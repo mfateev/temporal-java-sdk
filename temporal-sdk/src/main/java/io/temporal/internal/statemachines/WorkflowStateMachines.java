@@ -1263,11 +1263,13 @@ public final class WorkflowStateMachines {
       WorkflowStateMachines.this.isContinueAsNewSuggested = isContinueAsNewSuggested;
 
       eventLoop();
+      WorkflowStateMachines.this.insideResetWorkflowTask = false;
     }
 
     @Override
     public void notifyResetPoint(String currentRunId) {
       WorkflowStateMachines.this.currentRunId = currentRunId;
+      WorkflowStateMachines.this.insideResetWorkflowTask = true;
     }
   }
 

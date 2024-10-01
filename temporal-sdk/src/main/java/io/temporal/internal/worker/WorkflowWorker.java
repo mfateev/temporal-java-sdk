@@ -348,6 +348,7 @@ final class WorkflowWorker implements SuspendableWorker {
             RespondWorkflowTaskCompletedRequest taskCompleted = result.getTaskCompleted();
             RespondWorkflowTaskFailedRequest taskFailed = result.getTaskFailed();
             RespondQueryTaskCompletedRequest queryCompleted = result.getQueryCompleted();
+            ResetWorkflowExecutionRequest resetWorkflow = result.getResetWorkflow();
 
             if (taskCompleted != null) {
               RespondWorkflowTaskCompletedRequest.Builder requestBuilder =
@@ -383,6 +384,9 @@ final class WorkflowWorker implements SuspendableWorker {
             } else if (queryCompleted != null) {
               sendDirectQueryCompletedResponse(
                   currentTask.getTaskToken(), queryCompleted.toBuilder(), workflowTypeScope);
+            } else if (resetWorkflow != null) {
+              service.blockingStub().resetWorkflowExecution(resetWorkflow);
+              cache.invalidate(workflowExecution, workflowTypeScope, "Workflow was reset", null);
             }
           } catch (Exception e) {
             logExceptionDuringResultReporting(e, currentTask, result);

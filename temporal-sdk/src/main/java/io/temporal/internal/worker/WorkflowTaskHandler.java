@@ -72,6 +72,10 @@ public interface WorkflowTaskHandler {
       return queryCompleted;
     }
 
+    public ResetWorkflowExecutionRequest getResetWorkflow() {
+      return resetWorkflow;
+    }
+
     public RpcRetryOptions getRequestRetryOptions() {
       return requestRetryOptions;
     }

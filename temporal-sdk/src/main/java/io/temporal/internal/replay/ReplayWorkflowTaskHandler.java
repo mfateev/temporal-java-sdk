@@ -293,7 +293,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
               .setRequestId(UUID.randomUUID().toString())
               .setNamespace(namespace)
               .setWorkflowExecution(workflowTask.getWorkflowExecution())
-              .setWorkflowTaskFinishEventId(resetError.getWorkflowTaskFinishEventId())
+              .setWorkflowTaskFinishEventId(resetError.getResetEventId())
               .setReason("Workflow.reset reason: " + resetError.getResetReason())
               // TODO(maxim): Should this be an argument?
               .setResetReapplyType(ResetReapplyType.RESET_REAPPLY_TYPE_ALL_ELIGIBLE)

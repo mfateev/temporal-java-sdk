@@ -3,18 +3,18 @@ package io.temporal.internal.replay;
 public class ResetWorkflowTaskError extends Error {
 
   private final String resetReason;
-  private final long workflowTaskFinishEventId;
+  private final long resetEventId;
 
   public ResetWorkflowTaskError(String resetReason, long eventId) {
     this.resetReason = resetReason;
-    this.workflowTaskFinishEventId = eventId;
+    this.resetEventId = eventId;
   }
 
   public String getResetReason() {
     return resetReason;
   }
 
-  public long getWorkflowTaskFinishEventId() {
-    return workflowTaskFinishEventId;
+  public long getResetEventId() {
+    return resetEventId;
   }
 }
