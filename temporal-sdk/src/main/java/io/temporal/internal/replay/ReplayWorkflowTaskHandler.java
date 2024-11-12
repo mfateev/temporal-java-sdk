@@ -398,7 +398,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           .setNextPageToken(getHistoryResponse.getNextPageToken());
     }
     ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
-    return new ReplayWorkflowRunTaskHandler(
+    return new CoalescingWorkflowRunTaskHandlerImpl(
         namespace,
         workflow,
         workflowTask,
