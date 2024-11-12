@@ -32,6 +32,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.enums.v1.IndexedValueType;
 import io.temporal.api.history.v1.History;
 import io.temporal.api.history.v1.HistoryEvent;
+import io.temporal.api.nexus.v1.Endpoint;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.client.WorkflowQueryException;
@@ -88,6 +89,8 @@ public class SDKTestWorkflowRule implements TestRule {
   // Only enable when USE_DOCKER_SERVICE is true
   public static final boolean useExternalService =
       ExternalServiceTestConfigurator.isUseExternalService();
+  public static final boolean USE_VIRTUAL_THREADS =
+      ExternalServiceTestConfigurator.isUseVirtualThreads();
   private static final List<ScheduledFuture<?>> delayedCallbacks = new ArrayList<>();
   private static final ScheduledExecutorService scheduledExecutor =
       new ScheduledThreadPoolExecutor(1);
@@ -117,6 +120,7 @@ public class SDKTestWorkflowRule implements TestRule {
     private long testTimeoutSeconds;
 
     private boolean workerFactoryOptionsAreSet = false;
+    private boolean workerOptionsAreSet = false;
     private final TestWorkflowRule.Builder testWorkflowRuleBuilder;
 
     public Builder() {
@@ -135,7 +139,9 @@ public class SDKTestWorkflowRule implements TestRule {
     }
 
     public Builder setWorkerOptions(WorkerOptions options) {
-      testWorkflowRuleBuilder.setWorkerOptions(options);
+      testWorkflowRuleBuilder.setWorkerOptions(
+          WorkerOptions.newBuilder(options).setUsingVirtualThreads(USE_VIRTUAL_THREADS).build());
+      workerOptionsAreSet = true;
       return this;
     }
 
@@ -159,6 +165,11 @@ public class SDKTestWorkflowRule implements TestRule {
 
     public Builder setWorkflowTypes(Class<?>... workflowTypes) {
       testWorkflowRuleBuilder.setWorkflowTypes(workflowTypes);
+      return this;
+    }
+
+    public Builder setNexusServiceImplementation(Object... nexusServiceImplementations) {
+      testWorkflowRuleBuilder.setNexusServiceImplementation(nexusServiceImplementations);
       return this;
     }
 
@@ -223,16 +234,28 @@ public class SDKTestWorkflowRule implements TestRule {
       if (!workerFactoryOptionsAreSet) {
         testWorkflowRuleBuilder.setWorkerFactoryOptions(
             WorkerFactoryOptions.newBuilder()
+                .setUsingVirtualWorkflowThreads(USE_VIRTUAL_THREADS)
                 .setWorkerInterceptors(
                     new TracingWorkerInterceptor(new TracingWorkerInterceptor.FilteredTrace()))
                 .build());
+      }
+      if (!workerOptionsAreSet) {
+        testWorkflowRuleBuilder.setWorkerOptions(
+            WorkerOptions.newBuilder().setUsingVirtualThreads(USE_VIRTUAL_THREADS).build());
       }
       return new SDKTestWorkflowRule(this);
     }
   }
 
   public Statement apply(@Nonnull Statement base, Description description) {
-    Statement testWorkflowStatement = base;
+    Statement testWorkflowStatement =
+        new Statement() {
+          @Override
+          public void evaluate() throws Throwable {
+            base.evaluate();
+            shutdown();
+          }
+        };
 
     Test annotation = description.getAnnotation(Test.class);
     boolean timeoutIsOverriddenOnTestAnnotation = annotation != null && annotation.timeout() > 0;
@@ -249,6 +272,10 @@ public class SDKTestWorkflowRule implements TestRule {
 
   public String getTaskQueue() {
     return testWorkflowRule.getTaskQueue();
+  }
+
+  public Endpoint getNexusEndpoint() {
+    return testWorkflowRule.getNexusEndpoint();
   }
 
   public Worker getWorker() {

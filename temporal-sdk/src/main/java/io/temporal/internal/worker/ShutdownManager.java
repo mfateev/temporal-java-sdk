@@ -20,6 +20,12 @@
 
 package io.temporal.internal.worker;
 
+import static io.temporal.internal.common.GrpcUtils.isChannelShutdownException;
+
+import com.google.common.util.concurrent.ListenableFuture;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.temporal.api.workflowservice.v1.ShutdownWorkerResponse;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.concurrent.*;
@@ -116,6 +122,38 @@ public class ShutdownManager implements Closeable {
     CompletableFuture<Void> future = new CompletableFuture<>();
     scheduledExecutorService.submit(
         new ExecutorLimitedWaitShutdown(executorToShutdown, attempts, executorName, future));
+    return future;
+  }
+
+  /**
+   * Wait for {@code shutdownRequest} to finish. shutdownRequest is considered best effort, so we do
+   * not fail the shutdown if it fails.
+   */
+  public CompletableFuture<Void> waitOnWorkerShutdownRequest(
+      ListenableFuture<ShutdownWorkerResponse> shutdownRequest) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    shutdownRequest.addListener(
+        () -> {
+          try {
+            shutdownRequest.get();
+          } catch (Exception e) {
+            if (e instanceof ExecutionException) {
+              e = (Exception) e.getCause();
+            }
+            if (e instanceof StatusRuntimeException) {
+              // If the server does not support shutdown, ignore the exception
+              if (Status.Code.UNIMPLEMENTED.equals(
+                      ((StatusRuntimeException) e).getStatus().getCode())
+                  || isChannelShutdownException((StatusRuntimeException) e)) {
+                return;
+              }
+            }
+            log.warn("failed to call shutdown worker", e);
+          } finally {
+            future.complete(null);
+          }
+        },
+        scheduledExecutorService);
     return future;
   }
 

@@ -186,6 +186,15 @@ public class TracingWorkerInterceptor implements WorkerInterceptor {
     }
 
     @Override
+    public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
+        ExecuteNexusOperationInput<R> input) {
+      if (!WorkflowUnsafe.isReplaying()) {
+        trace.add("executeNexusOperation " + input.getOperation());
+      }
+      return next.executeNexusOperation(input);
+    }
+
+    @Override
     public Random newRandom() {
       if (!WorkflowUnsafe.isReplaying()) {
         trace.add("newRandom");
@@ -299,6 +308,7 @@ public class TracingWorkerInterceptor implements WorkerInterceptor {
       next.registerQuery(
           new RegisterQueryInput(
               queryType,
+              input.getDescription(),
               input.getArgTypes(),
               input.getGenericArgTypes(),
               (args) -> {

@@ -20,6 +20,8 @@
 
 package io.temporal.client;
 
+import static io.temporal.internal.common.InternalUtils.createNexusBoundStub;
+
 import com.google.common.base.Defaults;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy;
@@ -30,6 +32,7 @@ import io.temporal.common.interceptors.WorkflowClientInterceptor;
 import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata;
 import io.temporal.common.metadata.POJOWorkflowMethodMetadata;
 import io.temporal.common.metadata.WorkflowMethodType;
+import io.temporal.internal.client.NexusStartWorkflowRequest;
 import io.temporal.internal.sync.StubMarker;
 import io.temporal.workflow.QueryMethod;
 import io.temporal.workflow.SignalMethod;
@@ -37,8 +40,7 @@ import io.temporal.workflow.UpdateMethod;
 import io.temporal.workflow.WorkflowMethod;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Dynamic implementation of a strongly typed workflow interface that can be used to start, signal
@@ -51,6 +53,7 @@ class WorkflowInvocationHandler implements InvocationHandler {
     START,
     EXECUTE,
     SIGNAL_WITH_START,
+    START_NEXUS,
     UPDATE_WITH_START
   }
 
@@ -87,6 +90,9 @@ class WorkflowInvocationHandler implements InvocationHandler {
     } else if (type == InvocationType.SIGNAL_WITH_START) {
       SignalWithStartBatchRequest batch = (SignalWithStartBatchRequest) value;
       invocationContext.set(new SignalWithStartWorkflowInvocationHandler(batch));
+    } else if (type == InvocationType.START_NEXUS) {
+      NexusStartWorkflowRequest request = (NexusStartWorkflowRequest) value;
+      invocationContext.set(new StartNexusOperationInvocationHandler(request));
     } else if (type == InvocationType.UPDATE_WITH_START) {
       UpdateWithStartWorkflowOperation operation = (UpdateWithStartWorkflowOperation) value;
       invocationContext.set(new UpdateWithStartInvocationHandler(operation));
@@ -400,17 +406,52 @@ class WorkflowInvocationHandler implements InvocationHandler {
     }
   }
 
+  private static class StartNexusOperationInvocationHandler implements SpecificInvocationHandler {
+    private final NexusStartWorkflowRequest request;
+    private Object result;
+
+    public StartNexusOperationInvocationHandler(NexusStartWorkflowRequest request) {
+      this.request = request;
+    }
+
+    @Override
+    public InvocationType getInvocationType() {
+      return InvocationType.START_NEXUS;
+    }
+
+    @Override
+    public void invoke(
+        POJOWorkflowInterfaceMetadata workflowMetadata,
+        WorkflowStub untyped,
+        Method method,
+        Object[] args) {
+      WorkflowMethod workflowMethod = method.getAnnotation(WorkflowMethod.class);
+      if (workflowMethod == null) {
+        throw new IllegalArgumentException(
+            "Only on a method annotated with @WorkflowMethod can be used to start a Nexus operation.");
+      }
+
+      result = createNexusBoundStub(untyped, request).start(args);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <R> R getResult(Class<R> resultClass) {
+      return (R) result;
+    }
+  }
+
   private static class UpdateWithStartInvocationHandler implements SpecificInvocationHandler {
 
     enum State {
-      NOT_STARTED,
+      INIT,
       START_RECEIVED,
       UPDATE_RECEIVED,
     }
 
     private final UpdateWithStartWorkflowOperation operation;
 
-    private State state = State.NOT_STARTED;
+    private State state = State.INIT;
 
     public UpdateWithStartInvocationHandler(UpdateWithStartWorkflowOperation operation) {
       this.operation = operation;
@@ -430,7 +471,15 @@ class WorkflowInvocationHandler implements InvocationHandler {
 
       POJOWorkflowMethodMetadata methodMetadata = workflowMetadata.getMethodMetadata(method);
 
-      if (state == State.NOT_STARTED) {
+      if (state == State.INIT) {
+        WorkflowMethod workflowMethod = method.getAnnotation(WorkflowMethod.class);
+        if (workflowMethod == null) {
+          throw new IllegalArgumentException(
+              "Method '" + method.getName() + "' is not a WorkflowMethod");
+        }
+        this.operation.prepareStart(untyped, args);
+        state = State.START_RECEIVED;
+      } else if (state == State.START_RECEIVED) {
         UpdateMethod updateMethod = method.getAnnotation(UpdateMethod.class);
         if (updateMethod == null) {
           throw new IllegalArgumentException(
@@ -442,14 +491,6 @@ class WorkflowInvocationHandler implements InvocationHandler {
             method.getReturnType(),
             method.getGenericReturnType(),
             args);
-        state = State.START_RECEIVED;
-      } else if (state == State.START_RECEIVED) {
-        WorkflowMethod workflowMethod = method.getAnnotation(WorkflowMethod.class);
-        if (workflowMethod == null) {
-          throw new IllegalArgumentException(
-              "Method '" + method.getName() + "' is not a WorkflowMethod");
-        }
-        this.operation.prepareStart(untyped);
         state = State.UPDATE_RECEIVED;
       } else {
         throw new IllegalArgumentException(

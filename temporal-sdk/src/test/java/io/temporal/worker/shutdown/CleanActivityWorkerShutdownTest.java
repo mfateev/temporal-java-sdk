@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class CleanWorkerShutdownTest {
+public class CleanActivityWorkerShutdownTest {
 
   private static final String COMPLETED = "Completed";
   private static final String INTERRUPTED = "Interrupted";
@@ -96,7 +96,6 @@ public class CleanWorkerShutdownTest {
             .getExecutionHistory(execution.getWorkflowId())
             .getHistory()
             .getEventsList();
-    events.forEach(System.out::println);
     boolean found = false;
     for (HistoryEvent e : events) {
       if (e.getEventType() == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED) {

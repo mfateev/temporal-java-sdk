@@ -88,6 +88,18 @@ final class WorkflowClientRequestFactory {
       request.setWorkflowIdConflictPolicy(options.getWorkflowIdConflictPolicy());
     }
 
+    if (options.getRequestId() != null) {
+      request.setRequestId(options.getRequestId());
+    }
+
+    if (options.getCompletionCallbacks() != null) {
+      options.getCompletionCallbacks().forEach(request::addCompletionCallbacks);
+    }
+
+    if (options.getLinks() != null) {
+      options.getLinks().forEach(request::addLinks);
+    }
+
     String taskQueue = options.getTaskQueue();
     if (taskQueue != null && !taskQueue.isEmpty()) {
       request.setTaskQueue(TaskQueue.newBuilder().setName(taskQueue).build());
@@ -120,7 +132,8 @@ final class WorkflowClientRequestFactory {
             "Cannot have search attributes and typed search attributes");
       }
       request.setSearchAttributes(SearchAttributesUtil.encode(options.getSearchAttributes()));
-    } else if (options.getTypedSearchAttributes() != null) {
+    } else if (options.getTypedSearchAttributes() != null
+        && options.getTypedSearchAttributes().size() > 0) {
       request.setSearchAttributes(
           SearchAttributesUtil.encodeTyped(options.getTypedSearchAttributes()));
     }

@@ -20,6 +20,8 @@
 
 package io.temporal.internal.sync;
 
+import static io.temporal.client.WorkflowClient.QUERY_TYPE_STACK_TRACE;
+import static io.temporal.client.WorkflowClient.QUERY_TYPE_WORKFLOW_METADATA;
 import static io.temporal.internal.common.HeaderUtils.intoPayloadMap;
 import static io.temporal.internal.common.HeaderUtils.toHeaderGrpc;
 import static io.temporal.internal.common.RetryOptionsUtils.toRetryPolicy;
@@ -31,10 +33,7 @@ import com.google.common.base.Preconditions;
 import com.uber.m3.tally.Scope;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.activity.LocalActivityOptions;
-import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
-import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes;
-import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
-import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes;
+import io.temporal.api.command.v1.*;
 import io.temporal.api.common.v1.ActivityType;
 import io.temporal.api.common.v1.Memo;
 import io.temporal.api.common.v1.Payload;
@@ -46,6 +45,9 @@ import io.temporal.api.enums.v1.ParentClosePolicy;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.sdk.v1.UserMetadata;
+import io.temporal.api.sdk.v1.WorkflowDefinition;
+import io.temporal.api.sdk.v1.WorkflowInteractionDefinition;
+import io.temporal.api.sdk.v1.WorkflowMetadata;
 import io.temporal.api.taskqueue.v1.TaskQueue;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.client.WorkflowException;
@@ -119,12 +121,15 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
   private Map<String, ActivityOptions> activityOptionsMap;
   private LocalActivityOptions defaultLocalActivityOptions = null;
   private Map<String, LocalActivityOptions> localActivityOptionsMap;
+  private NexusServiceOptions defaultNexusServiceOptions = null;
+  private Map<String, NexusServiceOptions> nexusServiceOptionsMap;
   private boolean readOnly = false;
   private final WorkflowThreadLocal<UpdateInfo> currentUpdateInfo = new WorkflowThreadLocal<>();
   // Map of all running update handlers. Key is the update Id of the update request.
   private Map<String, UpdateHandlerInfo> runningUpdateHandlers = new HashMap<>();
   // Map of all running signal handlers. Key is the event Id of the signal event.
   private Map<Long, SignalHandlerInfo> runningSignalHandlers = new HashMap<>();
+  @Nullable private String currentDetails;
 
   public SyncWorkflowContext(
       @Nonnull String namespace,
@@ -152,6 +157,10 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
           workflowImplementationOptions.getDefaultLocalActivityOptions();
       this.localActivityOptionsMap =
           new HashMap<>(workflowImplementationOptions.getLocalActivityOptions());
+      this.defaultNexusServiceOptions =
+          workflowImplementationOptions.getDefaultNexusServiceOptions();
+      this.nexusServiceOptionsMap =
+          new HashMap<>(workflowImplementationOptions.getNexusServiceOptions());
     }
     this.workflowImplementationOptions =
         workflowImplementationOptions == null
@@ -221,6 +230,16 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         : Collections.emptyMap();
   }
 
+  public NexusServiceOptions getDefaultNexusServiceOptions() {
+    return defaultNexusServiceOptions;
+  }
+
+  public @Nonnull Map<String, NexusServiceOptions> getNexusServiceOptions() {
+    return nexusServiceOptionsMap != null
+        ? Collections.unmodifiableMap(nexusServiceOptionsMap)
+        : Collections.emptyMap();
+  }
+
   public void setDefaultActivityOptions(ActivityOptions defaultActivityOptions) {
     this.defaultActivityOptions =
         (this.defaultActivityOptions == null)
@@ -278,6 +297,10 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     ActivityOutput<Optional<Payloads>> output =
         executeActivityOnce(input.getActivityName(), input.getOptions(), input.getHeader(), args);
 
+    // Avoid passing the input to the output handle as it causes the input to be retained for the
+    // duration of the operation.
+    Type resultType = input.getResultType();
+    Class<T> resultClass = input.getResultClass();
     return new ActivityOutput<>(
         output.getActivityId(),
         output
@@ -285,9 +308,9 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
             .handle(
                 (r, f) -> {
                   if (f == null) {
-                    return input.getResultType() != Void.TYPE
+                    return resultType != Void.TYPE
                         ? dataConverterWithActivityContext.fromPayloads(
-                            0, r, input.getResultClass(), input.getResultType())
+                            0, r, resultClass, resultType)
                         : null;
                   } else {
                     throw dataConverterWithActivityContext.failureToException(
@@ -355,6 +378,40 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         && signalDispatcher.getRunningSignalHandlers().isEmpty();
   }
 
+  public WorkflowMetadata getWorkflowMetadata() {
+    WorkflowMetadata.Builder workflowMetadata = WorkflowMetadata.newBuilder();
+    WorkflowDefinition.Builder workflowDefinition = WorkflowDefinition.newBuilder();
+    // Set the workflow type
+    if (replayContext.getWorkflowType() != null
+        && replayContext.getWorkflowType().getName() != null) {
+      workflowDefinition.setType(replayContext.getWorkflowType().getName());
+    }
+    // Set built in queries
+    workflowDefinition.addQueryDefinitions(
+        WorkflowInteractionDefinition.newBuilder()
+            .setName(QUERY_TYPE_STACK_TRACE)
+            .setDescription("Current stack trace")
+            .build());
+    workflowDefinition.addQueryDefinitions(
+        WorkflowInteractionDefinition.newBuilder()
+            .setName(QUERY_TYPE_WORKFLOW_METADATA)
+            .setDescription("Metadata about the workflow")
+            .build());
+    // Add user defined queries
+    workflowDefinition.addAllQueryDefinitions(queryDispatcher.getQueryHandlers());
+    // Add user defined signals
+    workflowDefinition.addAllSignalDefinitions(signalDispatcher.getSignalHandlers());
+    // Add user defined update handlers
+    workflowDefinition.addAllUpdateDefinitions(updateDispatcher.getUpdateHandlers());
+    // Set the workflow definition
+    workflowMetadata.setDefinition(workflowDefinition.build());
+    // Add the current workflow details
+    if (currentDetails != null) {
+      workflowMetadata.setCurrentDetails(currentDetails);
+    }
+    return workflowMetadata.build();
+  }
+
   private class ActivityCallback {
     private final CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
 
@@ -412,13 +469,16 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         null,
         serializedResult);
 
+    // Avoid passing the input to the output handle as it causes the input to be retained for the
+    // duration of the operation.
+    Type resultType = input.getResultType();
+    Class<R> resultClass = input.getResultClass();
     Promise<R> result =
         serializedResult.handle(
             (r, f) -> {
               if (f == null) {
-                return input.getResultClass() != Void.TYPE
-                    ? dataConverterWithActivityContext.fromPayloads(
-                        0, r, input.getResultClass(), input.getResultType())
+                return resultClass != Void.TYPE
+                    ? dataConverterWithActivityContext.fromPayloads(0, r, resultClass, resultType)
                     : null;
               } else {
                 throw dataConverterWithActivityContext.failureToException(
@@ -565,7 +625,11 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
                   replayContext.getTaskQueue().equals(options.getTaskQueue())));
     }
 
-    return new ExecuteActivityParameters(attributes, options.getCancellationType());
+    @Nullable
+    UserMetadata userMetadata =
+        makeUserMetaData(options.getSummary(), null, dataConverterWithCurrentWorkflowContext);
+
+    return new ExecuteActivityParameters(attributes, options.getCancellationType(), userMetadata);
   }
 
   private ExecuteLocalActivityParameters constructExecuteLocalActivityParameters(
@@ -708,12 +772,101 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
               return null;
             });
 
+    // Avoid passing the input to the output handle as it causes the input to be retained for the
+    // duration of the operation.
+    Type resultType = input.getResultType();
+    Class<R> resultClass = input.getResultClass();
     Promise<R> result =
         resultPromise.thenApply(
             (b) ->
-                dataConverterWithChildWorkflowContext.fromPayloads(
-                    0, b, input.getResultClass(), input.getResultType()));
+                dataConverterWithChildWorkflowContext.fromPayloads(0, b, resultClass, resultType));
     return new ChildWorkflowOutput<>(result, executionPromise);
+  }
+
+  @Override
+  public <R> ExecuteNexusOperationOutput<R> executeNexusOperation(
+      ExecuteNexusOperationInput<R> input) {
+    Preconditions.checkArgument(
+        input.getEndpoint() != null && !input.getEndpoint().isEmpty(), "endpoint must be set");
+    Preconditions.checkArgument(
+        input.getService() != null && !input.getService().isEmpty(), "service must be set");
+
+    if (CancellationScope.current().isCancelRequested()) {
+      CanceledFailure canceledFailure =
+          new CanceledFailure("execute nexus operation called from a canceled scope");
+      return new ExecuteNexusOperationOutput<>(
+          Workflow.newFailedPromise(canceledFailure), Workflow.newFailedPromise(canceledFailure));
+    }
+
+    CompletablePromise<NexusOperationExecution> operationPromise = Workflow.newPromise();
+    CompletablePromise<Optional<Payload>> resultPromise = Workflow.newPromise();
+
+    // Not using the context aware data converter because the context will not be available on the
+    // worker side
+    Optional<Payload> payload = dataConverter.toPayload(input.getArg());
+
+    ScheduleNexusOperationCommandAttributes.Builder attributes =
+        ScheduleNexusOperationCommandAttributes.newBuilder();
+    payload.ifPresent(attributes::setInput);
+    attributes.setOperation(input.getOperation());
+    attributes.setService(input.getService());
+    attributes.setEndpoint(input.getEndpoint());
+    attributes.putAllNexusHeader(input.getHeaders());
+    attributes.setScheduleToCloseTimeout(
+        ProtobufTimeUtils.toProtoDuration(input.getOptions().getScheduleToCloseTimeout()));
+
+    Functions.Proc1<Exception> cancellationCallback =
+        replayContext.startNexusOperation(
+            attributes.build(),
+            (operationExec, failure) -> {
+              if (failure != null) {
+                runner.executeInWorkflowThread(
+                    "nexus operation start failed callback",
+                    () ->
+                        operationPromise.completeExceptionally(
+                            dataConverter.failureToException(failure)));
+              } else {
+                runner.executeInWorkflowThread(
+                    "nexus operation started callback",
+                    () ->
+                        operationPromise.complete(new NexusOperationExecutionImpl(operationExec)));
+              }
+            },
+            (Optional<Payload> result, Failure failure) -> {
+              if (failure != null) {
+                runner.executeInWorkflowThread(
+                    "nexus operation failure callback",
+                    () ->
+                        resultPromise.completeExceptionally(
+                            dataConverter.failureToException(failure)));
+              } else {
+                runner.executeInWorkflowThread(
+                    "nexus operation completion callback", () -> resultPromise.complete(result));
+              }
+            });
+    AtomicBoolean callbackCalled = new AtomicBoolean();
+    CancellationScope.current()
+        .getCancellationRequest()
+        .thenApply(
+            (reason) -> {
+              if (!callbackCalled.getAndSet(true)) {
+                cancellationCallback.apply(new CanceledFailure(reason));
+              }
+              return null;
+            });
+    Promise<R> result =
+        resultPromise.thenApply(
+            (b) ->
+                input.getResultClass() != Void.class
+                    ? dataConverter.fromPayload(
+                        b.get(), input.getResultClass(), input.getResultType())
+                    : null);
+    // We register an empty handler to make sure that this promise is always "accessed" and never
+    // leads to a log about it being completed exceptionally and non-accessed.
+    // The "main" operation promise is the one returned from the execute method and that
+    // promise will always be logged if not accessed.
+    operationPromise.handle((ex, failure) -> null);
+    return new ExecuteNexusOperationOutput<>(result, operationPromise);
   }
 
   @SuppressWarnings("deprecation")
@@ -761,7 +914,8 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
             "Cannot have both typed search attributes and search attributes");
       }
       attributes.setSearchAttributes(SearchAttributesUtil.encode(searchAttributes));
-    } else if (options.getTypedSearchAttributes() != null) {
+    } else if (options.getTypedSearchAttributes() != null
+        && options.getTypedSearchAttributes().size() > 0) {
       attributes.setSearchAttributes(
           SearchAttributesUtil.encodeTyped(options.getTypedSearchAttributes()));
     }
@@ -1175,7 +1329,8 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
               "Cannot have typed search attributes and search attributes");
         }
         attributes.setSearchAttributes(SearchAttributesUtil.encode(searchAttributes));
-      } else if (options.getTypedSearchAttributes() != null) {
+      } else if (options.getTypedSearchAttributes() != null
+          && options.getTypedSearchAttributes().size() > 0) {
         attributes.setSearchAttributes(
             SearchAttributesUtil.encodeTyped(options.getTypedSearchAttributes()));
       }
@@ -1343,6 +1498,15 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
 
   public void setCurrentUpdateInfo(UpdateInfo updateInfo) {
     currentUpdateInfo.set(updateInfo);
+  }
+
+  public void setCurrentDetails(String details) {
+    currentDetails = details;
+  }
+
+  @Nullable
+  public String getCurrentDetails() {
+    return currentDetails;
   }
 
   public Optional<UpdateInfo> getCurrentUpdateInfo() {

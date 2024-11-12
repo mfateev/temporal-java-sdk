@@ -30,9 +30,11 @@ public class WorkerProperties {
   private final @Nullable String name;
   private final @Nullable Collection<Class<?>> workflowClasses;
   private final @Nullable Collection<String> activityBeans;
+  private final @Nullable Collection<String> nexusServiceBeans;
   private final @Nullable CapacityConfigurationProperties capacity;
   private final @Nullable RateLimitsConfigurationProperties rateLimits;
   private final @Nullable BuildIdConfigurationProperties buildId;
+  private final @Nullable VirtualThreadConfigurationProperties virtualThreads;
 
   @ConstructorBinding
   public WorkerProperties(
@@ -40,16 +42,20 @@ public class WorkerProperties {
       @Nullable String name,
       @Nullable Collection<Class<?>> workflowClasses,
       @Nullable Collection<String> activityBeans,
+      @Nullable Collection<String> nexusServiceBeans,
       @Nullable CapacityConfigurationProperties capacity,
       @Nullable RateLimitsConfigurationProperties rateLimits,
-      @Nullable BuildIdConfigurationProperties buildId) {
+      @Nullable BuildIdConfigurationProperties buildId,
+      @Nullable VirtualThreadConfigurationProperties virtualThreads) {
     this.name = name;
     this.taskQueue = taskQueue;
     this.workflowClasses = workflowClasses;
     this.activityBeans = activityBeans;
+    this.nexusServiceBeans = nexusServiceBeans;
     this.capacity = capacity;
     this.rateLimits = rateLimits;
     this.buildId = buildId;
+    this.virtualThreads = virtualThreads;
   }
 
   @Nonnull
@@ -87,12 +93,24 @@ public class WorkerProperties {
     return buildId;
   }
 
+  @Nullable
+  public VirtualThreadConfigurationProperties getVirtualThreads() {
+    return virtualThreads;
+  }
+
+  @Nullable
+  public Collection<String> getNexusServiceBeans() {
+    return nexusServiceBeans;
+  }
+
   public static class CapacityConfigurationProperties {
     private final @Nullable Integer maxConcurrentWorkflowTaskExecutors;
     private final @Nullable Integer maxConcurrentActivityExecutors;
     private final @Nullable Integer maxConcurrentLocalActivityExecutors;
+    private final @Nullable Integer maxConcurrentNexusTaskExecutors;
     private final @Nullable Integer maxConcurrentWorkflowTaskPollers;
     private final @Nullable Integer maxConcurrentActivityTaskPollers;
+    private final @Nullable Integer maxConcurrentNexusTaskPollers;
 
     /**
      * @param maxConcurrentWorkflowTaskExecutors defines {@link
@@ -101,23 +119,31 @@ public class WorkerProperties {
      *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentActivityExecutionSize(int)}
      * @param maxConcurrentLocalActivityExecutors defines {@link
      *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentLocalActivityExecutionSize(int)}
+     * @param maxConcurrentNexusTaskExecutors defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentNexusTaskPollers(int)} (int)}
      * @param maxConcurrentWorkflowTaskPollers defines {@link
      *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentWorkflowTaskPollers(int)}
      * @param maxConcurrentActivityTaskPollers defines {@link
      *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentActivityTaskPollers(int)}
+     * @param maxConcurrentNexusTaskPollers defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setMaxConcurrentNexusTaskPollers(int)} (int)}
      */
     @ConstructorBinding
     public CapacityConfigurationProperties(
         @Nullable Integer maxConcurrentWorkflowTaskExecutors,
         @Nullable Integer maxConcurrentActivityExecutors,
         @Nullable Integer maxConcurrentLocalActivityExecutors,
+        @Nullable Integer maxConcurrentNexusTaskExecutors,
         @Nullable Integer maxConcurrentWorkflowTaskPollers,
-        @Nullable Integer maxConcurrentActivityTaskPollers) {
+        @Nullable Integer maxConcurrentActivityTaskPollers,
+        @Nullable Integer maxConcurrentNexusTaskPollers) {
       this.maxConcurrentWorkflowTaskExecutors = maxConcurrentWorkflowTaskExecutors;
       this.maxConcurrentActivityExecutors = maxConcurrentActivityExecutors;
       this.maxConcurrentLocalActivityExecutors = maxConcurrentLocalActivityExecutors;
+      this.maxConcurrentNexusTaskExecutors = maxConcurrentNexusTaskExecutors;
       this.maxConcurrentWorkflowTaskPollers = maxConcurrentWorkflowTaskPollers;
       this.maxConcurrentActivityTaskPollers = maxConcurrentActivityTaskPollers;
+      this.maxConcurrentNexusTaskPollers = maxConcurrentNexusTaskPollers;
     }
 
     @Nullable
@@ -136,6 +162,11 @@ public class WorkerProperties {
     }
 
     @Nullable
+    public Integer getMaxConcurrentNexusTasksExecutors() {
+      return maxConcurrentNexusTaskExecutors;
+    }
+
+    @Nullable
     public Integer getMaxConcurrentWorkflowTaskPollers() {
       return maxConcurrentWorkflowTaskPollers;
     }
@@ -143,6 +174,11 @@ public class WorkerProperties {
     @Nullable
     public Integer getMaxConcurrentActivityTaskPollers() {
       return maxConcurrentActivityTaskPollers;
+    }
+
+    @Nullable
+    public Integer getMaxConcurrentNexusTaskPollers() {
+      return maxConcurrentNexusTaskPollers;
     }
   }
 
@@ -200,6 +236,65 @@ public class WorkerProperties {
     @Nullable
     public boolean getEnabledWorkerVersioning() {
       return enabledWorkerVersioning;
+    }
+  }
+
+  public static class VirtualThreadConfigurationProperties {
+    private final @Nullable Boolean usingVirtualThreads;
+    private final @Nullable Boolean usingVirtualThreadsOnWorkflowWorker;
+    private final @Nullable Boolean usingVirtualThreadsOnActivityWorker;
+    private final @Nullable Boolean usingVirtualThreadsOnLocalActivityWorker;
+    private final @Nullable Boolean usingVirtualThreadsOnNexusWorker;
+
+    /**
+     * @param usingVirtualThreads defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setUsingVirtualThreads(boolean)}
+     * @param usingVirtualThreadsOnWorkflowWorker defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setUsingVirtualThreadsOnWorkflowWorker(boolean)}
+     * @param usingVirtualThreadsOnActivityWorker defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setUsingVirtualThreadsOnActivityWorker(boolean)}
+     * @param usingVirtualThreadsOnNexusWorker defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setUsingVirtualThreadsOnNexusWorker(boolean)}
+     * @param usingVirtualThreadsOnLocalActivityWorker defines {@link
+     *     io.temporal.worker.WorkerOptions.Builder#setUsingVirtualThreadsOnLocalActivityWorker(boolean)}
+     */
+    @ConstructorBinding
+    public VirtualThreadConfigurationProperties(
+        @Nullable Boolean usingVirtualThreads,
+        @Nullable Boolean usingVirtualThreadsOnWorkflowWorker,
+        @Nullable Boolean usingVirtualThreadsOnActivityWorker,
+        @Nullable Boolean usingVirtualThreadsOnLocalActivityWorker,
+        @Nullable Boolean usingVirtualThreadsOnNexusWorker) {
+      this.usingVirtualThreads = usingVirtualThreads;
+      this.usingVirtualThreadsOnWorkflowWorker = usingVirtualThreadsOnWorkflowWorker;
+      this.usingVirtualThreadsOnActivityWorker = usingVirtualThreadsOnActivityWorker;
+      this.usingVirtualThreadsOnLocalActivityWorker = usingVirtualThreadsOnLocalActivityWorker;
+      this.usingVirtualThreadsOnNexusWorker = usingVirtualThreadsOnNexusWorker;
+    }
+
+    @Nullable
+    public Boolean isUsingVirtualThreads() {
+      return usingVirtualThreads;
+    }
+
+    @Nullable
+    public Boolean isUsingVirtualThreadsOnWorkflowWorker() {
+      return usingVirtualThreadsOnWorkflowWorker;
+    }
+
+    @Nullable
+    public Boolean isUsingVirtualThreadsOnLocalActivityWorker() {
+      return usingVirtualThreadsOnLocalActivityWorker;
+    }
+
+    @Nullable
+    public Boolean isUsingVirtualThreadsOnNexusWorker() {
+      return usingVirtualThreadsOnNexusWorker;
+    }
+
+    @Nullable
+    public Boolean isUsingVirtualThreadsOnActivityWorker() {
+      return usingVirtualThreadsOnActivityWorker;
     }
   }
 }

@@ -30,10 +30,7 @@ import io.temporal.workflow.*;
 import io.temporal.workflow.Functions.Func;
 import java.lang.reflect.Type;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -261,6 +258,89 @@ public interface WorkflowOutboundCallsInterceptor {
     }
   }
 
+  @Experimental
+  final class ExecuteNexusOperationInput<R> {
+    private final String endpoint;
+    private final String service;
+    private final String operation;
+    private final Class<R> resultClass;
+    private final Type resultType;
+    private final Object arg;
+    private final NexusOperationOptions options;
+    private final Map<String, String> headers;
+
+    public ExecuteNexusOperationInput(
+        String endpoint,
+        String service,
+        String operation,
+        Class<R> resultClass,
+        Type resultType,
+        Object arg,
+        NexusOperationOptions options,
+        Map<String, String> headers) {
+      this.endpoint = endpoint;
+      this.service = service;
+      this.operation = operation;
+      this.resultClass = resultClass;
+      this.resultType = resultType;
+      this.arg = arg;
+      this.options = options;
+      this.headers = headers;
+    }
+
+    public String getService() {
+      return service;
+    }
+
+    public String getOperation() {
+      return operation;
+    }
+
+    public Object getArg() {
+      return arg;
+    }
+
+    public Class<R> getResultClass() {
+      return resultClass;
+    }
+
+    public Type getResultType() {
+      return resultType;
+    }
+
+    public String getEndpoint() {
+      return endpoint;
+    }
+
+    public NexusOperationOptions getOptions() {
+      return options;
+    }
+
+    public Map<String, String> getHeaders() {
+      return headers;
+    }
+  }
+
+  @Experimental
+  final class ExecuteNexusOperationOutput<R> {
+    private final Promise<R> result;
+    private final Promise<NexusOperationExecution> operationExecution;
+
+    public ExecuteNexusOperationOutput(
+        Promise<R> result, Promise<NexusOperationExecution> operationExecution) {
+      this.result = result;
+      this.operationExecution = operationExecution;
+    }
+
+    public Promise<R> getResult() {
+      return result;
+    }
+
+    public Promise<NexusOperationExecution> getOperationExecution() {
+      return operationExecution;
+    }
+  }
+
   final class SignalExternalInput {
     private final WorkflowExecution execution;
     private final String signalName;
@@ -372,6 +452,7 @@ public interface WorkflowOutboundCallsInterceptor {
 
   final class SignalRegistrationRequest {
     private final String signalType;
+    private final String description;
     private final HandlerUnfinishedPolicy unfinishedPolicy;
     private final Class<?>[] argTypes;
     private final Type[] genericArgTypes;
@@ -384,12 +465,14 @@ public interface WorkflowOutboundCallsInterceptor {
         Type[] genericArgTypes,
         Functions.Proc1<Object[]> callback) {
       this.signalType = signalType;
+      this.description = "";
       this.unfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON;
       this.argTypes = argTypes;
       this.genericArgTypes = genericArgTypes;
       this.callback = callback;
     }
 
+    // Kept for backward compatibility
     public SignalRegistrationRequest(
         String signalType,
         HandlerUnfinishedPolicy unfinishedPolicy,
@@ -397,6 +480,22 @@ public interface WorkflowOutboundCallsInterceptor {
         Type[] genericArgTypes,
         Functions.Proc1<Object[]> callback) {
       this.signalType = signalType;
+      this.description = "";
+      this.unfinishedPolicy = unfinishedPolicy;
+      this.argTypes = argTypes;
+      this.genericArgTypes = genericArgTypes;
+      this.callback = callback;
+    }
+
+    public SignalRegistrationRequest(
+        String signalType,
+        String description,
+        HandlerUnfinishedPolicy unfinishedPolicy,
+        Class<?>[] argTypes,
+        Type[] genericArgTypes,
+        Functions.Proc1<Object[]> callback) {
+      this.signalType = signalType;
+      this.description = description;
       this.unfinishedPolicy = unfinishedPolicy;
       this.argTypes = argTypes;
       this.genericArgTypes = genericArgTypes;
@@ -405,6 +504,11 @@ public interface WorkflowOutboundCallsInterceptor {
 
     public String getSignalType() {
       return signalType;
+    }
+
+    @Experimental
+    public String getDescription() {
+      return description;
     }
 
     public HandlerUnfinishedPolicy getUnfinishedPolicy() {
@@ -439,12 +543,14 @@ public interface WorkflowOutboundCallsInterceptor {
   @Experimental
   final class UpdateRegistrationRequest {
     private final String updateName;
+    private final String description;
     private final HandlerUnfinishedPolicy unfinishedPolicy;
     private final Class<?>[] argTypes;
     private final Type[] genericArgTypes;
     private final Functions.Func1<Object[], Object> executeCallback;
     private final Functions.Proc1<Object[]> validateCallback;
 
+    // Kept for backward compatibility
     public UpdateRegistrationRequest(
         String updateName,
         HandlerUnfinishedPolicy unfinishedPolicy,
@@ -453,6 +559,24 @@ public interface WorkflowOutboundCallsInterceptor {
         Functions.Proc1<Object[]> validateCallback,
         Functions.Func1<Object[], Object> executeCallback) {
       this.updateName = updateName;
+      this.description = "";
+      this.unfinishedPolicy = unfinishedPolicy;
+      this.argTypes = argTypes;
+      this.genericArgTypes = genericArgTypes;
+      this.validateCallback = validateCallback;
+      this.executeCallback = executeCallback;
+    }
+
+    public UpdateRegistrationRequest(
+        String updateName,
+        String description,
+        HandlerUnfinishedPolicy unfinishedPolicy,
+        Class<?>[] argTypes,
+        Type[] genericArgTypes,
+        Functions.Proc1<Object[]> validateCallback,
+        Functions.Func1<Object[], Object> executeCallback) {
+      this.updateName = updateName;
+      this.description = description;
       this.unfinishedPolicy = unfinishedPolicy;
       this.argTypes = argTypes;
       this.genericArgTypes = genericArgTypes;
@@ -462,6 +586,11 @@ public interface WorkflowOutboundCallsInterceptor {
 
     public String getUpdateName() {
       return updateName;
+    }
+
+    @Experimental
+    public String getDescription() {
+      return description;
     }
 
     public HandlerUnfinishedPolicy getUnfinishedPolicy() {
@@ -500,16 +629,32 @@ public interface WorkflowOutboundCallsInterceptor {
 
   final class RegisterQueryInput {
     private final String queryType;
+    private final String description;
     private final Class<?>[] argTypes;
     private final Type[] genericArgTypes;
     private final Functions.Func1<Object[], Object> callback;
 
+    // Kept for backward compatibility
     public RegisterQueryInput(
         String queryType,
         Class<?>[] argTypes,
         Type[] genericArgTypes,
         Functions.Func1<Object[], Object> callback) {
       this.queryType = queryType;
+      this.description = "";
+      this.argTypes = argTypes;
+      this.genericArgTypes = genericArgTypes;
+      this.callback = callback;
+    }
+
+    public RegisterQueryInput(
+        String queryType,
+        String description,
+        Class<?>[] argTypes,
+        Type[] genericArgTypes,
+        Functions.Func1<Object[], Object> callback) {
+      this.queryType = queryType;
+      this.description = description;
       this.argTypes = argTypes;
       this.genericArgTypes = genericArgTypes;
       this.callback = callback;
@@ -517,6 +662,11 @@ public interface WorkflowOutboundCallsInterceptor {
 
     public String getQueryType() {
       return queryType;
+    }
+
+    @Experimental
+    public String getDescription() {
+      return description;
     }
 
     public Class<?>[] getArgTypes() {
@@ -574,6 +724,9 @@ public interface WorkflowOutboundCallsInterceptor {
   <R> LocalActivityOutput<R> executeLocalActivity(LocalActivityInput<R> input);
 
   <R> ChildWorkflowOutput<R> executeChildWorkflow(ChildWorkflowInput<R> input);
+
+  @Experimental
+  <R> ExecuteNexusOperationOutput<R> executeNexusOperation(ExecuteNexusOperationInput<R> input);
 
   Random newRandom();
 

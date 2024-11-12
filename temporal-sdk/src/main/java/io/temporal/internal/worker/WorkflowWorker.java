@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 final class WorkflowWorker implements SuspendableWorker {
+  private static final String GRACEFUL_SHUTDOWN_MESSAGE = "graceful shutdown";
   private static final Logger log = LoggerFactory.getLogger(WorkflowWorker.class);
 
   private final WorkflowRunLockManager runLocks;
@@ -119,7 +120,8 @@ final class WorkflowWorker implements SuspendableWorker {
               new TaskHandlerImpl(handler),
               pollerOptions,
               this.slotSupplier.maximumSlots().orElse(Integer.MAX_VALUE),
-              true);
+              true,
+              options.isUsingVirtualThreads());
       stickyQueueBalancer =
           new StickyQueueBalancer(
               options.getPollerOptions().getPollThreadCount(), stickyTaskQueueName != null);
@@ -162,30 +164,49 @@ final class WorkflowWorker implements SuspendableWorker {
             && stickyTaskQueueName != null
             && stickyQueueBalancer != null;
 
-    return CompletableFuture.completedFuture(null)
-        .thenCompose(
-            ignore ->
-                stickyQueueBalancerDrainEnabled
-                    ? shutdownManager.waitForStickyQueueBalancer(
-                        stickyQueueBalancer, options.getDrainStickyTaskQueueTimeout())
-                    : CompletableFuture.completedFuture(null))
-        .thenCompose(ignore -> poller.shutdown(shutdownManager, interruptTasks))
-        .thenCompose(
-            ignore ->
-                !interruptTasks
-                    ? shutdownManager.waitForSupplierPermitsReleasedUnlimited(
-                        slotSupplier, supplierName)
-                    : CompletableFuture.completedFuture(null))
-        .thenCompose(
-            ignore ->
-                pollTaskExecutor != null
-                    ? pollTaskExecutor.shutdown(shutdownManager, interruptTasks)
-                    : CompletableFuture.completedFuture(null))
-        .exceptionally(
-            e -> {
-              log.error("Unexpected exception during shutdown", e);
-              return null;
-            });
+    CompletableFuture<Void> pollerShutdown =
+        CompletableFuture.completedFuture(null)
+            .thenCompose(
+                ignore ->
+                    stickyQueueBalancerDrainEnabled
+                        ? shutdownManager.waitForStickyQueueBalancer(
+                            stickyQueueBalancer, options.getDrainStickyTaskQueueTimeout())
+                        : CompletableFuture.completedFuture(null))
+            .thenCompose(ignore -> poller.shutdown(shutdownManager, interruptTasks));
+    return CompletableFuture.allOf(
+        pollerShutdown.thenCompose(
+            ignore -> {
+              if (!interruptTasks && stickyTaskQueueName != null) {
+                return shutdownManager.waitOnWorkerShutdownRequest(
+                    service
+                        .futureStub()
+                        .shutdownWorker(
+                            ShutdownWorkerRequest.newBuilder()
+                                .setIdentity(options.getIdentity())
+                                .setNamespace(namespace)
+                                .setStickyTaskQueue(stickyTaskQueueName)
+                                .setReason(GRACEFUL_SHUTDOWN_MESSAGE)
+                                .build()));
+              }
+              return CompletableFuture.completedFuture(null);
+            }),
+        pollerShutdown
+            .thenCompose(
+                ignore ->
+                    !interruptTasks
+                        ? shutdownManager.waitForSupplierPermitsReleasedUnlimited(
+                            slotSupplier, supplierName)
+                        : CompletableFuture.completedFuture(null))
+            .thenCompose(
+                ignore ->
+                    pollTaskExecutor != null
+                        ? pollTaskExecutor.shutdown(shutdownManager, interruptTasks)
+                        : CompletableFuture.completedFuture(null))
+            .exceptionally(
+                e -> {
+                  log.error("Unexpected exception during shutdown", e);
+                  return null;
+                }));
   }
 
   @Override

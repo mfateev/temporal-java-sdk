@@ -59,9 +59,11 @@ public final class WorkerOptions {
 
     private static final int DEFAULT_MAX_CONCURRENT_WORKFLOW_TASK_POLLERS = 5;
     private static final int DEFAULT_MAX_CONCURRENT_ACTIVITY_TASK_POLLERS = 5;
+    private static final int DEFAULT_MAX_CONCURRENT_NEXUS_TASK_POLLERS = 5;
     private static final int DEFAULT_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE = 200;
     private static final int DEFAULT_MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE = 200;
     private static final int DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE = 200;
+    private static final int DEFAULT_MAX_CONCURRENT_NEXUS_EXECUTION_SIZE = 200;
     private static final long DEFAULT_DEADLOCK_DETECTION_TIMEOUT = 1000;
     private static final Duration DEFAULT_MAX_HEARTBEAT_THROTTLE_INTERVAL = Duration.ofSeconds(60);
     private static final Duration DEFAULT_DEFAULT_HEARTBEAT_THROTTLE_INTERVAL =
@@ -71,9 +73,11 @@ public final class WorkerOptions {
     private int maxConcurrentActivityExecutionSize;
     private int maxConcurrentWorkflowTaskExecutionSize;
     private int maxConcurrentLocalActivityExecutionSize;
+    private int maxConcurrentNexusExecutionSize;
     private double maxTaskQueueActivitiesPerSecond;
     private int maxConcurrentWorkflowTaskPollers;
     private int maxConcurrentActivityTaskPollers;
+    private int maxConcurrentNexusTaskPollers;
     private boolean localActivityWorkerOnly;
     private long defaultDeadlockDetectionTimeout;
     private Duration maxHeartbeatThrottleInterval;
@@ -84,6 +88,10 @@ public final class WorkerOptions {
     private boolean useBuildIdForVersioning;
     private Duration stickyTaskQueueDrainTimeout;
     private WorkerTuner workerTuner;
+    private boolean usingVirtualThreadsOnWorkflowWorker;
+    private boolean usingVirtualThreadsOnActivityWorker;
+    private boolean usingVirtualThreadsOnLocalActivityWorker;
+    private boolean usingVirtualThreadsOnNexusWorker;
     private String identity;
 
     private Builder() {}
@@ -96,9 +104,11 @@ public final class WorkerOptions {
       this.maxConcurrentActivityExecutionSize = o.maxConcurrentActivityExecutionSize;
       this.maxConcurrentWorkflowTaskExecutionSize = o.maxConcurrentWorkflowTaskExecutionSize;
       this.maxConcurrentLocalActivityExecutionSize = o.maxConcurrentLocalActivityExecutionSize;
+      this.maxConcurrentNexusExecutionSize = o.maxConcurrentNexusExecutionSize;
       this.workerTuner = o.workerTuner;
       this.maxTaskQueueActivitiesPerSecond = o.maxTaskQueueActivitiesPerSecond;
       this.maxConcurrentWorkflowTaskPollers = o.maxConcurrentWorkflowTaskPollers;
+      this.maxConcurrentNexusTaskPollers = o.maxConcurrentNexusTaskPollers;
       this.maxConcurrentActivityTaskPollers = o.maxConcurrentActivityTaskPollers;
       this.localActivityWorkerOnly = o.localActivityWorkerOnly;
       this.defaultDeadlockDetectionTimeout = o.defaultDeadlockDetectionTimeout;
@@ -110,6 +120,10 @@ public final class WorkerOptions {
       this.buildId = o.buildId;
       this.stickyTaskQueueDrainTimeout = o.stickyTaskQueueDrainTimeout;
       this.identity = o.identity;
+      this.usingVirtualThreadsOnActivityWorker = o.usingVirtualThreadsOnActivityWorker;
+      this.usingVirtualThreadsOnWorkflowWorker = o.usingVirtualThreadsOnWorkflowWorker;
+      this.usingVirtualThreadsOnLocalActivityWorker = o.usingVirtualThreadsOnLocalActivityWorker;
+      this.usingVirtualThreadsOnNexusWorker = o.usingVirtualThreadsOnNexusWorker;
     }
 
     /**
@@ -184,6 +198,22 @@ public final class WorkerOptions {
     }
 
     /**
+     * @param maxConcurrentNexusExecutionSize Maximum number of nexus tasks executed in parallel.
+     *     Default is 200, which is chosen if set to zero.
+     * @return {@code this}
+     *     <p>Note setting is mutually exclusive with {@link #setWorkerTuner(WorkerTuner)}
+     */
+    @Experimental
+    public Builder setMaxConcurrentNexusExecutionSize(int maxConcurrentNexusExecutionSize) {
+      if (maxConcurrentNexusExecutionSize < 0) {
+        throw new IllegalArgumentException(
+            "Negative maxConcurrentNexusExecutionSize value: " + maxConcurrentNexusExecutionSize);
+      }
+      this.maxConcurrentNexusExecutionSize = maxConcurrentNexusExecutionSize;
+      return this;
+    }
+
+    /**
      * Optional: Sets the rate limiting on number of activities that can be executed per second.
      * This is managed by the server and controls activities per second for the entire task queue
      * across all the workers. Notice that the number is represented in double, so that you can set
@@ -208,6 +238,19 @@ public final class WorkerOptions {
      */
     public Builder setMaxConcurrentWorkflowTaskPollers(int maxConcurrentWorkflowTaskPollers) {
       this.maxConcurrentWorkflowTaskPollers = maxConcurrentWorkflowTaskPollers;
+      return this;
+    }
+
+    /**
+     * Sets the maximum number of simultaneous long poll requests to the Temporal Server to retrieve
+     * nexus tasks. Changing this value will affect the rate at which the worker is able to consume
+     * tasks from a task queue.
+     *
+     * <p>Default is 5, which is chosen if set to zero.
+     */
+    @Experimental
+    public Builder setMaxConcurrentNexusTaskPollers(int maxConcurrentNexusTaskPollers) {
+      this.maxConcurrentNexusTaskPollers = maxConcurrentNexusTaskPollers;
       return this;
     }
 
@@ -388,6 +431,60 @@ public final class WorkerOptions {
       return this;
     }
 
+    /**
+     * Use Virtual Threads for all the task executors created by this worker. This option is only
+     * supported for JDK >= 21. Individual options for different types of workers can be set using
+     * the respective methods.
+     */
+    @Experimental
+    public Builder setUsingVirtualThreads(boolean enable) {
+      this.usingVirtualThreadsOnWorkflowWorker = enable;
+      this.usingVirtualThreadsOnLocalActivityWorker = enable;
+      this.usingVirtualThreadsOnActivityWorker = enable;
+      this.usingVirtualThreadsOnNexusWorker = enable;
+      return this;
+    }
+
+    /**
+     * Use Virtual Threads for the Workflow task executors created by this worker. This option is
+     * only supported for JDK >= 21.
+     */
+    @Experimental
+    public Builder setUsingVirtualThreadsOnWorkflowWorker(boolean enable) {
+      this.usingVirtualThreadsOnWorkflowWorker = enable;
+      return this;
+    }
+
+    /**
+     * Use Virtual Threads for the Local Activity task executors created by this worker. This option
+     * is only supported for JDK >= 21.
+     */
+    @Experimental
+    public Builder setUsingVirtualThreadsOnLocalActivityWorker(boolean enable) {
+      this.usingVirtualThreadsOnLocalActivityWorker = enable;
+      return this;
+    }
+
+    /**
+     * Use Virtual Threads for the Activity task executors created by this worker. This option is
+     * only supported for JDK >= 21.
+     */
+    @Experimental
+    public Builder setUsingVirtualThreadsOnActivityWorker(boolean enable) {
+      this.usingVirtualThreadsOnActivityWorker = enable;
+      return this;
+    }
+
+    /**
+     * Use Virtual Threads for the Nexus task executors created by this worker. This option is only
+     * supported for JDK >= 21.
+     */
+    @Experimental
+    public Builder setUsingVirtualThreadsOnNexusWorker(boolean enable) {
+      this.usingVirtualThreadsOnNexusWorker = enable;
+      return this;
+    }
+
     /** Override identity of the worker primary specified in a WorkflowClient options. */
     public Builder setIdentity(String identity) {
       this.identity = identity;
@@ -400,10 +497,12 @@ public final class WorkerOptions {
           maxConcurrentActivityExecutionSize,
           maxConcurrentWorkflowTaskExecutionSize,
           maxConcurrentLocalActivityExecutionSize,
+          maxConcurrentNexusExecutionSize,
           workerTuner,
           maxTaskQueueActivitiesPerSecond,
           maxConcurrentWorkflowTaskPollers,
           maxConcurrentActivityTaskPollers,
+          maxConcurrentNexusTaskPollers,
           localActivityWorkerOnly,
           defaultDeadlockDetectionTimeout,
           maxHeartbeatThrottleInterval,
@@ -413,7 +512,11 @@ public final class WorkerOptions {
           useBuildIdForVersioning,
           buildId,
           stickyTaskQueueDrainTimeout,
-          identity);
+          identity,
+          usingVirtualThreadsOnWorkflowWorker,
+          usingVirtualThreadsOnActivityWorker,
+          usingVirtualThreadsOnLocalActivityWorker,
+          usingVirtualThreadsOnNexusWorker);
     }
 
     public WorkerOptions validateAndBuildWithDefaults() {
@@ -462,6 +565,8 @@ public final class WorkerOptions {
       Preconditions.checkState(
           stickyTaskQueueDrainTimeout == null || !stickyTaskQueueDrainTimeout.isNegative(),
           "negative stickyTaskQueueDrainTimeout");
+      Preconditions.checkState(
+          maxConcurrentNexusTaskPollers >= 0, "negative maxConcurrentNexusTaskPollers");
 
       return new WorkerOptions(
           maxWorkerActivitiesPerSecond,
@@ -474,6 +579,9 @@ public final class WorkerOptions {
           maxConcurrentLocalActivityExecutionSize == 0
               ? DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE
               : maxConcurrentLocalActivityExecutionSize,
+          maxConcurrentNexusExecutionSize == 0
+              ? DEFAULT_MAX_CONCURRENT_NEXUS_EXECUTION_SIZE
+              : maxConcurrentNexusExecutionSize,
           workerTuner,
           maxTaskQueueActivitiesPerSecond,
           maxConcurrentWorkflowTaskPollers == 0
@@ -482,6 +590,9 @@ public final class WorkerOptions {
           maxConcurrentActivityTaskPollers == 0
               ? DEFAULT_MAX_CONCURRENT_ACTIVITY_TASK_POLLERS
               : maxConcurrentActivityTaskPollers,
+          maxConcurrentNexusTaskPollers == 0
+              ? DEFAULT_MAX_CONCURRENT_NEXUS_TASK_POLLERS
+              : maxConcurrentNexusTaskPollers,
           localActivityWorkerOnly,
           defaultDeadlockDetectionTimeout == 0
               ? DEFAULT_DEADLOCK_DETECTION_TIMEOUT
@@ -501,7 +612,11 @@ public final class WorkerOptions {
           stickyTaskQueueDrainTimeout == null
               ? DEFAULT_STICKY_TASK_QUEUE_DRAIN_TIMEOUT
               : stickyTaskQueueDrainTimeout,
-          identity);
+          identity,
+          usingVirtualThreadsOnWorkflowWorker,
+          usingVirtualThreadsOnActivityWorker,
+          usingVirtualThreadsOnLocalActivityWorker,
+          usingVirtualThreadsOnNexusWorker);
     }
   }
 
@@ -509,10 +624,12 @@ public final class WorkerOptions {
   private final int maxConcurrentActivityExecutionSize;
   private final int maxConcurrentWorkflowTaskExecutionSize;
   private final int maxConcurrentLocalActivityExecutionSize;
+  private final int maxConcurrentNexusExecutionSize;
   private final WorkerTuner workerTuner;
   private final double maxTaskQueueActivitiesPerSecond;
   private final int maxConcurrentWorkflowTaskPollers;
   private final int maxConcurrentActivityTaskPollers;
+  private final int maxConcurrentNexusTaskPollers;
   private final boolean localActivityWorkerOnly;
   private final long defaultDeadlockDetectionTimeout;
   private final Duration maxHeartbeatThrottleInterval;
@@ -523,16 +640,22 @@ public final class WorkerOptions {
   private final String buildId;
   private final Duration stickyTaskQueueDrainTimeout;
   private final String identity;
+  private final boolean usingVirtualThreadsOnWorkflowWorker;
+  private final boolean usingVirtualThreadsOnActivityWorker;
+  private final boolean usingVirtualThreadsOnLocalActivityWorker;
+  private final boolean usingVirtualThreadsOnNexusWorker;
 
   private WorkerOptions(
       double maxWorkerActivitiesPerSecond,
       int maxConcurrentActivityExecutionSize,
       int maxConcurrentWorkflowTaskExecutionSize,
       int maxConcurrentLocalActivityExecutionSize,
+      int maxConcurrentNexusExecutionSize,
       WorkerTuner workerTuner,
       double maxTaskQueueActivitiesPerSecond,
       int workflowPollThreadCount,
       int activityPollThreadCount,
+      int nexusPollThreadCount,
       boolean localActivityWorkerOnly,
       long defaultDeadlockDetectionTimeout,
       Duration maxHeartbeatThrottleInterval,
@@ -542,15 +665,21 @@ public final class WorkerOptions {
       boolean useBuildIdForVersioning,
       String buildId,
       Duration stickyTaskQueueDrainTimeout,
-      String identity) {
+      String identity,
+      boolean useThreadsEnabledOnWorkflowWorker,
+      boolean useThreadsEnabledOnActivityWorker,
+      boolean virtualThreadsEnabledOnLocalActivityWorker,
+      boolean virtualThreadsEnabledOnNexusWorker) {
     this.maxWorkerActivitiesPerSecond = maxWorkerActivitiesPerSecond;
     this.maxConcurrentActivityExecutionSize = maxConcurrentActivityExecutionSize;
     this.maxConcurrentWorkflowTaskExecutionSize = maxConcurrentWorkflowTaskExecutionSize;
     this.maxConcurrentLocalActivityExecutionSize = maxConcurrentLocalActivityExecutionSize;
+    this.maxConcurrentNexusExecutionSize = maxConcurrentNexusExecutionSize;
     this.workerTuner = workerTuner;
     this.maxTaskQueueActivitiesPerSecond = maxTaskQueueActivitiesPerSecond;
     this.maxConcurrentWorkflowTaskPollers = workflowPollThreadCount;
     this.maxConcurrentActivityTaskPollers = activityPollThreadCount;
+    this.maxConcurrentNexusTaskPollers = nexusPollThreadCount;
     this.localActivityWorkerOnly = localActivityWorkerOnly;
     this.defaultDeadlockDetectionTimeout = defaultDeadlockDetectionTimeout;
     this.maxHeartbeatThrottleInterval = maxHeartbeatThrottleInterval;
@@ -561,6 +690,10 @@ public final class WorkerOptions {
     this.buildId = buildId;
     this.stickyTaskQueueDrainTimeout = stickyTaskQueueDrainTimeout;
     this.identity = identity;
+    this.usingVirtualThreadsOnWorkflowWorker = useThreadsEnabledOnWorkflowWorker;
+    this.usingVirtualThreadsOnActivityWorker = useThreadsEnabledOnActivityWorker;
+    this.usingVirtualThreadsOnLocalActivityWorker = virtualThreadsEnabledOnLocalActivityWorker;
+    this.usingVirtualThreadsOnNexusWorker = virtualThreadsEnabledOnNexusWorker;
   }
 
   public double getMaxWorkerActivitiesPerSecond() {
@@ -577,6 +710,10 @@ public final class WorkerOptions {
 
   public int getMaxConcurrentLocalActivityExecutionSize() {
     return maxConcurrentLocalActivityExecutionSize;
+  }
+
+  public int getMaxConcurrentNexusExecutionSize() {
+    return maxConcurrentNexusExecutionSize;
   }
 
   public double getMaxTaskQueueActivitiesPerSecond() {
@@ -605,6 +742,10 @@ public final class WorkerOptions {
 
   public int getMaxConcurrentActivityTaskPollers() {
     return maxConcurrentActivityTaskPollers;
+  }
+
+  public int getMaxConcurrentNexusTaskPollers() {
+    return maxConcurrentNexusTaskPollers;
   }
 
   public long getDefaultDeadlockDetectionTimeout() {
@@ -653,6 +794,22 @@ public final class WorkerOptions {
     return identity;
   }
 
+  public boolean isUsingVirtualThreadsOnWorkflowWorker() {
+    return usingVirtualThreadsOnActivityWorker;
+  }
+
+  public boolean isUsingVirtualThreadsOnActivityWorker() {
+    return usingVirtualThreadsOnActivityWorker;
+  }
+
+  public boolean isUsingVirtualThreadsOnLocalActivityWorker() {
+    return usingVirtualThreadsOnLocalActivityWorker;
+  }
+
+  public boolean isUsingVirtualThreadsOnNexusWorker() {
+    return usingVirtualThreadsOnNexusWorker;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -662,9 +819,11 @@ public final class WorkerOptions {
         && maxConcurrentActivityExecutionSize == that.maxConcurrentActivityExecutionSize
         && maxConcurrentWorkflowTaskExecutionSize == that.maxConcurrentWorkflowTaskExecutionSize
         && maxConcurrentLocalActivityExecutionSize == that.maxConcurrentLocalActivityExecutionSize
+        && maxConcurrentNexusExecutionSize == that.maxConcurrentNexusExecutionSize
         && compare(maxTaskQueueActivitiesPerSecond, that.maxTaskQueueActivitiesPerSecond) == 0
         && maxConcurrentWorkflowTaskPollers == that.maxConcurrentWorkflowTaskPollers
         && maxConcurrentActivityTaskPollers == that.maxConcurrentActivityTaskPollers
+        && maxConcurrentNexusTaskPollers == that.maxConcurrentNexusTaskPollers
         && localActivityWorkerOnly == that.localActivityWorkerOnly
         && defaultDeadlockDetectionTimeout == that.defaultDeadlockDetectionTimeout
         && disableEagerExecution == that.disableEagerExecution
@@ -675,7 +834,11 @@ public final class WorkerOptions {
         && Objects.equals(stickyQueueScheduleToStartTimeout, that.stickyQueueScheduleToStartTimeout)
         && Objects.equals(buildId, that.buildId)
         && Objects.equals(stickyTaskQueueDrainTimeout, that.stickyTaskQueueDrainTimeout)
-        && Objects.equals(identity, that.identity);
+        && Objects.equals(identity, that.identity)
+        && usingVirtualThreadsOnWorkflowWorker == that.usingVirtualThreadsOnWorkflowWorker
+        && usingVirtualThreadsOnActivityWorker == that.usingVirtualThreadsOnActivityWorker
+        && usingVirtualThreadsOnLocalActivityWorker == that.usingVirtualThreadsOnLocalActivityWorker
+        && usingVirtualThreadsOnNexusWorker == that.usingVirtualThreadsOnNexusWorker;
   }
 
   @Override
@@ -685,10 +848,12 @@ public final class WorkerOptions {
         maxConcurrentActivityExecutionSize,
         maxConcurrentWorkflowTaskExecutionSize,
         maxConcurrentLocalActivityExecutionSize,
+        maxConcurrentNexusExecutionSize,
         workerTuner,
         maxTaskQueueActivitiesPerSecond,
         maxConcurrentWorkflowTaskPollers,
         maxConcurrentActivityTaskPollers,
+        maxConcurrentNexusTaskPollers,
         localActivityWorkerOnly,
         defaultDeadlockDetectionTimeout,
         maxHeartbeatThrottleInterval,
@@ -698,7 +863,11 @@ public final class WorkerOptions {
         useBuildIdForVersioning,
         buildId,
         stickyTaskQueueDrainTimeout,
-        identity);
+        identity,
+        usingVirtualThreadsOnWorkflowWorker,
+        usingVirtualThreadsOnActivityWorker,
+        usingVirtualThreadsOnLocalActivityWorker,
+        usingVirtualThreadsOnNexusWorker);
   }
 
   @Override
@@ -712,6 +881,8 @@ public final class WorkerOptions {
         + maxConcurrentWorkflowTaskExecutionSize
         + ", maxConcurrentLocalActivityExecutionSize="
         + maxConcurrentLocalActivityExecutionSize
+        + ", maxConcurrentNexusExecutionSize="
+        + maxConcurrentNexusExecutionSize
         + ", workerTuner="
         + workerTuner
         + ", maxTaskQueueActivitiesPerSecond="
@@ -720,6 +891,8 @@ public final class WorkerOptions {
         + maxConcurrentWorkflowTaskPollers
         + ", maxConcurrentActivityTaskPollers="
         + maxConcurrentActivityTaskPollers
+        + ", maxConcurrentNexusTaskPollers="
+        + maxConcurrentNexusTaskPollers
         + ", localActivityWorkerOnly="
         + localActivityWorkerOnly
         + ", defaultDeadlockDetectionTimeout="
@@ -741,6 +914,14 @@ public final class WorkerOptions {
         + stickyTaskQueueDrainTimeout
         + ", identity="
         + identity
+        + ", usingVirtualThreadsOnWorkflowWorker="
+        + usingVirtualThreadsOnWorkflowWorker
+        + ", usingVirtualThreadsOnActivityWorker="
+        + usingVirtualThreadsOnActivityWorker
+        + ", usingVirtualThreadsOnLocalActivityWorker="
+        + usingVirtualThreadsOnLocalActivityWorker
+        + ", usingVirtualThreadsOnNexusWorker="
+        + usingVirtualThreadsOnNexusWorker
         + '}';
   }
 }

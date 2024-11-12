@@ -32,12 +32,14 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.DefaultDataConverter;
+import io.temporal.internal.logging.LoggerTag;
 import io.temporal.internal.replay.ReplayWorkflow;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowContext;
 import io.temporal.internal.statemachines.UpdateProtocolCallback;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowExecutorCache;
+import io.temporal.payload.context.WorkflowSerializationContext;
 import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.UpdateInfo;
 import java.util.List;
@@ -47,6 +49,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * SyncWorkflow supports workflows that use synchronous blocking code. An instance is created per
@@ -67,6 +70,7 @@ class SyncWorkflow implements ReplayWorkflow {
   private WorkflowExecutionHandler workflowProc;
   private DeterministicRunner runner;
   private DataConverter dataConverter;
+  private DataConverter dataConverterWithWorkflowContext;
 
   public SyncWorkflow(
       String namespace,
@@ -90,6 +94,9 @@ class SyncWorkflow implements ReplayWorkflow {
     this.cache = cache;
     this.defaultDeadlockDetectionTimeout = defaultDeadlockDetectionTimeout;
     this.dataConverter = dataConverter;
+    this.dataConverterWithWorkflowContext =
+        dataConverter.withContext(
+            new WorkflowSerializationContext(namespace, workflowExecution.getWorkflowId()));
     this.workflowContext =
         new SyncWorkflowContext(
             namespace,
@@ -166,6 +173,8 @@ class SyncWorkflow implements ReplayWorkflow {
         () -> {
           try {
             workflowContext.setCurrentUpdateInfo(updateInfo);
+            MDC.put(LoggerTag.UPDATE_ID, updateInfo.getUpdateId());
+            MDC.put(LoggerTag.UPDATE_NAME, updateInfo.getUpdateName());
             // Skip validator on replay
             if (!callbacks.isReplaying()) {
               try {
@@ -233,6 +242,9 @@ class SyncWorkflow implements ReplayWorkflow {
       // stack trace query result should be readable for UI even if user specifies a custom data
       // converter
       return DefaultDataConverter.STANDARD_INSTANCE.toPayloads(runner.stackTrace());
+    }
+    if (WorkflowClient.QUERY_TYPE_WORKFLOW_METADATA.equals(query.getQueryType())) {
+      return dataConverterWithWorkflowContext.toPayloads(workflowContext.getWorkflowMetadata());
     }
     Optional<Payloads> args =
         query.hasQueryArgs() ? Optional.of(query.getQueryArgs()) : Optional.empty();

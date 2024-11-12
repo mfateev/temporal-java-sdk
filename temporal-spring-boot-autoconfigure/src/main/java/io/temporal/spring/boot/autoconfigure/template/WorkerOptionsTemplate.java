@@ -58,10 +58,14 @@ class WorkerOptionsTemplate {
             .ifPresent(options::setMaxConcurrentActivityExecutionSize);
         Optional.ofNullable(threadsConfiguration.getMaxConcurrentLocalActivityExecutors())
             .ifPresent(options::setMaxConcurrentLocalActivityExecutionSize);
+        Optional.ofNullable(threadsConfiguration.getMaxConcurrentNexusTasksExecutors())
+            .ifPresent(options::setMaxConcurrentNexusExecutionSize);
         Optional.ofNullable(threadsConfiguration.getMaxConcurrentWorkflowTaskPollers())
             .ifPresent(options::setMaxConcurrentWorkflowTaskPollers);
         Optional.ofNullable(threadsConfiguration.getMaxConcurrentActivityTaskPollers())
             .ifPresent(options::setMaxConcurrentActivityTaskPollers);
+        Optional.ofNullable(threadsConfiguration.getMaxConcurrentNexusTaskPollers())
+            .ifPresent(options::setMaxConcurrentNexusTaskPollers);
       }
 
       WorkerProperties.RateLimitsConfigurationProperties rateLimitConfiguration =
@@ -78,8 +82,22 @@ class WorkerOptionsTemplate {
       if (buildIdConfigurations != null) {
         Optional.ofNullable(buildIdConfigurations.getWorkerBuildId())
             .ifPresent(options::setBuildId);
-        Optional.ofNullable(buildIdConfigurations.getEnabledWorkerVersioning())
-            .ifPresent(options::setUseBuildIdForVersioning);
+        options.setUseBuildIdForVersioning(buildIdConfigurations.getEnabledWorkerVersioning());
+      }
+
+      WorkerProperties.VirtualThreadConfigurationProperties virtualThreadConfiguration =
+          workerProperties.getVirtualThreads();
+      if (virtualThreadConfiguration != null) {
+        Optional.ofNullable(virtualThreadConfiguration.isUsingVirtualThreads())
+            .ifPresent(options::setUsingVirtualThreads);
+        Optional.ofNullable(virtualThreadConfiguration.isUsingVirtualThreadsOnWorkflowWorker())
+            .ifPresent(options::setUsingVirtualThreadsOnWorkflowWorker);
+        Optional.ofNullable(virtualThreadConfiguration.isUsingVirtualThreadsOnActivityWorker())
+            .ifPresent(options::setUsingVirtualThreadsOnActivityWorker);
+        Optional.ofNullable(virtualThreadConfiguration.isUsingVirtualThreadsOnLocalActivityWorker())
+            .ifPresent(options::setUsingVirtualThreadsOnLocalActivityWorker);
+        Optional.ofNullable(virtualThreadConfiguration.isUsingVirtualThreadsOnNexusWorker())
+            .ifPresent(options::setUsingVirtualThreadsOnNexusWorker);
       }
     }
     if (customizer != null) {

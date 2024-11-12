@@ -84,8 +84,35 @@ public class UpdateWithStartTest {
     assertEquals(options.getWorkflowId(), handle1.getExecution().getWorkflowId());
     assertEquals("Hello Update", handle1.getResultAsync().get());
 
-    WorkflowUpdateHandle<String> updHandle = updateOp.getUpdateHandle().get();
-    assertEquals(updateOp.getResult(), updHandle.getResultAsync().get());
+    WorkflowUpdateHandle<String> handle2 = updateOp.getUpdateHandle().get();
+    assertEquals(updateOp.getResult(), handle2.getResultAsync().get());
+
+    workflow.complete();
+
+    assertEquals("Hello Update complete", WorkflowStub.fromTyped(workflow).getResult(String.class));
+  }
+
+  @Test
+  public void startAndSendUpdateTogetherUsingUntypedWorkflowOperation()
+      throws ExecutionException, InterruptedException {
+    WorkflowClient workflowClient = testWorkflowRule.getWorkflowClient();
+
+    WorkflowOptions options = createOptions();
+    TestWorkflows.WorkflowWithUpdate workflow =
+        workflowClient.newWorkflowStub(TestWorkflows.WorkflowWithUpdate.class, options);
+
+    UpdateWithStartWorkflowOperation<String> updateOp =
+        UpdateWithStartWorkflowOperation.newBuilder(
+                "update", String.class, new Object[] {1, "Hello Update"}) // untyped!
+            .setWaitForStage(WorkflowUpdateStage.COMPLETED)
+            .build();
+
+    WorkflowUpdateHandle<String> handle1 =
+        WorkflowClient.updateWithStart(workflow::execute, updateOp);
+    assertEquals("Hello Update", handle1.getResultAsync().get());
+
+    WorkflowUpdateHandle<String> handle2 = updateOp.getUpdateHandle().get();
+    assertEquals(updateOp.getResult(), handle2.getResultAsync().get());
 
     workflow.complete();
 
@@ -110,8 +137,8 @@ public class UpdateWithStartTest {
         WorkflowClient.updateWithStart(workflow::execute, updateOp);
     assertNull(handle1.getResultAsync().get());
 
-    WorkflowUpdateHandle<Void> updHandle = updateOp.getUpdateHandle().get();
-    assertEquals(updateOp.getResult(), updHandle.getResultAsync().get());
+    WorkflowUpdateHandle<Void> handle2 = updateOp.getUpdateHandle().get();
+    assertEquals(updateOp.getResult(), handle2.getResultAsync().get());
 
     assertEquals("Hello Update", WorkflowStub.fromTyped(workflow).getResult(String.class));
   }
@@ -175,7 +202,7 @@ public class UpdateWithStartTest {
             TestMultiArgWorkflowFunctions.Test1ArgWorkflowFunc.class, createOptions());
     UpdateWithStartWorkflowOperation<String> updateOp1 = newUpdateOp.apply(stubF1::update, 1);
     WorkflowUpdateHandle<String> handle1 =
-        WorkflowClient.updateWithStart(stubF1::func1, 1, updateOp1);
+        WorkflowClient.updateWithStart(stubF1::func1, "1", updateOp1);
 
     // 2 args
     TestMultiArgWorkflowFunctions.Test2ArgWorkflowFunc stubF2 =
@@ -218,12 +245,19 @@ public class UpdateWithStartTest {
         WorkflowClient.updateWithStart(stubF6::func6, "1", 2, 3, 4, 5, 6, updateOp6);
 
     assertEquals("0", handle0.getResultAsync().get());
+    assertEquals("func", WorkflowStub.fromTyped(stubF).getResult(String.class));
     assertEquals("1", handle1.getResultAsync().get());
+    assertEquals("1", WorkflowStub.fromTyped(stubF1).getResult(String.class));
     assertEquals("2", handle2.getResultAsync().get());
+    assertEquals("12", WorkflowStub.fromTyped(stubF2).getResult(String.class));
     assertEquals("3", handle3.getResultAsync().get());
+    assertEquals("123", WorkflowStub.fromTyped(stubF3).getResult(String.class));
     assertEquals("4", handle4.getResultAsync().get());
+    assertEquals("1234", WorkflowStub.fromTyped(stubF4).getResult(String.class));
     assertEquals("5", handle5.getResultAsync().get());
+    assertEquals("12345", WorkflowStub.fromTyped(stubF5).getResult(String.class));
     assertEquals("6", handle6.getResultAsync().get());
+    assertEquals("123456", WorkflowStub.fromTyped(stubF6).getResult(String.class));
   }
 
   @Test
