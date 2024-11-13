@@ -25,6 +25,7 @@ import io.temporal.client.*;
 import io.temporal.common.interceptors.WorkflowClientInterceptorBase;
 import io.temporal.serviceclient.TestServiceStubs;
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -72,6 +73,11 @@ class TimeLockingInterceptor extends WorkflowClientInterceptorBase {
     @Override
     public WorkflowExecution start(Object... args) {
       return next.start(args);
+    }
+
+    @Override
+    public <T> WorkflowExecution startCoalesced(List<T> args) {
+      return next.startCoalesced(args);
     }
 
     @Override
