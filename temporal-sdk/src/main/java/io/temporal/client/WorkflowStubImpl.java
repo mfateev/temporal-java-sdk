@@ -131,6 +131,17 @@ class WorkflowStubImpl implements WorkflowStub {
   }
 
   @Override
+  public <T> WorkflowExecution startCoalesced(T... args) {
+    if (options == null) {
+      throw new IllegalStateException("Required parameter WorkflowOptions is missing");
+    }
+    // TODO(maxim): Hacky way to indicate that the workflow is coalesced
+    WorkflowOptions cOptions =
+        WorkflowOptions.newBuilder(options).setStaticSummary("coalesced").build();
+    return startWithOptions(WorkflowOptions.merge(null, null, cOptions), args);
+  }
+
+  @Override
   public <R> WorkflowUpdateHandle<R> updateWithStart(
       UpdateWithStartWorkflowOperation<R> updateOperation, Object... startArgs) {
     if (options == null) {

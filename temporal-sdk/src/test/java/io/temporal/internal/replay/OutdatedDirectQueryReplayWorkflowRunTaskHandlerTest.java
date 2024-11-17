@@ -36,7 +36,6 @@ import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.workflowservice.v1.GetSystemInfoResponse;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
-import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 import io.temporal.client.WorkflowStub;
 import io.temporal.common.WorkflowExecutionHistory;
 import io.temporal.common.converter.DataConverter;
@@ -84,7 +83,7 @@ public class OutdatedDirectQueryReplayWorkflowRunTaskHandlerTest {
     WorkflowExecutionHistory workflowExecutionHistory =
         testWorkflowRule.getWorkflowClient().fetchHistory(workflowExecution.getWorkflowId());
 
-    PollWorkflowTaskQueueResponseOrBuilder wft =
+    PollWorkflowTaskQueueResponse wft =
         PollWorkflowTaskQueueResponse.newBuilder()
             .setWorkflowExecution(workflowExecution)
             .setPreviousStartedEventId(
@@ -94,7 +93,8 @@ public class OutdatedDirectQueryReplayWorkflowRunTaskHandlerTest {
                     .get(0)
                     .getEventId())
             .setHistory(workflowExecutionHistory.getHistory())
-            .setQuery(WorkflowQuery.newBuilder().setQueryType("some-query").build());
+            .setQuery(WorkflowQuery.newBuilder().setQueryType("some-query").build())
+            .build();
 
     ReplayWorkflowRunTaskHandler handler =
         new ReplayWorkflowRunTaskHandler(

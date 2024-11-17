@@ -150,6 +150,12 @@ public interface WorkflowStub {
   WorkflowExecution start(Object... args);
 
   /**
+   * @param args one argument per split
+   * @return workflow id and run id of the started coalesced workflow.
+   */
+  <T> WorkflowExecution startCoalesced(T... args);
+
+  /**
    * Execute a workflow together with an update workflow request.
    *
    * @param updateOperation update workflow operation

@@ -40,6 +40,7 @@ import io.temporal.api.protocol.v1.Message;
 import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.query.v1.WorkflowQueryResult;
 import io.temporal.api.workflowservice.v1.GetSystemInfoResponse;
+import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 import io.temporal.internal.Config;
 import io.temporal.internal.common.SdkFlag;
@@ -59,6 +60,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implements workflow executor that relies on replay of a workflow code. An instance of this class
@@ -93,11 +96,12 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
   private final ReplayWorkflowExecutor replayWorkflowExecutor;
 
   private final GetSystemInfoResponse.Capabilities capabilities;
+  private Logger log = LoggerFactory.getLogger(ReplayWorkflowRunTaskHandler.class);
 
   ReplayWorkflowRunTaskHandler(
       String namespace,
       ReplayWorkflow workflow,
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask,
+      PollWorkflowTaskQueueResponse workflowTask,
       SingleWorkerOptions workerOptions,
       Scope metricsScope,
       LocalActivityDispatcher localActivityDispatcher,
@@ -136,7 +140,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
 
   @Override
   public WorkflowTaskResult handleWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable {
     lock.lock();
     try {
@@ -196,7 +200,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
 
   @Override
   public QueryResult handleDirectQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable {
     WorkflowQuery query = workflowTask.getQuery();
     lock.lock();
@@ -243,6 +247,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
         // iteration itself is intentionally left outside the try-catch below,
         // as gRPC exception happened during history iteration should never ever fail the workflow
         HistoryEvent event = historyIterator.next();
+        log.info(
+            "Processing history event: id={} type={}", event.getEventId(), event.getEventType());
         currentEventId = event.getEventId();
         boolean hasNext = historyIterator.hasNext();
         try {

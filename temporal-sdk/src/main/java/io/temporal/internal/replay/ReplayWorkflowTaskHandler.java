@@ -29,7 +29,6 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.MeteringMetadata;
 import io.temporal.api.common.v1.WorkflowExecution;
-import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.QueryResultType;
 import io.temporal.api.enums.v1.WorkflowTaskFailedCause;
@@ -118,6 +117,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       boolean finalCommand;
       Result result;
 
+      PollWorkflowTaskQueueResponse task = workflowTask.build();
       if (directQuery) {
         // Direct query happens when there is no reason (events) to produce a real persisted
         // workflow task.
@@ -126,13 +126,13 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
         // This WFT has no new events in the history to process
         // and the worker response on such a WFT can't contain any new commands either.
         QueryResult queryResult =
-            workflowRunTaskHandler.handleDirectQueryWorkflowTask(workflowTask, historyIterator);
+            workflowRunTaskHandler.handleDirectQueryWorkflowTask(task, historyIterator);
         finalCommand = queryResult.isWorkflowMethodCompleted();
         result = createDirectQueryResult(workflowTask, queryResult, null);
       } else {
         // main code path, handle workflow task that can have an embedded query
         WorkflowTaskResult wftResult =
-            workflowRunTaskHandler.handleWorkflowTask(workflowTask, historyIterator);
+            workflowRunTaskHandler.handleWorkflowTask(task, historyIterator);
         finalCommand = wftResult.isFinalCommand();
         result =
             createCompletedWFTRequest(
@@ -378,8 +378,6 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
   // TODO(maxim): Consider refactoring that avoids mutating workflow task.
   private WorkflowRunTaskHandler createStatefulHandler(
       PollWorkflowTaskQueueResponse.Builder workflowTask, Scope metricsScope) throws Exception {
-    WorkflowType workflowType = workflowTask.getWorkflowType();
-    WorkflowExecution workflowExecution = workflowTask.getWorkflowExecution();
     List<HistoryEvent> events = workflowTask.getHistory().getEventsList();
     // Sticky workflow task with partial history.
     if (events.isEmpty() || events.get(0).getEventId() > 1) {
@@ -397,11 +395,10 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           .setHistory(getHistoryResponse.getHistory())
           .setNextPageToken(getHistoryResponse.getNextPageToken());
     }
-    ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
     return new CoalescingWorkflowRunTaskHandlerImpl(
         namespace,
-        workflow,
-        workflowTask,
+        workflowFactory,
+        workflowTask.build(),
         options,
         metricsScope,
         localActivityDispatcher,

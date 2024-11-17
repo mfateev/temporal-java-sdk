@@ -27,45 +27,58 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.api.common.v1.Payloads;
+import io.temporal.api.common.v1.WorkflowExecution;
+import io.temporal.api.common.v1.WorkflowType;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.GetSystemInfoResponse;
-import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
+import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.internal.common.WorkflowExecutionUtils;
 import io.temporal.internal.worker.LocalActivityDispatcher;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHandler {
 
+  private static final Logger log =
+      LoggerFactory.getLogger(CoalescingWorkflowRunTaskHandlerImpl.class);
   private final WorkflowRunTaskHandler handler;
   private final List<WorkflowRunTaskHandler> handlers = new ArrayList<>();
-  // One result per split
-  private final Payloads.Builder splitResults = Payloads.newBuilder();
+  private MultiIterator multiIterator;
   private int completionCount;
+  List<Payload> resultPayloads = new ArrayList<>();
 
   public CoalescingWorkflowRunTaskHandlerImpl(
       String namespace,
-      ReplayWorkflow workflow,
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask,
+      ReplayWorkflowFactory workflowFactory,
+      PollWorkflowTaskQueueResponse workflowTask,
       SingleWorkerOptions workerOptions,
       Scope metricsScope,
       LocalActivityDispatcher localActivityDispatcher,
-      GetSystemInfoResponse.Capabilities capabilities) {
+      GetSystemInfoResponse.Capabilities capabilities)
+      throws Exception {
     HistoryEvent event = workflowTask.getHistory().getEvents(0);
     if (event.getEventType() != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED) {
       throw new IllegalArgumentException("First event is not workflow task started: " + event);
     }
-    if (event.getUserMetadata().getSummary().containsMetadata("coalesced")) {
+    Payload s = event.getUserMetadata().getSummary();
+    String summary = s.getData().toString(StandardCharsets.UTF_8);
+    WorkflowType workflowType = workflowTask.getWorkflowType();
+    WorkflowExecution workflowExecution = workflowTask.getWorkflowExecution();
+    if ("coalesced".equals(summary)) {
       handler = null;
       WorkflowExecutionStartedEventAttributes started =
           event.getWorkflowExecutionStartedEventAttributes();
+      multiIterator = new MultiIterator(started.getInput().getPayloadsCount());
       // Assumption that a coalesced workflow must have a single input.
       for (int i = 0; i < started.getInput().getPayloadsCount(); i++) {
+        ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
         handlers.add(
             new ReplayWorkflowRunTaskHandler(
                 namespace,
@@ -75,8 +88,10 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
                 metricsScope,
                 localActivityDispatcher,
                 capabilities));
+        resultPayloads.add(null);
       }
     } else {
+      ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
       handler =
           new ReplayWorkflowRunTaskHandler(
               namespace,
@@ -91,25 +106,44 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
 
   @Override
   public WorkflowTaskResult handleWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable {
     if (handler != null) {
       return handler.handleWorkflowTask(workflowTask, historyIterator);
     }
-    List<WorkflowTaskResult> results = new ArrayList<>();
-    CoalescedWorkflowHistoryIterators iterators =
-        new CoalescedWorkflowHistoryIterators(results.size(), historyIterator);
+    multiIterator.setSourceIterator(historyIterator, workflowTask.getPreviousStartedEventId());
 
+    List<PollWorkflowTaskQueueResponse> tasks = new ArrayList<>();
+    {
+      // Ugly hack that requires scanning the whole history to find the last event id and
+      // previousStartedEventId
+      for (int i = 0; i < handlers.size(); i++) {
+        SplitHistoryIterator iterator = multiIterator.getStartedIdIterator(i);
+        while (iterator.hasNext()) {
+          iterator.next();
+        }
+        long splitPreviousStartedEventId = iterator.getSplitPreviousStartedEventId();
+        PollWorkflowTaskQueueResponse.Builder task =
+            workflowTask.toBuilder()
+                .setStartedEventId(iterator.getLastEventId())
+                .setPreviousStartedEventId(splitPreviousStartedEventId);
+        PollWorkflowTaskQueueResponse tt = task.build();
+        tasks.add(task.build());
+      }
+    }
+    List<WorkflowTaskResult> results = new ArrayList<>();
     for (int i = 0; i < handlers.size(); i++) {
-      WorkflowRunTaskHandler h = handlers.get(0);
-      results.add(h.handleWorkflowTask(workflowTask, iterators.get(i)));
+      WorkflowRunTaskHandler h = handlers.get(i);
+      WorkflowHistoryIterator iterator = multiIterator.getIterator(i);
+      WorkflowTaskResult result = h.handleWorkflowTask(tasks.get(i), iterator);
+      results.add(result);
     }
     return coalesceResults(results);
   }
 
   @Override
   public QueryResult handleDirectQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable {
     if (handler != null) {
       return handler.handleDirectQueryWorkflowTask(workflowTask, historyIterator);
@@ -137,6 +171,12 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
   }
 
   private WorkflowTaskResult coalesceResults(List<WorkflowTaskResult> results) {
+    log.info("coalesceResults begin");
+    for (WorkflowTaskResult result : results) {
+      log.debug(
+          "Coalescing results {}",
+          WorkflowExecutionUtils.prettyPrintCommands(result.getCommands()));
+    }
     List<Command> coalescedCommands = new ArrayList<>();
     boolean forceTask = false;
     Set<Integer> sdkFlags = new HashSet<>();
@@ -162,9 +202,12 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
               throw new RuntimeException(e);
             }
           }
-          splitResults.setPayloads(i, r);
-          // Only one completion command is allowed
+          resultPayloads.set(i, r);
+          // All completion commands are merged into a single completion command
           if (++completionCount == handlers.size()) {
+            // One result per split
+            Payloads.Builder splitResults = Payloads.newBuilder();
+            splitResults.addAllPayloads(resultPayloads);
             CompleteWorkflowExecutionCommandAttributes attr =
                 CompleteWorkflowExecutionCommandAttributes.newBuilder()
                     .setResult(splitResults.build())
@@ -187,6 +230,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
         }
       }
     }
+
     // TODO(maxim): Figure out the final command. And may be query later.
     return WorkflowTaskResult.newBuilder()
         .setCommands(coalescedCommands)

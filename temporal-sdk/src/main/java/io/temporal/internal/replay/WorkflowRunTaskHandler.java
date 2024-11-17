@@ -20,7 +20,7 @@
 
 package io.temporal.internal.replay;
 
-import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
+import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.worker.NonDeterministicException;
 
 /**
@@ -40,7 +40,7 @@ public interface WorkflowRunTaskHandler {
    *     current workflow task. {@link NonDeterministicException} or {@link Error} are such cases.
    */
   WorkflowTaskResult handleWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable;
 
   /**
@@ -53,7 +53,7 @@ public interface WorkflowRunTaskHandler {
    *     current workflow task. {@link NonDeterministicException} or {@link Error} are such cases.
    */
   QueryResult handleDirectQueryWorkflowTask(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, WorkflowHistoryIterator historyIterator)
+      PollWorkflowTaskQueueResponse workflowTask, WorkflowHistoryIterator historyIterator)
       throws Throwable;
 
   /**
