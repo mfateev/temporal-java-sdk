@@ -20,6 +20,7 @@
 
 package io.temporal.internal.replay;
 
+import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.api.common.v1.Payloads;
@@ -139,6 +140,28 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
             .setFirstExecutionRunId(runId)
             .setInput(Payloads.newBuilder().addPayloads(payload).build());
         result.setWorkflowExecutionStartedEventAttributes(attr);
+        break;
+      case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+        ActivityTaskScheduledEventAttributes.Builder scheduledAttr =
+            result.getActivityTaskScheduledEventAttributesBuilder();
+        ByteString coalesced =
+            event.getUserMetadata().getSummary().getMetadataMap().get("coalesced");
+        // TODO(maxim): This doesn't handle situation when the coalesced activity contains
+        // more then one scheduled activity from the same split
+        if (coalesced != null) {
+          for (Payload p : scheduledAttr.getInput().getPayloadsList()) {
+            Map<String, ByteString> m = p.getMetadataMap();
+            int splitIndex = Integer.parseInt(m.get("split").toString(StandardCharsets.UTF_8));
+            if (splitIndex != this.splitIndex) {
+              continue;
+            }
+            String activityId = m.get("activityId").toString(StandardCharsets.UTF_8);
+            scheduledAttr.setActivityId(activityId);
+            scheduledAttr.setInput(Payloads.newBuilder().addPayloads(p).build());
+            result.setActivityTaskScheduledEventAttributes(scheduledAttr);
+            break;
+          }
+        }
         break;
       default:
         Payload summary = event.getUserMetadata().getSummary();

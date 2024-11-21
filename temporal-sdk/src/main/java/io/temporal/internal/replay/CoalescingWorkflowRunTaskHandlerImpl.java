@@ -71,7 +71,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     String summary = s.getData().toString(StandardCharsets.UTF_8);
     WorkflowType workflowType = workflowTask.getWorkflowType();
     WorkflowExecution workflowExecution = workflowTask.getWorkflowExecution();
-    if ("coalesced".equals(summary)) {
+    if ("\"coalesced\"".equals(summary)) {
       handler = null;
       WorkflowExecutionStartedEventAttributes started =
           event.getWorkflowExecutionStartedEventAttributes();
@@ -170,6 +170,14 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     }
   }
 
+  // index is to the first list. The element is appended to the inner list.
+  private static void insertAtIndex(List<List<Command>> list, int index, Command command) {
+    while (list.size() <= index) {
+      list.add(new ArrayList<>());
+    }
+    list.get(index).add(command);
+  }
+
   private WorkflowTaskResult coalesceResults(List<WorkflowTaskResult> results) {
     log.info("coalesceResults begin");
     for (WorkflowTaskResult result : results) {
@@ -178,6 +186,12 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
           WorkflowExecutionUtils.prettyPrintCommands(result.getCommands()));
     }
     List<Command> coalescedCommands = new ArrayList<>();
+
+    // Current batch of commands to be coalesced
+    String scheduleActivityTypeName = null;
+    Command scheduleActivityCommand = null;
+    List<Payload> scheduleActivityInputs = new ArrayList<>();
+
     boolean forceTask = false;
     Set<Integer> sdkFlags = new HashSet<>();
     for (int i = 0; i < results.size(); i++) {
@@ -186,38 +200,38 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       sdkFlags.addAll(result.getSdkFlags());
       List<Command> commands = result.getCommands();
       for (Command command : commands) {
-        Payload r;
         if (WorkflowExecutionUtils.isWorkflowExecutionCompleteCommand(command)) {
-          if (command.getCommandType() == CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION) {
-            // Only one result is supported
-            r = command.getCompleteWorkflowExecutionCommandAttributes().getResult().getPayloads(0);
-          } else {
-            try {
-              r =
-                  Payload.parseFrom(
-                      WorkflowExecutionUtils.prettyPrintObject(command)
-                          .getBytes(StandardCharsets.UTF_8));
-
-            } catch (InvalidProtocolBufferException e) {
-              throw new RuntimeException(e);
+          if (coalesceWorkflowCompleteCommand(command, i, coalescedCommands)) break;
+        } else if (command.getCommandType() == CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK) {
+          String typeName =
+              command.getScheduleActivityTaskCommandAttributes().getActivityType().getName();
+          if (scheduleActivityTypeName == null || scheduleActivityTypeName.equals(typeName)) {
+            ByteString index = ByteString.copyFromUtf8(Integer.toString(i));
+            ByteString activityId =
+                ByteString.copyFromUtf8(
+                    command.getScheduleActivityTaskCommandAttributes().getActivityId());
+            // Only the first argument is used
+            Payload input =
+                command
+                    .getScheduleActivityTaskCommandAttributes()
+                    .getInput()
+                    .getPayloads(0)
+                    .toBuilder()
+                    .putMetadata("split", index)
+                    .putMetadata("activityId", activityId)
+                    .build();
+            if (scheduleActivityCommand == null) {
+              scheduleActivityCommand = command;
             }
-          }
-          resultPayloads.set(i, r);
-          // All completion commands are merged into a single completion command
-          if (++completionCount == handlers.size()) {
-            // One result per split
-            Payloads.Builder splitResults = Payloads.newBuilder();
-            splitResults.addAllPayloads(resultPayloads);
-            CompleteWorkflowExecutionCommandAttributes attr =
-                CompleteWorkflowExecutionCommandAttributes.newBuilder()
-                    .setResult(splitResults.build())
-                    .build();
-            Command c =
-                Command.newBuilder()
-                    .setCommandType(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
-                    .setCompleteWorkflowExecutionCommandAttributes(attr)
-                    .build();
-            coalescedCommands.add(c);
+            scheduleActivityInputs.add(input);
+            scheduleActivityTypeName = typeName;
+          } else {
+            coalesceScheduleActivity(
+                scheduleActivityCommand, scheduleActivityInputs, coalescedCommands);
+
+            scheduleActivityCommand = command;
+            scheduleActivityTypeName = typeName;
+            scheduleActivityInputs.clear();
           }
         } else {
           Payload summary =
@@ -226,16 +240,71 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
                       "split", ByteString.copyFrom(Integer.toString(i), StandardCharsets.UTF_8))
                   .build();
           UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
-          coalescedCommands.add(command.toBuilder().setUserMetadata(metadata).build());
+          Command.Builder commandBuilder = command.toBuilder().setUserMetadata(metadata);
+          coalescedCommands.add(commandBuilder.build());
         }
       }
     }
+    if (scheduleActivityInputs.size() > 0) {
+      coalesceScheduleActivity(scheduleActivityCommand, scheduleActivityInputs, coalescedCommands);
+    }
+    return WorkflowTaskResult.newBuilder(results.get(0)).setCommands(coalescedCommands).build();
+  }
 
-    // TODO(maxim): Figure out the final command. And may be query later.
-    return WorkflowTaskResult.newBuilder()
-        .setCommands(coalescedCommands)
-        .setForceWorkflowTask(forceTask)
-        .setSdkFlags(new ArrayList<>(sdkFlags))
-        .build();
+  private static void coalesceScheduleActivity(
+      Command scheduleActivityCommand,
+      List<Payload> scheduleActivityInputs,
+      List<Command> coalescedCommands) {
+    // Coalesce all commands of the same type
+    Payload summary =
+        Payload.newBuilder()
+            .putMetadata("coalesced", ByteString.copyFrom("true", StandardCharsets.UTF_8))
+            .build();
+    UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
+    Command c =
+        scheduleActivityCommand.toBuilder()
+            .setUserMetadata(metadata)
+            .setScheduleActivityTaskCommandAttributes(
+                scheduleActivityCommand.getScheduleActivityTaskCommandAttributes().toBuilder()
+                    .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))
+            .build();
+    coalescedCommands.add(c);
+  }
+
+  private boolean coalesceWorkflowCompleteCommand(
+      Command command, int i, List<Command> coalescedCommands) {
+    Payload r;
+    if (command.getCommandType() == CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION) {
+      // Only one result is supported
+      r = command.getCompleteWorkflowExecutionCommandAttributes().getResult().getPayloads(0);
+    } else {
+      try {
+        r =
+            Payload.parseFrom(
+                WorkflowExecutionUtils.prettyPrintObject(command).getBytes(StandardCharsets.UTF_8));
+
+      } catch (InvalidProtocolBufferException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    resultPayloads.set(i, r);
+    // All completion commands are merged into a single completion command
+    if (++completionCount == handlers.size()) {
+      // One result per split
+      Payloads.Builder splitResults = Payloads.newBuilder();
+      splitResults.addAllPayloads(resultPayloads);
+      CompleteWorkflowExecutionCommandAttributes attr =
+          CompleteWorkflowExecutionCommandAttributes.newBuilder()
+              .setResult(splitResults.build())
+              .build();
+      Command c =
+          Command.newBuilder()
+              .setCommandType(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
+              .setCompleteWorkflowExecutionCommandAttributes(attr)
+              .build();
+      coalescedCommands.add(c);
+      return true;
+    }
+    return false;
   }
 }

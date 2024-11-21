@@ -29,6 +29,17 @@ import java.util.Map;
 
 public final class WorkflowTaskResult {
 
+  public static Builder newBuilder(WorkflowTaskResult result) {
+    return new Builder()
+        .setCommands(result.getCommands())
+        .setMessages(result.getMessages())
+        .setFinalCommand(result.isFinalCommand())
+        .setQueryResults(result.getQueryResults())
+        .setForceWorkflowTask(result.isForceWorkflowTask())
+        .setNonfirstLocalActivityAttempts(result.getNonfirstLocalActivityAttempts())
+        .setSdkFlags(result.getSdkFlags());
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
