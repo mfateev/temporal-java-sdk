@@ -144,11 +144,10 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
         ActivityTaskScheduledEventAttributes.Builder scheduledAttr =
             result.getActivityTaskScheduledEventAttributesBuilder();
-        ByteString coalesced =
-            event.getUserMetadata().getSummary().getMetadataMap().get("coalesced");
+        boolean coalesced = scheduledAttr.getHeader().getFieldsMap().containsKey("coalesced");
         // TODO(maxim): This doesn't handle situation when the coalesced activity contains
         // more then one scheduled activity from the same split
-        if (coalesced != null) {
+        if (coalesced) {
           for (Payload p : scheduledAttr.getInput().getPayloadsList()) {
             Map<String, ByteString> m = p.getMetadataMap();
             int splitIndex = Integer.parseInt(m.get("split").toString(StandardCharsets.UTF_8));

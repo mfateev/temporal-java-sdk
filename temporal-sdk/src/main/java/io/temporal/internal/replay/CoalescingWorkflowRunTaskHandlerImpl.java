@@ -25,10 +25,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
-import io.temporal.api.common.v1.Payload;
-import io.temporal.api.common.v1.Payloads;
-import io.temporal.api.common.v1.WorkflowExecution;
-import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.common.v1.*;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -256,16 +253,12 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       List<Payload> scheduleActivityInputs,
       List<Command> coalescedCommands) {
     // Coalesce all commands of the same type
-    Payload summary =
-        Payload.newBuilder()
-            .putMetadata("coalesced", ByteString.copyFrom("true", StandardCharsets.UTF_8))
-            .build();
-    UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
     Command c =
         scheduleActivityCommand.toBuilder()
-            .setUserMetadata(metadata)
             .setScheduleActivityTaskCommandAttributes(
                 scheduleActivityCommand.getScheduleActivityTaskCommandAttributes().toBuilder()
+                    .setHeader(
+                        Header.newBuilder().putFields("coalesced", Payload.newBuilder().build()))
                     .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))
             .build();
     coalescedCommands.add(c);
