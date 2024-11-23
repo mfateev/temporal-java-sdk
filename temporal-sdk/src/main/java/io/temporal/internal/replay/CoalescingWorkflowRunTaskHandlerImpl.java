@@ -175,6 +175,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     list.get(index).add(command);
   }
 
+  /** Coalesces results of multiple split workflows into a single result. */
   private WorkflowTaskResult coalesceResults(List<WorkflowTaskResult> results) {
     log.info("coalesceResults begin");
     for (WorkflowTaskResult result : results) {
@@ -218,12 +219,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
             addScheduleActivityInput(command, i, scheduleActivityInputs);
           }
         } else {
-          Payload summary =
-              Payload.newBuilder()
-                  .putMetadata(
-                      "split", ByteString.copyFrom(Integer.toString(i), StandardCharsets.UTF_8))
-                  .build();
-          UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
+          UserMetadata metadata = splitIdToUserMetadata(i);
           Command.Builder commandBuilder = command.toBuilder().setUserMetadata(metadata);
           coalescedCommands.add(commandBuilder.build());
         }
@@ -255,15 +251,8 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       List<Command> coalescedCommands) {
     if (scheduleActivityInputs.size() == 1) {
       Payload payload = scheduleActivityInputs.get(0);
-      Map<String, ByteString> metadataMap = payload.getMetadataMap();
-      String splitS = metadataMap.get("split").toStringUtf8();
-      int splitId = Integer.parseInt(splitS);
-      Payload summary =
-          Payload.newBuilder()
-              .putMetadata(
-                  "split", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
-              .build();
-      UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
+      int splitId = getSplitId(payload);
+      UserMetadata metadata = splitIdToUserMetadata(splitId);
       Command.Builder commandBuilder = firstInTheBatch.toBuilder().setUserMetadata(metadata);
       coalescedCommands.add(commandBuilder.build());
       return;
@@ -278,6 +267,23 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
                     .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))
             .build();
     coalescedCommands.add(c);
+  }
+
+  private static UserMetadata splitIdToUserMetadata(int splitId) {
+    Payload summary =
+        Payload.newBuilder()
+            .putMetadata(
+                "split", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
+            .build();
+    UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
+    return metadata;
+  }
+
+  private static int getSplitId(Payload payload) {
+    Map<String, ByteString> metadataMap = payload.getMetadataMap();
+    String splitS = metadataMap.get("split").toStringUtf8();
+    int splitId = Integer.parseInt(splitS);
+    return splitId;
   }
 
   private boolean coalesceWorkflowCompleteCommand(

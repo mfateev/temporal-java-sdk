@@ -60,8 +60,9 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
   }
 
   public void reset(long previousStartedEventId) {
-    log.info(
-        "Resetting splitIndex={} previousStartedEventId={}", splitIndex, previousStartedEventId);
+    //    log.info(
+    //        "Resetting splitIndex={} previousStartedEventId={}", splitIndex,
+    // previousStartedEventId);
     this.previousStartedEventId = previousStartedEventId;
     nextElement = null;
     hasNextComputed = false;
@@ -96,11 +97,11 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       throw new NoSuchElementException("No more elements");
     }
     hasNextComputed = false;
-    log.info(
-        "SplitHistoryIterator.next splitIndex={} event={} eventType={}",
-        splitIndex,
-        nextElement.getEventId(),
-        nextElement.getEventType());
+    //    log.info(
+    //        "SplitHistoryIterator.next splitIndex={} event={} eventType={}",
+    //        splitIndex,
+    //        nextElement.getEventId(),
+    //        nextElement.getEventType());
     return nextElement;
   }
 
@@ -124,11 +125,11 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
    * @return null if event is not part of the split
    */
   private HistoryEvent copy(HistoryEvent event) {
-    log.info(
-        "copy splitIndex={} event={} type={}",
-        splitIndex,
-        event.getEventId(),
-        event.getEventType());
+    //    log.info(
+    //        "copy splitIndex={} event={} type={}",
+    //        splitIndex,
+    //        event.getEventId(),
+    //        event.getEventType());
     HistoryEvent.Builder result = event.toBuilder();
     SWITCH:
     switch (event.getEventType()) {
@@ -172,11 +173,11 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
             scheduledAttr.setActivityId(activityId);
             scheduledAttr.setInput(Payloads.newBuilder().addPayloads(p).build());
             result.setActivityTaskScheduledEventAttributes(scheduledAttr);
-            break SWITCH;
+            break SWITCH; // avoid default pass through
           }
           return null; // coalesced activity doesn't contain this split input
         }
-      // Intentionally pass through
+      // Intentionally pass through as this is not coallesced event
       default:
         Payload summary = event.getUserMetadata().getSummary();
         if (summary.containsMetadata("split")) {
@@ -184,12 +185,13 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
               Integer.parseInt(
                   summary.getMetadataOrThrow("split").toString(StandardCharsets.UTF_8));
           if (splitIndexFromEvent != splitIndex) {
-            log.info(
-                "Skipping splitIndex={} event={} type={} as it is not part of the split splitIndexFromEvent={}",
-                splitIndex,
-                event.getEventId(),
-                event.getEventType(),
-                splitIndexFromEvent);
+            //            log.info(
+            //                "Skipping splitIndex={} event={} type={} as it is not part of the
+            // split splitIndexFromEvent={}",
+            //                splitIndex,
+            //                event.getEventId(),
+            //                event.getEventType(),
+            //                splitIndexFromEvent);
             return null;
           }
         }
@@ -199,21 +201,22 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
     saveScheduledId(event, eventId);
     if (!updateScheduledId(event, result)) {
       // Skip event as its schedule id is not part of the split
-      log.info(
-          "Skipping splitIndex={} event={} type={} as its schedule id is not part of the split",
-          splitIndex,
-          event.getEventId(),
-          event.getEventType());
+      //      log.info(
+      //          "Skipping splitIndex={} event={} type={} as its schedule id is not part of the
+      // split",
+      //          splitIndex,
+      //          event.getEventId(),
+      //          event.getEventType());
       return null;
     }
     if (event.getEventType() == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED) {
       workflowTaskStartedEventIds.put(event.getEventId(), eventId);
     }
-    log.info(
-        "copy result: splitIndex={} event={} type={}",
-        splitIndex,
-        result.getEventId(),
-        result.getEventType());
+    //    log.info(
+    //        "copy result: splitIndex={} event={} type={}",
+    //        splitIndex,
+    //        result.getEventId(),
+    //        result.getEventType());
     lastEventId = eventId;
     return result.build();
   }
