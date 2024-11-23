@@ -159,7 +159,7 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
           for (int i = 0; i < paylads.size(); i++) {
             Payload p = paylads.get(i);
             Map<String, ByteString> m = p.getMetadataMap();
-            int splitIndex = Integer.parseInt(m.get("split").toString(StandardCharsets.UTF_8));
+            int splitIndex = Integer.parseInt(m.get("element").toString(StandardCharsets.UTF_8));
             if (splitIndex != this.splitIndex) {
               continue;
             }
@@ -180,10 +180,10 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       // Intentionally pass through as this is not coallesced event
       default:
         Payload summary = event.getUserMetadata().getSummary();
-        if (summary.containsMetadata("split")) {
+        if (summary.containsMetadata("element")) {
           int splitIndexFromEvent =
               Integer.parseInt(
-                  summary.getMetadataOrThrow("split").toString(StandardCharsets.UTF_8));
+                  summary.getMetadataOrThrow("element").toString(StandardCharsets.UTF_8));
           if (splitIndexFromEvent != splitIndex) {
             //            log.info(
             //                "Skipping splitIndex={} event={} type={} as it is not part of the

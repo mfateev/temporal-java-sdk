@@ -239,7 +239,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     // Only the first argument is used
     Payload input =
         command.getScheduleActivityTaskCommandAttributes().getInput().getPayloads(0).toBuilder()
-            .putMetadata("split", index)
+            .putMetadata("element", index)
             .putMetadata("activityId", activityId)
             .build();
     scheduleActivityInputs.add(input);
@@ -273,7 +273,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     Payload summary =
         Payload.newBuilder()
             .putMetadata(
-                "split", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
+                "element", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
             .build();
     UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
     return metadata;
@@ -281,7 +281,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
 
   private static int getSplitId(Payload payload) {
     Map<String, ByteString> metadataMap = payload.getMetadataMap();
-    String splitS = metadataMap.get("split").toStringUtf8();
+    String splitS = metadataMap.get("element").toStringUtf8();
     int splitId = Integer.parseInt(splitS);
     return splitId;
   }
