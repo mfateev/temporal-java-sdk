@@ -25,10 +25,10 @@ import com.google.common.collect.ImmutableSet;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.util.ImmutableMap;
 import io.temporal.activity.DynamicActivity;
+import io.temporal.api.common.v1.Payload;
+import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponseOrBuilder;
-import io.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest;
-import io.temporal.api.workflowservice.v1.RespondActivityTaskFailedRequest;
+import io.temporal.api.workflowservice.v1.*;
 import io.temporal.client.ActivityCanceledException;
 import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
@@ -44,6 +44,7 @@ import io.temporal.worker.MetricsType;
 import io.temporal.worker.TypeAlreadyRegisteredException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -112,6 +113,7 @@ public final class ActivityTaskHandlerImpl implements ActivityTaskHandler {
   public Result handle(ActivityTask activityTask, Scope metricsScope, boolean localActivity) {
     PollActivityTaskQueueResponseOrBuilder pollResponse = activityTask.getResponse();
     String activityType = pollResponse.getActivityType().getName();
+    String activityId = pollResponse.getActivityId();
     ActivityInfoInternal activityInfo =
         new ActivityInfoImpl(
             pollResponse,
@@ -121,7 +123,45 @@ public final class ActivityTaskHandlerImpl implements ActivityTaskHandler {
             activityTask.getCompletionCallback());
     ActivityTaskExecutor activity = activities.get(activityType);
     if (activity != null) {
-      return activity.execute(activityInfo, metricsScope);
+      boolean coalesced = activityTask.getResponse().getHeader().containsFields("coalesced");
+      if (!coalesced) {
+        return activity.execute(activityInfo, metricsScope);
+      } else {
+        Payloads input = activityTask.getResponse().getInput();
+        List<Payload> payloads = input.getPayloadsList();
+        AtomicInteger completionCounter = new AtomicInteger(payloads.size());
+        List<Payload> results = new ArrayList<>();
+        RespondActivityTaskCompletedRequest firstCompleted = null;
+        for (Payload payload : payloads) {
+          PollActivityTaskQueueResponse response = activityTask.getResponse();
+          PollActivityTaskQueueResponse splitPollResponse =
+              response.toBuilder().setInput(Payloads.newBuilder().addPayloads(payload)).build();
+          ActivityInfoInternal split =
+              new ActivityInfoImpl(
+                  splitPollResponse,
+                  this.namespace,
+                  this.taskQueue,
+                  localActivity,
+                  () -> {
+                    if (completionCounter.decrementAndGet() == 0) {
+                      activityTask.getCompletionCallback().apply();
+                    }
+                  });
+          Result r = activity.execute(split, metricsScope);
+          if (r.getTaskFailed() != null) {
+            return r;
+          }
+          if (firstCompleted == null && r.getTaskCompleted() != null) {
+            firstCompleted = r.getTaskCompleted();
+          }
+          results.add(r.getTaskCompleted().getResult().getPayloads(0));
+        }
+        RespondActivityTaskCompletedRequest taskCompleted =
+            firstCompleted.toBuilder()
+                .setResult(Payloads.newBuilder().addAllPayloads(results))
+                .build();
+        return new Result(activityId, taskCompleted, null, null, false);
+      }
     }
     if (dynamicActivity != null) {
       return dynamicActivity.execute(activityInfo, metricsScope);

@@ -203,24 +203,10 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
           String typeName =
               command.getScheduleActivityTaskCommandAttributes().getActivityType().getName();
           if (scheduleActivityTypeName == null || scheduleActivityTypeName.equals(typeName)) {
-            ByteString index = ByteString.copyFromUtf8(Integer.toString(i));
-            ByteString activityId =
-                ByteString.copyFromUtf8(
-                    command.getScheduleActivityTaskCommandAttributes().getActivityId());
-            // Only the first argument is used
-            Payload input =
-                command
-                    .getScheduleActivityTaskCommandAttributes()
-                    .getInput()
-                    .getPayloads(0)
-                    .toBuilder()
-                    .putMetadata("split", index)
-                    .putMetadata("activityId", activityId)
-                    .build();
+            addScheduleActivityInput(command, i, scheduleActivityInputs);
             if (scheduleActivityCommand == null) {
               scheduleActivityCommand = command;
             }
-            scheduleActivityInputs.add(input);
             scheduleActivityTypeName = typeName;
           } else {
             coalesceScheduleActivity(
@@ -229,6 +215,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
             scheduleActivityCommand = command;
             scheduleActivityTypeName = typeName;
             scheduleActivityInputs.clear();
+            addScheduleActivityInput(command, i, scheduleActivityInputs);
           }
         } else {
           Payload summary =
@@ -248,15 +235,44 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     return WorkflowTaskResult.newBuilder(results.get(0)).setCommands(coalescedCommands).build();
   }
 
+  private static void addScheduleActivityInput(
+      Command command, int i, List<Payload> scheduleActivityInputs) {
+    ByteString index = ByteString.copyFromUtf8(Integer.toString(i));
+    ByteString activityId =
+        ByteString.copyFromUtf8(command.getScheduleActivityTaskCommandAttributes().getActivityId());
+    // Only the first argument is used
+    Payload input =
+        command.getScheduleActivityTaskCommandAttributes().getInput().getPayloads(0).toBuilder()
+            .putMetadata("split", index)
+            .putMetadata("activityId", activityId)
+            .build();
+    scheduleActivityInputs.add(input);
+  }
+
   private static void coalesceScheduleActivity(
-      Command scheduleActivityCommand,
+      Command firstInTheBatch,
       List<Payload> scheduleActivityInputs,
       List<Command> coalescedCommands) {
+    if (scheduleActivityInputs.size() == 1) {
+      Payload payload = scheduleActivityInputs.get(0);
+      Map<String, ByteString> metadataMap = payload.getMetadataMap();
+      String splitS = metadataMap.get("split").toStringUtf8();
+      int splitId = Integer.parseInt(splitS);
+      Payload summary =
+          Payload.newBuilder()
+              .putMetadata(
+                  "split", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
+              .build();
+      UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
+      Command.Builder commandBuilder = firstInTheBatch.toBuilder().setUserMetadata(metadata);
+      coalescedCommands.add(commandBuilder.build());
+      return;
+    }
     // Coalesce all commands of the same type
     Command c =
-        scheduleActivityCommand.toBuilder()
+        firstInTheBatch.toBuilder()
             .setScheduleActivityTaskCommandAttributes(
-                scheduleActivityCommand.getScheduleActivityTaskCommandAttributes().toBuilder()
+                firstInTheBatch.getScheduleActivityTaskCommandAttributes().toBuilder()
                     .setHeader(
                         Header.newBuilder().putFields("coalesced", Payload.newBuilder().build()))
                     .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))

@@ -123,7 +123,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
         new SlotReservationData(taskQueue, options.getIdentity(), options.getBuildId());
     activityTask.setCurrentAttemptScheduledTime(ProtobufTimeUtils.getCurrentProtoTime());
     final LocalActivityAttemptTask task =
-        new LocalActivityAttemptTask(executionContext, activityTask, scheduleToStartFuture);
+        new LocalActivityAttemptTask(executionContext, activityTask.build(), scheduleToStartFuture);
     slotQueue.submitAttempt(reservationDat, isRetry, task);
   }
 
@@ -416,7 +416,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
 
       LocalActivityExecutionContext executionContext = attemptTask.getExecutionContext();
       executionContext.newAttempt();
-      PollActivityTaskQueueResponseOrBuilder activityTask = attemptTask.getAttemptTask();
+      PollActivityTaskQueueResponse activityTask = attemptTask.getAttemptTask();
 
       try {
         // if an activity was already completed by any mean like scheduleToClose or scheduleToStart,

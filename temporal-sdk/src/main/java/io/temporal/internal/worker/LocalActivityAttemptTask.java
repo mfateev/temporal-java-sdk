@@ -27,12 +27,12 @@ import javax.annotation.Nullable;
 
 class LocalActivityAttemptTask {
   private final @Nonnull LocalActivityExecutionContext executionContext;
-  private final @Nonnull PollActivityTaskQueueResponse.Builder attemptTask;
+  private final @Nonnull PollActivityTaskQueueResponse attemptTask;
   private final @Nullable ScheduledFuture<?> scheduleToStartFuture;
 
   public LocalActivityAttemptTask(
       @Nonnull LocalActivityExecutionContext executionContext,
-      @Nonnull PollActivityTaskQueueResponse.Builder attemptTask,
+      @Nonnull PollActivityTaskQueueResponse attemptTask,
       @Nullable ScheduledFuture<?> scheduleToStartFuture) {
     this.executionContext = executionContext;
     this.attemptTask = attemptTask;
@@ -49,7 +49,7 @@ class LocalActivityAttemptTask {
   }
 
   @Nonnull
-  public PollActivityTaskQueueResponse.Builder getAttemptTask() {
+  public PollActivityTaskQueueResponse getAttemptTask() {
     return attemptTask;
   }
 

@@ -28,6 +28,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.*;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
@@ -45,6 +46,8 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
   // Mapping of scheduled event ids
   // Original event id -> split history event id
   private Map<Long, Long> scheduledEventIds = new HashMap<>();
+  // Original event id -> (splitIndex -> index of the result for this split)
+  private Map<Long, Map<Integer, Integer>> scheduledEventInputPayloadIndex = new HashMap<>();
   private long previousStartedEventId;
 
   // Mapping of workflow task started event ids
@@ -127,6 +130,7 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
         event.getEventId(),
         event.getEventType());
     HistoryEvent.Builder result = event.toBuilder();
+    SWITCH:
     switch (event.getEventType()) {
       case EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
         WorkflowExecutionStartedEventAttributes.Builder attr =
@@ -148,20 +152,31 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
         // TODO(maxim): This doesn't handle situation when the coalesced activity contains
         // more then one scheduled activity from the same split
         if (coalesced) {
-          for (Payload p : scheduledAttr.getInput().getPayloadsList()) {
+          int inputIndex = 0;
+          //          for (Payload p : scheduledAttr.getInput().getPayloadsList()) {
+          List<Payload> paylads = scheduledAttr.getInput().getPayloadsList();
+          for (int i = 0; i < paylads.size(); i++) {
+            Payload p = paylads.get(i);
             Map<String, ByteString> m = p.getMetadataMap();
             int splitIndex = Integer.parseInt(m.get("split").toString(StandardCharsets.UTF_8));
             if (splitIndex != this.splitIndex) {
               continue;
             }
+            Map<Integer, Integer> innerMap =
+                scheduledEventInputPayloadIndex.computeIfAbsent(
+                    event.getEventId(), k -> new HashMap<>());
+
+            // Add or update the value in the inner map
+            innerMap.put(splitIndex, i);
             String activityId = m.get("activityId").toString(StandardCharsets.UTF_8);
             scheduledAttr.setActivityId(activityId);
             scheduledAttr.setInput(Payloads.newBuilder().addPayloads(p).build());
             result.setActivityTaskScheduledEventAttributes(scheduledAttr);
-            break;
+            break SWITCH;
           }
+          return null; // coalesced activity doesn't contain this split input
         }
-        break;
+      // Intentionally pass through
       default:
         Payload summary = event.getUserMetadata().getSummary();
         if (summary.containsMetadata("split")) {
@@ -258,6 +273,13 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
           {
             ActivityTaskCompletedEventAttributes.Builder attr =
                 result.getActivityTaskCompletedEventAttributesBuilder();
+            Map<Integer, Integer> sIndex =
+                scheduledEventInputPayloadIndex.get(attr.getScheduledEventId());
+            if (sIndex != null) {
+              Payloads payloads = attr.getResult();
+              Payload payload = payloads.getPayloads(sIndex.get(splitIndex));
+              attr.setResult(Payloads.newBuilder().addPayloads(payload).build());
+            }
             result.setActivityTaskCompletedEventAttributes(
                 attr.setScheduledEventId(getScheduledEventId(attr.getScheduledEventId())));
             break;

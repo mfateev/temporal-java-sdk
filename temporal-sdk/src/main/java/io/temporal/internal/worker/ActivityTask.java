@@ -20,18 +20,18 @@
 
 package io.temporal.internal.worker;
 
-import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponseOrBuilder;
+import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.worker.tuning.SlotPermit;
 import io.temporal.workflow.Functions;
 import javax.annotation.Nonnull;
 
 public final class ActivityTask {
-  private final @Nonnull PollActivityTaskQueueResponseOrBuilder response;
+  private final @Nonnull PollActivityTaskQueueResponse response;
   private final @Nonnull SlotPermit permit;
   private final @Nonnull Functions.Proc completionCallback;
 
   public ActivityTask(
-      @Nonnull PollActivityTaskQueueResponseOrBuilder response,
+      @Nonnull PollActivityTaskQueueResponse response,
       @Nonnull SlotPermit permit,
       @Nonnull Functions.Proc completionCallback) {
     this.response = response;
@@ -40,7 +40,7 @@ public final class ActivityTask {
   }
 
   @Nonnull
-  public PollActivityTaskQueueResponseOrBuilder getResponse() {
+  public PollActivityTaskQueueResponse getResponse() {
     return response;
   }
 
