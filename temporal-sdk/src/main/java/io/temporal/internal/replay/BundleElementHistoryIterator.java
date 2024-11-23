@@ -34,34 +34,35 @@ import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SplitHistoryIterator implements WorkflowHistoryIterator {
+public class BundleElementHistoryIterator implements WorkflowHistoryIterator {
 
-  private static final Logger log = LoggerFactory.getLogger(SplitHistoryIterator.class);
+  private static final Logger log = LoggerFactory.getLogger(BundleElementHistoryIterator.class);
 
-  private MultiIterator.SplitIterator sourceIterator;
-  private final int splitIndex;
+  private MultiIterator.BundleElementIterator sourceIterator;
+  private final int elementIndex;
   private long lastEventId;
   private HistoryEvent nextElement;
   private boolean hasNextComputed;
   // Mapping of scheduled event ids
-  // Original event id -> split history event id
+  // Original event id -> element history event id
   private Map<Long, Long> scheduledEventIds = new HashMap<>();
-  // Original event id -> (splitIndex -> index of the result for this split)
+  // Original event id -> (elementIndex -> index of the result for this element)
   private Map<Long, Map<Integer, Integer>> scheduledEventInputPayloadIndex = new HashMap<>();
   private long previousStartedEventId;
 
   // Mapping of workflow task started event ids
-  // Original event id -> split history event id
+  // Original event id -> element history event id
   private Map<Long, Long> workflowTaskStartedEventIds = new HashMap<>();
 
-  public SplitHistoryIterator(int splitIndex, MultiIterator.SplitIterator sourceIterator) {
-    this.splitIndex = splitIndex;
+  public BundleElementHistoryIterator(
+      int elementIndex, MultiIterator.BundleElementIterator sourceIterator) {
+    this.elementIndex = elementIndex;
     this.sourceIterator = sourceIterator;
   }
 
   public void reset(long previousStartedEventId) {
     //    log.info(
-    //        "Resetting splitIndex={} previousStartedEventId={}", splitIndex,
+    //        "Resetting elementIndex={} previousStartedEventId={}", elementIndex,
     // previousStartedEventId);
     this.previousStartedEventId = previousStartedEventId;
     nextElement = null;
@@ -73,7 +74,7 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
     return lastEventId;
   }
 
-  public long getSplitPreviousStartedEventId() {
+  public long getElementPreviousStartedEventId() {
     if (previousStartedEventId == 0) {
       return 0;
     }
@@ -98,8 +99,8 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
     }
     hasNextComputed = false;
     //    log.info(
-    //        "SplitHistoryIterator.next splitIndex={} event={} eventType={}",
-    //        splitIndex,
+    //        "elementHistoryIterator.next elementIndex={} event={} eventType={}",
+    //        elementIndex,
     //        nextElement.getEventId(),
     //        nextElement.getEventType());
     return nextElement;
@@ -122,12 +123,12 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
   }
 
   /**
-   * @return null if event is not part of the split
+   * @return null if event is not part of the element
    */
   private HistoryEvent copy(HistoryEvent event) {
     //    log.info(
-    //        "copy splitIndex={} event={} type={}",
-    //        splitIndex,
+    //        "copy elementIndex={} event={} type={}",
+    //        elementIndex,
     //        event.getEventId(),
     //        event.getEventType());
     HistoryEvent.Builder result = event.toBuilder();
@@ -137,10 +138,10 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
         WorkflowExecutionStartedEventAttributes.Builder attr =
             result.getWorkflowExecutionStartedEventAttributesBuilder();
         Payloads payloads = attr.getInput();
-        Payload payload = payloads.getPayloads(splitIndex);
+        Payload payload = payloads.getPayloads(elementIndex);
         // Override runId to use a different seed for random.
         // This avoids activity and child workflow id collisions.
-        String runId = attr.getOriginalExecutionRunId() + "/" + splitIndex;
+        String runId = attr.getOriginalExecutionRunId() + "/" + elementIndex;
         attr.setOriginalExecutionRunId(runId)
             .setFirstExecutionRunId(runId)
             .setInput(Payloads.newBuilder().addPayloads(payload).build());
@@ -149,18 +150,18 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
         ActivityTaskScheduledEventAttributes.Builder scheduledAttr =
             result.getActivityTaskScheduledEventAttributesBuilder();
-        boolean coalesced = scheduledAttr.getHeader().getFieldsMap().containsKey("bundle");
-        // TODO(maxim): This doesn't handle situation when the coalesced activity contains
-        // more then one scheduled activity from the same split
-        if (coalesced) {
+        boolean bundle = scheduledAttr.getHeader().getFieldsMap().containsKey("bundle");
+        // TODO(maxim): This doesn't handle situation when the bundle activity contains
+        // more then one scheduled activity from the same element
+        if (bundle) {
           int inputIndex = 0;
           //          for (Payload p : scheduledAttr.getInput().getPayloadsList()) {
           List<Payload> paylads = scheduledAttr.getInput().getPayloadsList();
           for (int i = 0; i < paylads.size(); i++) {
             Payload p = paylads.get(i);
             Map<String, ByteString> m = p.getMetadataMap();
-            int splitIndex = Integer.parseInt(m.get("element").toString(StandardCharsets.UTF_8));
-            if (splitIndex != this.splitIndex) {
+            int elementIndex = Integer.parseInt(m.get("element").toString(StandardCharsets.UTF_8));
+            if (elementIndex != this.elementIndex) {
               continue;
             }
             Map<Integer, Integer> innerMap =
@@ -168,30 +169,30 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
                     event.getEventId(), k -> new HashMap<>());
 
             // Add or update the value in the inner map
-            innerMap.put(splitIndex, i);
+            innerMap.put(elementIndex, i);
             String activityId = m.get("activityId").toString(StandardCharsets.UTF_8);
             scheduledAttr.setActivityId(activityId);
             scheduledAttr.setInput(Payloads.newBuilder().addPayloads(p).build());
             result.setActivityTaskScheduledEventAttributes(scheduledAttr);
             break SWITCH; // avoid default pass through
           }
-          return null; // coalesced activity doesn't contain this split input
+          return null; // bundle activity doesn't contain this element input
         }
-      // Intentionally pass through as this is not coallesced event
+      // Intentionally pass through as this is not bundled event
       default:
         Payload summary = event.getUserMetadata().getSummary();
         if (summary.containsMetadata("element")) {
-          int splitIndexFromEvent =
+          int elementIndexFromEvent =
               Integer.parseInt(
                   summary.getMetadataOrThrow("element").toString(StandardCharsets.UTF_8));
-          if (splitIndexFromEvent != splitIndex) {
+          if (elementIndexFromEvent != elementIndex) {
             //            log.info(
-            //                "Skipping splitIndex={} event={} type={} as it is not part of the
-            // split splitIndexFromEvent={}",
-            //                splitIndex,
+            //                "Skipping elementIndex={} event={} type={} as it is not part of the
+            // element elementIndexFromEvent={}",
+            //                elementIndex,
             //                event.getEventId(),
             //                event.getEventType(),
-            //                splitIndexFromEvent);
+            //                elementIndexFromEvent);
             return null;
           }
         }
@@ -200,11 +201,11 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
     result.setEventId(eventId);
     saveScheduledId(event, eventId);
     if (!updateScheduledId(event, result)) {
-      // Skip event as its schedule id is not part of the split
+      // Skip event as its schedule id is not part of the element
       //      log.info(
-      //          "Skipping splitIndex={} event={} type={} as its schedule id is not part of the
-      // split",
-      //          splitIndex,
+      //          "Skipping elementIndex={} event={} type={} as its schedule id is not part of the
+      // element",
+      //          elementIndex,
       //          event.getEventId(),
       //          event.getEventType());
       return null;
@@ -213,8 +214,8 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       workflowTaskStartedEventIds.put(event.getEventId(), eventId);
     }
     //    log.info(
-    //        "copy result: splitIndex={} event={} type={}",
-    //        splitIndex,
+    //        "copy result: elementIndex={} event={} type={}",
+    //        elementIndex,
     //        result.getEventId(),
     //        result.getEventType());
     lastEventId = eventId;
@@ -280,7 +281,7 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
                 scheduledEventInputPayloadIndex.get(attr.getScheduledEventId());
             if (sIndex != null) {
               Payloads payloads = attr.getResult();
-              Payload payload = payloads.getPayloads(sIndex.get(splitIndex));
+              Payload payload = payloads.getPayloads(sIndex.get(elementIndex));
               attr.setResult(Payloads.newBuilder().addPayloads(payload).build());
             }
             result.setActivityTaskCompletedEventAttributes(
@@ -404,8 +405,8 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
               + originalScheduledEventId
               + ", scheduledEventIds="
               + scheduledEventIds
-              + ", splitIndex="
-              + splitIndex);
+              + ", elementIndex="
+              + elementIndex);
     }
     return scheduledEventId;
   }
@@ -417,9 +418,9 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
 
   @Override
   public String toString() {
-    return "SplitHistoryIterator{"
-        + "splitIndex="
-        + splitIndex
+    return "elementHistoryIterator{"
+        + "elementIndex="
+        + elementIndex
         + ", lastEventId="
         + lastEventId
         + ", scheduledEventIds="

@@ -395,7 +395,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           .setHistory(getHistoryResponse.getHistory())
           .setNextPageToken(getHistoryResponse.getNextPageToken());
     }
-    return new CoalescingWorkflowRunTaskHandlerImpl(
+    return new WorkflowBundleTaskHandler(
         namespace,
         workflowFactory,
         workflowTask.build(),

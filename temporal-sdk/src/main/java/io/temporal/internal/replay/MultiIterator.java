@@ -26,14 +26,14 @@ import java.util.*;
 
 public class MultiIterator {
   private final List<HistoryEvent> buffer = new ArrayList<>();
-  private final List<SplitHistoryIterator> startedIdIterators = new ArrayList<>();
-  private final List<SplitHistoryIterator> iterators = new ArrayList<>();
+  private final List<BundleElementHistoryIterator> startedIdIterators = new ArrayList<>();
+  private final List<BundleElementHistoryIterator> iterators = new ArrayList<>();
   private WorkflowHistoryIterator sourceIterator;
 
-  public MultiIterator(int splitCount) {
-    for (int i = 0; i < splitCount; i++) {
-      iterators.add(new SplitHistoryIterator(i, new SplitIterator()));
-      startedIdIterators.add(new SplitHistoryIterator(i, new SplitIterator()));
+  public MultiIterator(int elementCount) {
+    for (int i = 0; i < elementCount; i++) {
+      iterators.add(new BundleElementHistoryIterator(i, new BundleElementIterator()));
+      startedIdIterators.add(new BundleElementHistoryIterator(i, new BundleElementIterator()));
     }
   }
 
@@ -47,15 +47,15 @@ public class MultiIterator {
     }
   }
 
-  public SplitHistoryIterator getIterator(int splitIndex) {
-    return iterators.get(splitIndex);
+  public BundleElementHistoryIterator getIterator(int elementIndex) {
+    return iterators.get(elementIndex);
   }
 
-  public SplitHistoryIterator getStartedIdIterator(int splitIndex) {
-    return startedIdIterators.get(splitIndex);
+  public BundleElementHistoryIterator getBundleElementIterator(int elementIndex) {
+    return startedIdIterators.get(elementIndex);
   }
 
-  class SplitIterator implements WorkflowHistoryIterator {
+  class BundleElementIterator implements WorkflowHistoryIterator {
 
     private int position;
 

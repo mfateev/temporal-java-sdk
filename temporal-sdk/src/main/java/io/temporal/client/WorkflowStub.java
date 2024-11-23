@@ -151,9 +151,9 @@ public interface WorkflowStub {
 
   /**
    * @param args one argument per split
-   * @return workflow id and run id of the started coalesced workflow.
+   * @return workflow id and run id of the started bundle workflow.
    */
-  <T> WorkflowExecution startCoalesced(T... args);
+  <T> WorkflowExecution startBundle(T... args);
 
   /**
    * Execute a workflow together with an update workflow request.

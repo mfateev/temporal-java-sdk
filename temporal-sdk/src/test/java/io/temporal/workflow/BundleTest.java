@@ -28,23 +28,23 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 
-public class CoalescedTest {
+public class BundleTest {
 
-  private static final Logger log = Workflow.getLogger(CoalescedTest.class);
+  private static final Logger log = Workflow.getLogger(BundleTest.class);
 
   @Rule
   public SDKTestWorkflowRule testWorkflowRule =
       SDKTestWorkflowRule.newBuilder()
-          .setWorkflowTypes(TestCoalescedWorkflowImpl.class)
+          .setWorkflowTypes(TestBundleWorkflowImpl.class)
           .setActivityImplementations(new TestActivitiesImpl())
           .setUseExternalService(true)
           .setNamespace("default")
           .build();
 
   @Test
-  public void testCoalescedWorkflow() {
-    WorkflowStub sagaWorkflow = testWorkflowRule.newUntypedWorkflowStub("TestCoalescedWorkflow");
-    sagaWorkflow.startCoalesced(1, 2, 3); // , 4, 5, 6, 7, 9, 10);
+  public void testBundleWorkflow() {
+    WorkflowStub sagaWorkflow = testWorkflowRule.newUntypedWorkflowStub("TestBundleWorkflow");
+    sagaWorkflow.startBundle(1, 2, 3); // , 4, 5, 6, 7, 9, 10);
     Integer result = sagaWorkflow.getResult(Integer.class, Integer.class);
     //    Assert.assertEquals(Integer.valueOf(11), result);
     //    String trace = testWorkflowRule.getInterceptor(TracingWorkerInterceptor.class).getTrace();
@@ -79,12 +79,12 @@ public class CoalescedTest {
   }
 
   @WorkflowInterface
-  public interface TestCoalescedWorkflow {
+  public interface TestBundleWorkflow {
     @WorkflowMethod
     int execute(int arg);
   }
 
-  public static class TestCoalescedWorkflowImpl implements TestCoalescedWorkflow {
+  public static class TestBundleWorkflowImpl implements TestBundleWorkflow {
 
     @Override
     public int execute(int arg) {

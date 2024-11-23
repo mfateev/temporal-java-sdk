@@ -123,8 +123,8 @@ public final class ActivityTaskHandlerImpl implements ActivityTaskHandler {
             activityTask.getCompletionCallback());
     ActivityTaskExecutor activity = activities.get(activityType);
     if (activity != null) {
-      boolean coalesced = activityTask.getResponse().getHeader().containsFields("bundle");
-      if (!coalesced) {
+      boolean bundle = activityTask.getResponse().getHeader().containsFields("bundle");
+      if (!bundle) {
         return activity.execute(activityInfo, metricsScope);
       } else {
         Payloads input = activityTask.getResponse().getInput();

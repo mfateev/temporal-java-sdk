@@ -131,11 +131,11 @@ class WorkflowStubImpl implements WorkflowStub {
   }
 
   @Override
-  public <T> WorkflowExecution startCoalesced(T... args) {
+  public <T> WorkflowExecution startBundle(T... args) {
     if (options == null) {
       throw new IllegalStateException("Required parameter WorkflowOptions is missing");
     }
-    // TODO(maxim): Hacky way to indicate that the workflow is coalesced
+    // TODO(maxim): Hacky way to indicate that the workflow is bundle
     WorkflowOptions cOptions =
         WorkflowOptions.newBuilder(options).setStaticSummary("bundle").build();
     return startWithOptions(WorkflowOptions.merge(null, null, cOptions), args);

@@ -41,17 +41,16 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHandler {
+final class WorkflowBundleTaskHandler implements WorkflowRunTaskHandler {
 
-  private static final Logger log =
-      LoggerFactory.getLogger(CoalescingWorkflowRunTaskHandlerImpl.class);
+  private static final Logger log = LoggerFactory.getLogger(WorkflowBundleTaskHandler.class);
   private final WorkflowRunTaskHandler handler;
   private final List<WorkflowRunTaskHandler> handlers = new ArrayList<>();
   private MultiIterator multiIterator;
   private int completionCount;
   List<Payload> resultPayloads = new ArrayList<>();
 
-  public CoalescingWorkflowRunTaskHandlerImpl(
+  public WorkflowBundleTaskHandler(
       String namespace,
       ReplayWorkflowFactory workflowFactory,
       PollWorkflowTaskQueueResponse workflowTask,
@@ -73,7 +72,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       WorkflowExecutionStartedEventAttributes started =
           event.getWorkflowExecutionStartedEventAttributes();
       multiIterator = new MultiIterator(started.getInput().getPayloadsCount());
-      // Assumption that a coalesced workflow must have a single input.
+      // Assumption that an element workflow must have a single input.
       for (int i = 0; i < started.getInput().getPayloadsCount(); i++) {
         ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
         handlers.add(
@@ -115,16 +114,15 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       // Ugly hack that requires scanning the whole history to find the last event id and
       // previousStartedEventId
       for (int i = 0; i < handlers.size(); i++) {
-        SplitHistoryIterator iterator = multiIterator.getStartedIdIterator(i);
+        BundleElementHistoryIterator iterator = multiIterator.getBundleElementIterator(i);
         while (iterator.hasNext()) {
           iterator.next();
         }
-        long splitPreviousStartedEventId = iterator.getSplitPreviousStartedEventId();
+        long elementPreviousStartedEventId = iterator.getElementPreviousStartedEventId();
         PollWorkflowTaskQueueResponse.Builder task =
             workflowTask.toBuilder()
                 .setStartedEventId(iterator.getLastEventId())
-                .setPreviousStartedEventId(splitPreviousStartedEventId);
-        PollWorkflowTaskQueueResponse tt = task.build();
+                .setPreviousStartedEventId(elementPreviousStartedEventId);
         tasks.add(task.build());
       }
     }
@@ -135,7 +133,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       WorkflowTaskResult result = h.handleWorkflowTask(tasks.get(i), iterator);
       results.add(result);
     }
-    return coalesceResults(results);
+    return bundleResults(results);
   }
 
   @Override
@@ -145,7 +143,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     if (handler != null) {
       return handler.handleDirectQueryWorkflowTask(workflowTask, historyIterator);
     }
-    throw new UnsupportedOperationException("Coalescing workflow doesn't support queries yet");
+    throw new UnsupportedOperationException("Bundle workflow doesn't support queries yet");
   }
 
   @Override
@@ -153,7 +151,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     if (handler != null) {
       handler.resetStartedEvenId(eventId);
     }
-    throw new UnsupportedOperationException("Coalescing workflow doesn't support reset yet");
+    throw new UnsupportedOperationException("Bundle workflow doesn't support reset yet");
   }
 
   @Override
@@ -175,17 +173,11 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     list.get(index).add(command);
   }
 
-  /** Coalesces results of multiple split workflows into a single result. */
-  private WorkflowTaskResult coalesceResults(List<WorkflowTaskResult> results) {
-    log.info("coalesceResults begin");
-    for (WorkflowTaskResult result : results) {
-      log.debug(
-          "Coalescing results {}",
-          WorkflowExecutionUtils.prettyPrintCommands(result.getCommands()));
-    }
-    List<Command> coalescedCommands = new ArrayList<>();
+  /** Bundles results of multiple element workflows into a single result. */
+  private WorkflowTaskResult bundleResults(List<WorkflowTaskResult> results) {
+    List<Command> bundledCommands = new ArrayList<>();
 
-    // Current batch of commands to be coalesced
+    // Current batch of commands to be bundled
     String scheduleActivityTypeName = null;
     Command scheduleActivityCommand = null;
     List<Payload> scheduleActivityInputs = new ArrayList<>();
@@ -199,7 +191,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
       List<Command> commands = result.getCommands();
       for (Command command : commands) {
         if (WorkflowExecutionUtils.isWorkflowExecutionCompleteCommand(command)) {
-          if (coalesceWorkflowCompleteCommand(command, i, coalescedCommands)) break;
+          if (bundleWorkflowCompleteCommand(command, i, bundledCommands)) break;
         } else if (command.getCommandType() == CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK) {
           String typeName =
               command.getScheduleActivityTaskCommandAttributes().getActivityType().getName();
@@ -210,8 +202,8 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
             }
             scheduleActivityTypeName = typeName;
           } else {
-            coalesceScheduleActivity(
-                scheduleActivityCommand, scheduleActivityInputs, coalescedCommands);
+            bundleScheduleActivity(
+                scheduleActivityCommand, scheduleActivityInputs, bundledCommands);
 
             scheduleActivityCommand = command;
             scheduleActivityTypeName = typeName;
@@ -219,16 +211,16 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
             addScheduleActivityInput(command, i, scheduleActivityInputs);
           }
         } else {
-          UserMetadata metadata = splitIdToUserMetadata(i);
+          UserMetadata metadata = elementIndexToUserMetadata(i);
           Command.Builder commandBuilder = command.toBuilder().setUserMetadata(metadata);
-          coalescedCommands.add(commandBuilder.build());
+          bundledCommands.add(commandBuilder.build());
         }
       }
     }
     if (scheduleActivityInputs.size() > 0) {
-      coalesceScheduleActivity(scheduleActivityCommand, scheduleActivityInputs, coalescedCommands);
+      bundleScheduleActivity(scheduleActivityCommand, scheduleActivityInputs, bundledCommands);
     }
-    return WorkflowTaskResult.newBuilder(results.get(0)).setCommands(coalescedCommands).build();
+    return WorkflowTaskResult.newBuilder(results.get(0)).setCommands(bundledCommands).build();
   }
 
   private static void addScheduleActivityInput(
@@ -245,19 +237,19 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     scheduleActivityInputs.add(input);
   }
 
-  private static void coalesceScheduleActivity(
+  private static void bundleScheduleActivity(
       Command firstInTheBatch,
       List<Payload> scheduleActivityInputs,
-      List<Command> coalescedCommands) {
+      List<Command> bundledCommands) {
     if (scheduleActivityInputs.size() == 1) {
       Payload payload = scheduleActivityInputs.get(0);
-      int splitId = getSplitId(payload);
-      UserMetadata metadata = splitIdToUserMetadata(splitId);
+      int elementIndex = getElementIndex(payload);
+      UserMetadata metadata = elementIndexToUserMetadata(elementIndex);
       Command.Builder commandBuilder = firstInTheBatch.toBuilder().setUserMetadata(metadata);
-      coalescedCommands.add(commandBuilder.build());
+      bundledCommands.add(commandBuilder.build());
       return;
     }
-    // Coalesce all commands of the same type
+    // Bundle all commands of the same type
     Command c =
         firstInTheBatch.toBuilder()
             .setScheduleActivityTaskCommandAttributes(
@@ -266,28 +258,28 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
                         Header.newBuilder().putFields("bundle", Payload.newBuilder().build()))
                     .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))
             .build();
-    coalescedCommands.add(c);
+    bundledCommands.add(c);
   }
 
-  private static UserMetadata splitIdToUserMetadata(int splitId) {
+  private static UserMetadata elementIndexToUserMetadata(int elementIndex) {
     Payload summary =
         Payload.newBuilder()
             .putMetadata(
-                "element", ByteString.copyFrom(Integer.toString(splitId), StandardCharsets.UTF_8))
+                "element",
+                ByteString.copyFrom(Integer.toString(elementIndex), StandardCharsets.UTF_8))
             .build();
     UserMetadata metadata = UserMetadata.newBuilder().setSummary(summary).build();
     return metadata;
   }
 
-  private static int getSplitId(Payload payload) {
+  private static int getElementIndex(Payload payload) {
     Map<String, ByteString> metadataMap = payload.getMetadataMap();
-    String splitS = metadataMap.get("element").toStringUtf8();
-    int splitId = Integer.parseInt(splitS);
-    return splitId;
+    String elementIndex = metadataMap.get("element").toStringUtf8();
+    return Integer.parseInt(elementIndex);
   }
 
-  private boolean coalesceWorkflowCompleteCommand(
-      Command command, int i, List<Command> coalescedCommands) {
+  private boolean bundleWorkflowCompleteCommand(
+      Command command, int i, List<Command> bundledCommands) {
     Payload r;
     if (command.getCommandType() == CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION) {
       // Only one result is supported
@@ -305,19 +297,19 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     resultPayloads.set(i, r);
     // All completion commands are merged into a single completion command
     if (++completionCount == handlers.size()) {
-      // One result per split
-      Payloads.Builder splitResults = Payloads.newBuilder();
-      splitResults.addAllPayloads(resultPayloads);
+      // One result per element
+      Payloads.Builder bundleResult = Payloads.newBuilder();
+      bundleResult.addAllPayloads(resultPayloads);
       CompleteWorkflowExecutionCommandAttributes attr =
           CompleteWorkflowExecutionCommandAttributes.newBuilder()
-              .setResult(splitResults.build())
+              .setResult(bundleResult.build())
               .build();
       Command c =
           Command.newBuilder()
               .setCommandType(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION)
               .setCompleteWorkflowExecutionCommandAttributes(attr)
               .build();
-      coalescedCommands.add(c);
+      bundledCommands.add(c);
       return true;
     }
     return false;

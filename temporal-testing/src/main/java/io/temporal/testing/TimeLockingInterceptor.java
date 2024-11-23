@@ -75,8 +75,8 @@ class TimeLockingInterceptor extends WorkflowClientInterceptorBase {
     }
 
     @Override
-    public <T> WorkflowExecution startCoalesced(T... args) {
-      return next.startCoalesced(args);
+    public <T> WorkflowExecution startBundle(T... args) {
+      return next.startBundle(args);
     }
 
     @Override
