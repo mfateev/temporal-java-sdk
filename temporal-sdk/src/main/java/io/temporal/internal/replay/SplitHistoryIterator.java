@@ -149,7 +149,7 @@ public class SplitHistoryIterator implements WorkflowHistoryIterator {
       case EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
         ActivityTaskScheduledEventAttributes.Builder scheduledAttr =
             result.getActivityTaskScheduledEventAttributesBuilder();
-        boolean coalesced = scheduledAttr.getHeader().getFieldsMap().containsKey("coalesced");
+        boolean coalesced = scheduledAttr.getHeader().getFieldsMap().containsKey("bundle");
         // TODO(maxim): This doesn't handle situation when the coalesced activity contains
         // more then one scheduled activity from the same split
         if (coalesced) {

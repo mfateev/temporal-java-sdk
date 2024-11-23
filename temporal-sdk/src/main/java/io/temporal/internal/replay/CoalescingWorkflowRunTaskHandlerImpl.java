@@ -68,7 +68,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
     String summary = s.getData().toString(StandardCharsets.UTF_8);
     WorkflowType workflowType = workflowTask.getWorkflowType();
     WorkflowExecution workflowExecution = workflowTask.getWorkflowExecution();
-    if ("\"coalesced\"".equals(summary)) {
+    if ("\"bundle\"".equals(summary)) {
       handler = null;
       WorkflowExecutionStartedEventAttributes started =
           event.getWorkflowExecutionStartedEventAttributes();
@@ -263,7 +263,7 @@ public class CoalescingWorkflowRunTaskHandlerImpl implements WorkflowRunTaskHand
             .setScheduleActivityTaskCommandAttributes(
                 firstInTheBatch.getScheduleActivityTaskCommandAttributes().toBuilder()
                     .setHeader(
-                        Header.newBuilder().putFields("coalesced", Payload.newBuilder().build()))
+                        Header.newBuilder().putFields("bundle", Payload.newBuilder().build()))
                     .setInput(Payloads.newBuilder().addAllPayloads(scheduleActivityInputs)))
             .build();
     coalescedCommands.add(c);

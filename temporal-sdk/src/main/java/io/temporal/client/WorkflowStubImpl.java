@@ -137,7 +137,7 @@ class WorkflowStubImpl implements WorkflowStub {
     }
     // TODO(maxim): Hacky way to indicate that the workflow is coalesced
     WorkflowOptions cOptions =
-        WorkflowOptions.newBuilder(options).setStaticSummary("coalesced").build();
+        WorkflowOptions.newBuilder(options).setStaticSummary("bundle").build();
     return startWithOptions(WorkflowOptions.merge(null, null, cOptions), args);
   }
 
