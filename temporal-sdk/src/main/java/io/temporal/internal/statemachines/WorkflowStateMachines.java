@@ -77,10 +77,10 @@ public final class WorkflowStateMachines {
    * <p>Set from the "outside" from the PollWorkflowTaskQueueResponse. Not modified by the SDK state
    * machines.
    */
-  private long workflowTaskStartedEventId;
+  private long lastHistoryWTSEventId;
 
   /** EventId of the last WorkflowTaskStarted event handled by these state machines. */
-  private long lastWFTStartedEventId;
+  private long currentWFTStartedEventId;
 
   /** The Build ID used in the current WFT if already completed and set (may be null) */
   private String currentTaskBuildId;
@@ -88,6 +88,8 @@ public final class WorkflowStateMachines {
   private long historySize;
 
   private boolean isContinueAsNewSuggested;
+
+  private long currentWorkflowTaskCompletedEventId;
 
   /**
    * EventId of the last event seen by these state machines. Events earlier than this one will be
@@ -217,12 +219,12 @@ public final class WorkflowStateMachines {
   // execution is completed for example.
   // Most likely we can rework WorkflowTaskStateMachine to use only hasNext.
   /**
-   * @param workflowTaskStartedEventId eventId of the workflowTask that was picked up by a worker
-   *     and triggered an execution. Used in {@link WorkflowTaskStateMachine} only to understand
-   *     that this workflow task will not have a matching closing event and needs to be executed.
+   * @param eventId eventId of the workflowTask that was picked up by a worker and triggered an
+   *     execution. Used in {@link WorkflowTaskStateMachine} only to understand that this workflow
+   *     task will not have a matching closing event and needs to be executed.
    */
-  public void setWorkflowStartedEventId(long workflowTaskStartedEventId) {
-    this.workflowTaskStartedEventId = workflowTaskStartedEventId;
+  public void setLastHistoryWTSEventId(long eventId) {
+    this.lastHistoryWTSEventId = eventId;
   }
 
   public void resetStartedEvenId(long eventId) {
@@ -237,16 +239,20 @@ public final class WorkflowStateMachines {
     for (long i = this.lastHandledEventId; i > resetLastHandledEventId; i--) {
       stateMachines.remove(i);
     }
-    this.lastWFTStartedEventId = eventId;
+    this.currentWFTStartedEventId = eventId;
     this.lastHandledEventId = resetLastHandledEventId;
   }
 
-  public long getLastWFTStartedEventId() {
-    return lastWFTStartedEventId;
+  public long getCurrentWFTStartedEventId() {
+    return currentWFTStartedEventId;
   }
 
-  public long getCurrentWFTStartedEventId() {
-    return workflowTaskStartedEventId;
+  public long getLastHistoryWTSEventId() {
+    return lastHistoryWTSEventId;
+  }
+
+  public long getCurrentWorkflowTaskCompletedEventId() {
+    return currentWorkflowTaskCompletedEventId;
   }
 
   public long getHistorySize() {
@@ -374,6 +380,7 @@ public final class WorkflowStateMachines {
         }
         break;
       case EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
+        currentWorkflowTaskCompletedEventId = event.getEventId();
         WorkflowTaskCompletedEventAttributes completedEvent =
             event.getWorkflowTaskCompletedEventAttributes();
         String maybeBuildId = completedEvent.getWorkerVersion().getBuildId();
@@ -739,7 +746,7 @@ public final class WorkflowStateMachines {
       case EVENT_TYPE_WORKFLOW_TASK_SCHEDULED:
         WorkflowTaskStateMachine c =
             WorkflowTaskStateMachine.newInstance(
-                workflowTaskStartedEventId, new WorkflowTaskCommandsListener());
+                lastHistoryWTSEventId, new WorkflowTaskCommandsListener());
         c.handleEvent(event, hasNextEvent);
         stateMachines.put(event.getEventId(), c);
         break;
@@ -779,7 +786,7 @@ public final class WorkflowStateMachines {
   }
 
   public long getLastStartedEventId() {
-    return lastWFTStartedEventId;
+    return currentWFTStartedEventId;
   }
 
   /**
@@ -1321,7 +1328,7 @@ public final class WorkflowStateMachines {
           value.nonReplayWorkflowTaskStarted();
         }
       }
-      WorkflowStateMachines.this.lastWFTStartedEventId = startedEventId;
+      WorkflowStateMachines.this.currentWFTStartedEventId = startedEventId;
       WorkflowStateMachines.this.historySize = historySize;
       WorkflowStateMachines.this.isContinueAsNewSuggested = isContinueAsNewSuggested;
 
@@ -1486,6 +1493,6 @@ public final class WorkflowStateMachines {
   private String createShortCurrentStateMessagePostfix() {
     return String.format(
         "{WorkflowTaskStartedEventId=%s, CurrentStartedEventId=%s}",
-        this.workflowTaskStartedEventId, this.lastWFTStartedEventId);
+        this.lastHistoryWTSEventId, this.currentWFTStartedEventId);
   }
 }

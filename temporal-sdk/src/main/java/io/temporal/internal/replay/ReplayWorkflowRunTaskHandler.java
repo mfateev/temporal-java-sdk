@@ -150,7 +150,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
               TimeUnit.NANOSECONDS);
 
       if (workflowTask.getPreviousStartedEventId()
-          < workflowStateMachines.getLastWFTStartedEventId()) {
+          < workflowStateMachines.getCurrentWFTStartedEventId()) {
         // if previousStartedEventId < currentStartedEventId - the last workflow task handled by
         // these state machines is ahead of the last handled workflow task known by the server.
         // Something is off, the server lost progress.
@@ -181,7 +181,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
       }
       if (context.getResetReason() != null) {
         throw new ResetWorkflowTaskError(
-            context.getResetReason(), this.workflowStateMachines.getCurrentWFTStartedEventId() + 1);
+            context.getResetReason(),
+            this.workflowStateMachines.getCurrentWorkflowTaskCompletedEventId());
       }
       Map<String, WorkflowQueryResult> queryResults = executeQueries(workflowTask.getQueriesMap());
       return WorkflowTaskResult.newBuilder()
@@ -229,7 +230,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
   private void handleWorkflowTaskImpl(
       PollWorkflowTaskQueueResponseOrBuilder workflowTask,
       WorkflowHistoryIterator historyIterator) {
-    workflowStateMachines.setWorkflowStartedEventId(workflowTask.getStartedEventId());
+    workflowStateMachines.setLastHistoryWTSEventId(workflowTask.getStartedEventId());
     workflowStateMachines.setReplaying(workflowTask.getPreviousStartedEventId() > 0);
     workflowStateMachines.setMessages(workflowTask.getMessagesList());
     applyServerHistory(workflowTask.getStartedEventId(), historyIterator);
