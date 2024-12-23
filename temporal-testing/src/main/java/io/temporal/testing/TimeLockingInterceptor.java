@@ -75,9 +75,15 @@ class TimeLockingInterceptor extends WorkflowClientInterceptorBase {
     }
 
     @Override
-    public <R> WorkflowUpdateHandle<R> updateWithStart(
-        UpdateWithStartWorkflowOperation<R> updateOperation, Object... args) {
-      return next.updateWithStart(updateOperation, args);
+    public <R> WorkflowUpdateHandle<R> startUpdateWithStart(
+        UpdateOptions<R> options, Object[] updateArgs, Object[] startArgs) {
+      return next.startUpdateWithStart(options, updateArgs, startArgs);
+    }
+
+    @Override
+    public <R> R executeUpdateWithStart(
+        UpdateOptions<R> updateOptions, Object[] updateArgs, Object[] startArgs) {
+      return next.executeUpdateWithStart(updateOptions, updateArgs, startArgs);
     }
 
     @Override
@@ -191,6 +197,11 @@ class TimeLockingInterceptor extends WorkflowClientInterceptorBase {
     @Override
     public WorkflowStub newInstance(WorkflowOptions options) {
       return new TimeLockingWorkflowStub(locker, next.newInstance(options));
+    }
+
+    @Override
+    public WorkflowExecutionDescription describe() {
+      return next.describe();
     }
 
     /** Unlocks time skipping before blocking calls and locks back after completion. */

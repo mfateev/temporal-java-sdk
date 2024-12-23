@@ -680,13 +680,18 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
       localRetryThreshold = replayContext.getWorkflowTaskTimeout().multipliedBy(3);
     }
 
+    @Nullable
+    UserMetadata userMetadata =
+        makeUserMetaData(options.getSummary(), null, dataConverterWithCurrentWorkflowContext);
+
     return new ExecuteLocalActivityParameters(
         activityTask,
         options.getScheduleToStartTimeout(),
         originalScheduledTime,
         previousExecutionFailure,
         options.isDoNotIncludeArgumentsIntoMarker(),
-        localRetryThreshold);
+        localRetryThreshold,
+        userMetadata);
   }
 
   @Override
@@ -811,7 +816,8 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     attributes.setOperation(input.getOperation());
     attributes.setService(input.getService());
     attributes.setEndpoint(input.getEndpoint());
-    attributes.putAllNexusHeader(input.getHeaders());
+    // Ensure that the headers are lowercase
+    input.getHeaders().forEach((k, v) -> attributes.putNexusHeader(k.toLowerCase(), v));
     attributes.setScheduleToCloseTimeout(
         ProtobufTimeUtils.toProtoDuration(input.getOptions().getScheduleToCloseTimeout()));
 

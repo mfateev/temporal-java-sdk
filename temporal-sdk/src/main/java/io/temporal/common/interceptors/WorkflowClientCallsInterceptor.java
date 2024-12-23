@@ -62,8 +62,9 @@ public interface WorkflowClientCallsInterceptor {
   WorkflowSignalWithStartOutput signalWithStart(WorkflowSignalWithStartInput input);
 
   /**
-   * Intercepts calls from {@link WorkflowStub#updateWithStart} and {@link
-   * WorkflowClient#updateWithStart}.
+   * Intercepts calls from {@link WorkflowStub#startUpdateWithStart} and {@link
+   * WorkflowStub#executeUpdateWithStart} as well as {@link WorkflowClient#startUpdateWithStart} and
+   * {@link WorkflowClient#executeUpdateWithStart}.
    */
   @Experimental
   <R> WorkflowUpdateWithStartOutput<R> updateWithStart(WorkflowUpdateWithStartInput<R> input);
@@ -84,15 +85,15 @@ public interface WorkflowClientCallsInterceptor {
 
   <R> QueryOutput<R> query(QueryInput<R> input);
 
-  @Experimental
   <R> WorkflowUpdateHandle<R> startUpdate(StartUpdateInput<R> input);
 
-  @Experimental
   <R> PollWorkflowUpdateOutput<R> pollWorkflowUpdate(PollWorkflowUpdateInput<R> input);
 
   CancelOutput cancel(CancelInput input);
 
   TerminateOutput terminate(TerminateInput input);
+
+  DescribeWorkflowOutput describe(DescribeWorkflowInput input);
 
   final class WorkflowStartInput {
     private final String workflowId;
@@ -231,21 +232,20 @@ public interface WorkflowClientCallsInterceptor {
 
   final class WorkflowUpdateWithStartInput<R> {
     private final WorkflowStartInput workflowStartInput;
-    private final UpdateWithStartWorkflowOperation<R> updateOperation;
+    private final StartUpdateInput<R> workflowUpdateInput;
 
     public WorkflowUpdateWithStartInput(
-        WorkflowStartInput workflowStartInput,
-        UpdateWithStartWorkflowOperation<R> updateOperation) {
+        WorkflowStartInput workflowStartInput, StartUpdateInput<R> workflowUpdateInput) {
       this.workflowStartInput = workflowStartInput;
-      this.updateOperation = updateOperation;
+      this.workflowUpdateInput = workflowUpdateInput;
     }
 
     public WorkflowStartInput getWorkflowStartInput() {
       return workflowStartInput;
     }
 
-    public UpdateWithStartWorkflowOperation<R> getUpdateOperation() {
-      return updateOperation;
+    public StartUpdateInput<R> getStartUpdateInput() {
+      return workflowUpdateInput;
     }
   }
 
@@ -426,7 +426,6 @@ public interface WorkflowClientCallsInterceptor {
     }
   }
 
-  @Experimental
   final class StartUpdateInput<R> {
     private final WorkflowExecution workflowExecution;
     private final Optional<String> workflowType;
@@ -503,7 +502,6 @@ public interface WorkflowClientCallsInterceptor {
     }
   }
 
-  @Experimental
   final class PollWorkflowUpdateInput<R> {
     private final WorkflowExecution workflowExecution;
     private long timeout;
@@ -559,7 +557,6 @@ public interface WorkflowClientCallsInterceptor {
     }
   }
 
-  @Experimental
   final class PollWorkflowUpdateOutput<R> {
     private final CompletableFuture<R> result;
 
@@ -601,4 +598,28 @@ public interface WorkflowClientCallsInterceptor {
   }
 
   final class TerminateOutput {}
+
+  final class DescribeWorkflowInput {
+    private final WorkflowExecution workflowExecution;
+
+    public DescribeWorkflowInput(WorkflowExecution workflowExecution) {
+      this.workflowExecution = workflowExecution;
+    }
+
+    public WorkflowExecution getWorkflowExecution() {
+      return workflowExecution;
+    }
+  }
+
+  final class DescribeWorkflowOutput {
+    private final WorkflowExecutionDescription description;
+
+    public DescribeWorkflowOutput(WorkflowExecutionDescription description) {
+      this.description = description;
+    }
+
+    public WorkflowExecutionDescription getDescription() {
+      return description;
+    }
+  }
 }

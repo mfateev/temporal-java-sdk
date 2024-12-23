@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -285,7 +286,14 @@ public interface WorkflowOutboundCallsInterceptor {
       this.resultType = resultType;
       this.arg = arg;
       this.options = options;
-      this.headers = headers;
+      this.headers =
+          headers.entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      (k) -> k.getKey().toLowerCase(),
+                      Map.Entry::getValue,
+                      (a, b) -> a,
+                      () -> new TreeMap<>(String.CASE_INSENSITIVE_ORDER)));
     }
 
     public String getService() {
@@ -316,6 +324,10 @@ public interface WorkflowOutboundCallsInterceptor {
       return options;
     }
 
+    /**
+     * Get headers that will be sent with the request. The returned map operates without regard to
+     * case.
+     */
     public Map<String, String> getHeaders() {
       return headers;
     }
@@ -540,7 +552,6 @@ public interface WorkflowOutboundCallsInterceptor {
     }
   }
 
-  @Experimental
   final class UpdateRegistrationRequest {
     private final String updateName;
     private final String description;
@@ -614,7 +625,6 @@ public interface WorkflowOutboundCallsInterceptor {
     }
   }
 
-  @Experimental
   final class RegisterUpdateHandlersInput {
     private final List<UpdateRegistrationRequest> requests;
 
@@ -706,7 +716,6 @@ public interface WorkflowOutboundCallsInterceptor {
     }
   }
 
-  @Experimental
   final class RegisterDynamicUpdateHandlerInput {
     private final DynamicUpdateHandler handler;
 
@@ -757,14 +766,12 @@ public interface WorkflowOutboundCallsInterceptor {
 
   void registerSignalHandlers(RegisterSignalHandlersInput input);
 
-  @Experimental
   void registerUpdateHandlers(RegisterUpdateHandlersInput input);
 
   void registerDynamicSignalHandler(RegisterDynamicSignalHandlerInput handler);
 
   void registerDynamicQueryHandler(RegisterDynamicQueryHandlerInput input);
 
-  @Experimental
   void registerDynamicUpdateHandler(RegisterDynamicUpdateHandlerInput input);
 
   UUID randomUUID();

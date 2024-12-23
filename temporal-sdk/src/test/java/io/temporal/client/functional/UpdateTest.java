@@ -22,6 +22,7 @@ package io.temporal.client.functional;
 
 import static org.junit.Assert.*;
 
+import io.grpc.StatusRuntimeException;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.WorkflowIdConflictPolicy;
 import io.temporal.client.*;
@@ -54,12 +55,18 @@ public class UpdateTest {
   }
 
   @Test
-  public void pollUpdateNonExistentWorkflow() throws ExecutionException, InterruptedException {
+  public void pollUpdateNonExistentWorkflow() {
     WorkflowStub workflowStub =
         testWorkflowRule.getWorkflowClient().newUntypedWorkflowStub("non-existing-id");
     // Getting the update handle to a nonexistent workflow is fine
     WorkflowUpdateHandle<String> handle = workflowStub.getUpdateHandle("update-id", String.class);
-    assertThrows(Exception.class, () -> handle.getResultAsync().get());
+    ExecutionException e =
+        assertThrows(ExecutionException.class, () -> handle.getResultAsync().get());
+    assertTrue(e.getCause() instanceof StatusRuntimeException);
+    StatusRuntimeException sre = (StatusRuntimeException) e.getCause();
+    assertEquals(io.grpc.Status.Code.NOT_FOUND, sre.getStatus().getCode());
+    sre = assertThrows(StatusRuntimeException.class, () -> handle.getResult());
+    assertEquals(io.grpc.Status.Code.NOT_FOUND, sre.getStatus().getCode());
   }
 
   @Test
@@ -127,7 +134,7 @@ public class UpdateTest {
 
     // Try to get the result of an invalid update
     WorkflowUpdateHandle<String> handle = workflowStub.getUpdateHandle(updateId, String.class);
-    assertThrows(Exception.class, () -> handle.getResultAsync().get());
+    assertThrows(ExecutionException.class, () -> handle.getResultAsync().get());
 
     assertEquals(
         "some-value",
@@ -170,36 +177,68 @@ public class UpdateTest {
   }
 
   @Test
-  public void updateWithStart() throws ExecutionException, InterruptedException {
+  public void updateWorkflowReuseOptions() throws ExecutionException, InterruptedException {
+    WorkflowClient workflowClient = testWorkflowRule.getWorkflowClient();
+    String workflowType = TestWorkflows.WorkflowWithUpdate.class.getSimpleName();
+    WorkflowStub workflowStub =
+        workflowClient.newUntypedWorkflowStub(
+            workflowType,
+            SDKTestOptions.newWorkflowOptionsWithTimeouts(testWorkflowRule.getTaskQueue()));
+
+    WorkflowExecution execution = workflowStub.start();
+    SDKTestWorkflowRule.waitForOKQuery(workflowStub);
+
+    UpdateOptions<String> updateOptions =
+        UpdateOptions.newBuilder(String.class)
+            .setUpdateName("update")
+            .setFirstExecutionRunId(execution.getRunId())
+            .setWaitForStage(WorkflowUpdateStage.ACCEPTED)
+            .build();
+    assertEquals(
+        "some-value",
+        workflowStub.startUpdate(updateOptions, 0, "some-value").getResultAsync().get());
+    testWorkflowRule.waitForTheEndOfWFT(execution.getWorkflowId());
+    // Try to send another update request with the same update options
+    WorkflowUpdateHandle<String> handle =
+        workflowStub.startUpdate(updateOptions, 0, "some-other-value");
+    assertEquals("some-other-value", handle.getResultAsync().get());
+    assertEquals("some-other-value", handle.getResult());
+
+    // Complete the workflow
+    workflowStub.update("complete", void.class);
+    assertEquals("complete", workflowStub.getResult(String.class));
+  }
+
+  @Test
+  public void startUpdateWithStartWithUntypedStub() {
     String workflowId = UUID.randomUUID().toString();
     String workflowType = TestWorkflows.WorkflowWithUpdate.class.getSimpleName();
     WorkflowClient workflowClient = testWorkflowRule.getWorkflowClient();
 
-    // first update-with-start
-    UpdateWithStartWorkflowOperation<String> update1 =
-        UpdateWithStartWorkflowOperation.newBuilder(
-                "update", String.class, new Object[] {0, "Hello Update"})
+    UpdateOptions<String> updateOptions =
+        UpdateOptions.newBuilder(String.class)
+            .setUpdateName("update")
+            .setResultClass(String.class)
             .setWaitForStage(WorkflowUpdateStage.COMPLETED)
             .build();
+
+    // send first update-with-start
     WorkflowStub workflowStub1 =
         workflowClient.newUntypedWorkflowStub(
             workflowType,
             SDKTestOptions.newWorkflowOptionsWithTimeouts(testWorkflowRule.getTaskQueue())
                 .toBuilder()
+                .setWorkflowIdConflictPolicy(
+                    WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_FAIL)
                 .setWorkflowId(workflowId)
                 .build());
     WorkflowUpdateHandle<String> updateHandle1 =
-        workflowStub1.updateWithStart(update1, new String[] {"some-value"}, new String[] {});
+        workflowStub1.startUpdateWithStart(
+            updateOptions, new Object[] {0, "Hello Update 1"}, new Object[] {});
 
-    assertEquals(updateHandle1, update1.getUpdateHandle().get());
-    assertEquals("Hello Update", update1.getResult());
+    assertEquals("Hello Update 1", updateHandle1.getResult());
 
-    // second update-with-start
-    UpdateWithStartWorkflowOperation<String> update2 =
-        UpdateWithStartWorkflowOperation.newBuilder(
-                "update", String.class, new Object[] {0, "Hello Update 2"})
-            .setWaitForStage(WorkflowUpdateStage.COMPLETED)
-            .build();
+    // send second update-with-start
     WorkflowStub workflowStub2 =
         workflowClient.newUntypedWorkflowStub(
             workflowType,
@@ -210,40 +249,68 @@ public class UpdateTest {
                 .setWorkflowId(workflowId)
                 .build());
     WorkflowUpdateHandle<String> updateHandle2 =
-        workflowStub2.updateWithStart(update2, new String[] {"some-value"}, new String[] {});
+        workflowStub2.startUpdateWithStart(
+            updateOptions, new Object[] {0, "Hello Update 2"}, new Object[] {});
 
-    assertEquals(updateHandle2, update2.getUpdateHandle().get());
-    assertEquals("Hello Update 2", update2.getResult());
+    assertEquals("Hello Update 2", updateHandle2.getResult());
 
+    // send update
     workflowStub2.update("complete", void.class);
+
+    assertEquals("complete", workflowStub1.getResult(String.class));
     assertEquals("complete", workflowStub2.getResult(String.class));
   }
 
   @Test
-  public void updateWithStartOperationSingleUse() {
+  public void executeUpdateWithStartWithUntypedStub() {
     String workflowId = UUID.randomUUID().toString();
+    String workflowType = TestWorkflows.WorkflowWithUpdate.class.getSimpleName();
     WorkflowClient workflowClient = testWorkflowRule.getWorkflowClient();
 
-    UpdateWithStartWorkflowOperation<String> update =
-        UpdateWithStartWorkflowOperation.newBuilder(
-                "update", String.class, new Object[] {0, "Hello Update"})
+    UpdateOptions<String> updateOptions =
+        UpdateOptions.newBuilder(String.class)
+            .setUpdateName("update")
+            .setResultClass(String.class)
             .setWaitForStage(WorkflowUpdateStage.COMPLETED)
             .build();
-    WorkflowStub workflowStub =
+
+    // send first update-with-start
+    WorkflowStub workflowStub1 =
         workflowClient.newUntypedWorkflowStub(
-            TestWorkflows.WorkflowWithUpdate.class.getSimpleName(),
+            workflowType,
             SDKTestOptions.newWorkflowOptionsWithTimeouts(testWorkflowRule.getTaskQueue())
                 .toBuilder()
+                .setWorkflowIdConflictPolicy(
+                    WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_FAIL)
                 .setWorkflowId(workflowId)
                 .build());
+    String updateResult1 =
+        workflowStub1.executeUpdateWithStart(
+            updateOptions, new Object[] {0, "Hello Update 1"}, new Object[] {});
 
-    workflowStub.updateWithStart(update, new String[] {"some-value"}, new String[] {});
+    assertEquals("Hello Update 1", updateResult1);
 
-    try {
-      workflowStub.updateWithStart(update, new String[] {"some-value"}, new String[] {});
-    } catch (IllegalStateException e) {
-      assertEquals(e.getMessage(), "UpdateWithStartWorkflowOperation was already executed");
-    }
+    // send second update-with-start
+    WorkflowStub workflowStub2 =
+        workflowClient.newUntypedWorkflowStub(
+            workflowType,
+            SDKTestOptions.newWorkflowOptionsWithTimeouts(testWorkflowRule.getTaskQueue())
+                .toBuilder()
+                .setWorkflowIdConflictPolicy(
+                    WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING)
+                .setWorkflowId(workflowId)
+                .build());
+    String updateResult2 =
+        workflowStub2.executeUpdateWithStart(
+            updateOptions, new Object[] {0, "Hello Update 2"}, new Object[] {});
+
+    assertEquals("Hello Update 2", updateResult2);
+
+    // send update
+    workflowStub2.update("complete", void.class);
+
+    assertEquals("complete", workflowStub1.getResult(String.class));
+    assertEquals("complete", workflowStub2.getResult(String.class));
   }
 
   public static class QuickWorkflowWithUpdateImpl implements TestWorkflows.TestUpdatedWorkflow {

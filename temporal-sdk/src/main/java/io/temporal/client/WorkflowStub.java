@@ -22,6 +22,7 @@ package io.temporal.client;
 
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.QueryRejectCondition;
+import io.temporal.api.enums.v1.WorkflowIdConflictPolicy;
 import io.temporal.common.Experimental;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.failure.TerminatedFailure;
@@ -83,12 +84,12 @@ public interface WorkflowStub {
    * @param <R> type of the update return value
    * @param args update method arguments
    * @return update result
-   * @throws WorkflowNotFoundException if the workflow execution doesn't exist or completed and
-   *     can't be signalled
+   * @throws WorkflowUpdateException if the update is rejected or failed during it's execution by
+   *     the workflow.
+   * @throws WorkflowNotFoundException if the workflow execution doesn't exist or is completed.
    * @throws WorkflowServiceException for all other failures including networking and service
-   *     availability issues
+   *     availability issues.
    */
-  @Experimental
   <R> R update(String updateName, Class<R> resultClass, Object... args);
 
   /**
@@ -103,8 +104,10 @@ public interface WorkflowStub {
    * @param <R> type of the update return value
    * @param args update method arguments
    * @return update handle that can be used to get the result of the update.
+   * @throws WorkflowNotFoundException if the workflow execution doesn't exist or completed.
+   * @throws WorkflowServiceException for all other failures including networking and service
+   *     availability issues.
    */
-  @Experimental
   <R> WorkflowUpdateHandle<R> startUpdate(
       String updateName, WorkflowUpdateStage waitForStage, Class<R> resultClass, Object... args);
 
@@ -116,8 +119,10 @@ public interface WorkflowStub {
    * @param options options that will be used to configure and start a new update request.
    * @param args update method arguments
    * @return update handle that can be used to get the result of the update.
+   * @throws WorkflowNotFoundException if the workflow execution doesn't exist or completed.
+   * @throws WorkflowServiceException for all other failures including networking and service
+   *     availability issues.
    */
-  @Experimental
   <R> WorkflowUpdateHandle<R> startUpdate(UpdateOptions<R> options, Object... args);
 
   /**
@@ -129,7 +134,6 @@ public interface WorkflowStub {
    * @param <R> type of the update return value.
    * @return update handle that can be used to get the result of the update.
    */
-  @Experimental
   <R> WorkflowUpdateHandle<R> getUpdateHandle(String updateId, Class<R> resultClass);
 
   /**
@@ -143,23 +147,41 @@ public interface WorkflowStub {
    * @param resultType type of the update return value. Differs from resultClass for generic types.
    * @return update handle that can be used to get the result of the update.
    */
-  @Experimental
   <R> WorkflowUpdateHandle<R> getUpdateHandle(
       String updateId, Class<R> resultClass, Type resultType);
 
   WorkflowExecution start(Object... args);
 
   /**
-   * Execute a workflow together with an update workflow request.
+   * Asynchronously update a workflow execution by invoking its update handler, and start the
+   * workflow according to the option's {@link WorkflowIdConflictPolicy}. It returns a handle to the
+   * update request. If {@link WorkflowUpdateStage#COMPLETED} is specified, in the options, the
+   * handle will not be returned until the update is completed.
    *
-   * @param updateOperation update workflow operation
+   * @param updateOptions options that will be used to configure and start a new update request
+   * @param updateArgs update method arguments
    * @param startArgs workflow start arguments
    * @param <R> type of the update workflow result
    * @return WorkflowUpdateHandle that can be used to get the result of the update
    */
   @Experimental
-  <R> WorkflowUpdateHandle<R> updateWithStart(
-      UpdateWithStartWorkflowOperation<R> updateOperation, Object... startArgs);
+  <R> WorkflowUpdateHandle<R> startUpdateWithStart(
+      UpdateOptions<R> updateOptions, Object[] updateArgs, Object[] startArgs);
+
+  /**
+   * Synchronously update a workflow execution by invoking its update handler, and start the
+   * workflow according to the option's {@link WorkflowIdConflictPolicy}. It returns the update
+   * result.
+   *
+   * @param updateOptions options that will be used to configure and start a new update request
+   * @param updateArgs update method arguments
+   * @param startArgs workflow start arguments
+   * @param <R> type of the update workflow result
+   * @return update result
+   */
+  @Experimental
+  <R> R executeUpdateWithStart(
+      UpdateOptions<R> updateOptions, Object[] updateArgs, Object[] startArgs);
 
   WorkflowExecution signalWithStart(String signalName, Object[] signalArgs, Object[] startArgs);
 
@@ -381,6 +403,16 @@ public interface WorkflowStub {
    *     availability issues
    */
   void terminate(@Nullable String reason, Object... details);
+
+  /**
+   * Get the current description of this workflow.
+   *
+   * @throws WorkflowNotFoundException if the workflow execution doesn't exist
+   * @throws WorkflowServiceException for all other failures including networking and service
+   *     availability issues
+   * @return the current description of this workflow
+   */
+  WorkflowExecutionDescription describe();
 
   Optional<WorkflowOptions> getOptions();
 
