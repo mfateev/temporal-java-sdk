@@ -44,7 +44,7 @@ public class BundleTest {
   @Test
   public void testBundleWorkflow() {
     WorkflowStub sagaWorkflow = testWorkflowRule.newUntypedWorkflowStub("TestBundleWorkflow");
-    sagaWorkflow.startBundle(1, 2, 3); // , 4, 5, 6, 7, 9, 10);
+    sagaWorkflow.startBundle(1, 2, 3, 4, 5, 6, 7, 9, 10);
     Integer result = sagaWorkflow.getResult(Integer.class, Integer.class);
     //    Assert.assertEquals(Integer.valueOf(11), result);
     //    String trace = testWorkflowRule.getInterceptor(TracingWorkerInterceptor.class).getTrace();
@@ -94,7 +94,7 @@ public class BundleTest {
               TestActivities.class, SDKTestOptions.newActivityOptionsForTaskQueue(taskQueue));
 
       int result = testActivities.activity1(arg);
-      if (result > 1) {
+      if (result > 3) {
         result = testActivities.activity3(result);
       } else {
         result = testActivities.activity2(result);
