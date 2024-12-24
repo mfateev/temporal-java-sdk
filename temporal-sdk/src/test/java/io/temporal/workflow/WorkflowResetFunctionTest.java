@@ -21,23 +21,22 @@
 package io.temporal.workflow;
 
 import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.*;
 
+import io.temporal.api.common.v1.WorkflowExecution;
+import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowFailedException;
 import io.temporal.client.WorkflowOptions;
-import io.temporal.failure.ApplicationFailure;
-import io.temporal.testing.internal.SDKTestOptions;
+import io.temporal.client.WorkflowStub;
+import io.temporal.failure.TerminatedFailure;
 import io.temporal.testing.internal.SDKTestWorkflowRule;
-import io.temporal.worker.NonDeterministicException;
 import io.temporal.worker.WorkerOptions;
 import io.temporal.worker.WorkflowImplementationOptions;
-import io.temporal.workflow.shared.TestActivities;
-import io.temporal.workflow.shared.TestActivities.TestActivitiesImpl;
 import io.temporal.workflow.shared.TestWorkflows;
 import io.temporal.workflow.shared.TestWorkflows.TestWorkflowStringArg;
-import io.temporal.workflow.unsafe.WorkflowUnsafe;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -46,12 +45,13 @@ public class WorkflowResetFunctionTest {
   @Rule
   public SDKTestWorkflowRule testWorkflowRule =
       SDKTestWorkflowRule.newBuilder()
-          .setActivityImplementations(new TestActivitiesImpl())
+          .setUseExternalService(true)
           .setWorkflowTypes(
               WorkflowImplementationOptions.newBuilder()
                   .setFailWorkflowExceptionTypes(Throwable.class)
                   .build(),
-              DeterminismFailingWorkflowImpl.class)
+              WorkflowToReset.class)
+          .setUseTimeskipping(false)
           // Forcing a replay. Full history arrived from a normal queue causing a replay.
           .setWorkerOptions(
               WorkerOptions.newBuilder()
@@ -59,36 +59,40 @@ public class WorkflowResetFunctionTest {
                   .build())
           .build();
 
+  private static final CompletableFuture<Void> goingToSleep = new CompletableFuture<>();
+
   @Test
-  public void testNonDeterministicWorkflowPolicyFailWorkflow() {
+  public void testWorkflowResetFunction() throws ExecutionException, InterruptedException {
     WorkflowOptions options =
-        WorkflowOptions.newBuilder()
-            .setWorkflowRunTimeout(Duration.ofSeconds(1))
-            .setWorkflowTaskTimeout(Duration.ofSeconds(1))
-            .setTaskQueue(testWorkflowRule.getTaskQueue())
-            .build();
+        WorkflowOptions.newBuilder().setTaskQueue(testWorkflowRule.getTaskQueue()).build();
     TestWorkflowStringArg workflowStub =
         testWorkflowRule.getWorkflowClient().newWorkflowStub(TestWorkflowStringArg.class, options);
+
+    // start workflow
+    WorkflowExecution we =
+        WorkflowClient.start(workflowStub::execute, testWorkflowRule.getTaskQueue());
+    goingToSleep.get();
+    WorkflowStub untyped = WorkflowStub.fromTyped(workflowStub);
+    untyped.signal("unexpectedSignal", "test");
     WorkflowFailedException e =
-        assertThrows(
-            WorkflowFailedException.class,
-            () -> workflowStub.execute(testWorkflowRule.getTaskQueue()));
-    assertThat(e.getCause(), is(instanceOf(ApplicationFailure.class)));
-    assertEquals(
-        NonDeterministicException.class.getName(), ((ApplicationFailure) e.getCause()).getType());
+        assertThrows(WorkflowFailedException.class, () -> untyped.getResult(Void.class));
+    assertTrue(e.getCause() instanceof TerminatedFailure);
+    WorkflowStub resetWorkflow =
+        testWorkflowRule.getWorkflowClient().newUntypedWorkflowStub(we.getWorkflowId());
+    resetWorkflow.getResult(Void.class);
   }
 
-  public static class DeterminismFailingWorkflowImpl
-      implements TestWorkflows.TestWorkflowStringArg {
+  public static class WorkflowToReset implements TestWorkflows.TestWorkflowStringArg {
 
     @Override
     public void execute(String taskQueue) {
-      TestActivities.VariousTestActivities activities =
-          Workflow.newActivityStub(
-              TestActivities.VariousTestActivities.class,
-              SDKTestOptions.newActivityOptionsForTaskQueue(taskQueue));
-      if (!WorkflowUnsafe.isReplaying()) {
-        activities.activity1(1);
+      // Hack to test code changes in the middle of a workflow execution
+      if (goingToSleep.isDone()) {
+        Workflow.reset("timerUpdate", "test");
+        Workflow.sleep(100);
+      } else {
+        goingToSleep.complete(null);
+        Workflow.sleep(Duration.ofHours(100));
       }
     }
   }

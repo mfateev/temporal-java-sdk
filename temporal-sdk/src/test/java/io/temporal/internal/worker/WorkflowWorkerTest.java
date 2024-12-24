@@ -160,6 +160,7 @@ public class WorkflowWorkerTest {
                       null,
                       null,
                       null,
+                      null,
                       false,
                       (id) -> {
                         // verify the lock is still being held
@@ -313,6 +314,7 @@ public class WorkflowWorkerTest {
                       null,
                       null,
                       null,
+                      null,
                       false,
                       null);
                 });
@@ -370,6 +372,7 @@ public class WorkflowWorkerTest {
                 result.getTaskCompleted(),
                 result.getTaskFailed(),
                 result.getQueryCompleted(),
+                result.getResetWorkflow(),
                 result.getRequestRetryOptions(),
                 result.isCompletionCommand(),
                 (id) -> {
