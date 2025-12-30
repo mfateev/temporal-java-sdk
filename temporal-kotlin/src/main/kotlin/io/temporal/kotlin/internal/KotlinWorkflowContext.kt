@@ -674,13 +674,13 @@ internal class KotlinWorkflowContext(
 
   /**
    * Notifies all condition waiters that they should re-check their conditions.
-   * Called after processing signals, timers, activity completions, etc.
+   * Called by the dispatcher after all ready tasks have been processed.
    *
    * Uses explicit dispatch to add resumptions to the end of the queue,
-   * ensuring all pending signal handlers complete before condition waiters
+   * ensuring all pending work completes before condition waiters
    * re-check their conditions.
    */
-  fun notifyConditionWaiters() {
+  internal fun notifyConditionWaiters() {
     val waiters = conditionWaiters.toList()
     conditionWaiters.clear()
     val disp = dispatcher

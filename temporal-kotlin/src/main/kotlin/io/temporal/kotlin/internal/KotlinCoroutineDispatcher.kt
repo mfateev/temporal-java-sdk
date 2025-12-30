@@ -132,10 +132,24 @@ internal class KotlinCoroutineDispatcher(
    * @throws WorkflowDeadlockException if a coroutine runs longer than the timeout
    */
   fun runUntilAllBlocked(deadlockDetectionTimeoutMs: Long): Boolean {
+    // Process all ready tasks
+    processAllReadyTasks(deadlockDetectionTimeoutMs)
+
+    // After processing all tasks, notify condition waiters to re-check.
+    // Any task execution could have changed state that conditions depend on.
+    workflowContext.notifyConditionWaiters()
+
+    // Process any newly ready tasks (from conditions that became true)
+    processAllReadyTasks(deadlockDetectionTimeoutMs)
+
+    return lock.withLock { readyQueue.isEmpty() }
+  }
+
+  private fun processAllReadyTasks(deadlockDetectionTimeoutMs: Long) {
     while (true) {
       val task = lock.withLock {
         if (readyQueue.isEmpty()) {
-          return readyQueue.isEmpty()
+          return
         }
         readyQueue.removeFirst()
       }

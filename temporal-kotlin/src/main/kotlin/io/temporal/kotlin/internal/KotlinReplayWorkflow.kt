@@ -199,8 +199,6 @@ internal class KotlinReplayWorkflow(
             } else {
               signalMethod.call(instance, *args)
             }
-            // Notify condition waiters after signal is processed
-            ctx.notifyConditionWaiters()
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
           }
@@ -217,8 +215,6 @@ internal class KotlinReplayWorkflow(
           try {
             val encodedValues = ctx.createEncodedValues(input)
             dynamicHandler(encodedValues)
-            // Notify condition waiters after signal is processed
-            ctx.notifyConditionWaiters()
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
           }
@@ -235,8 +231,6 @@ internal class KotlinReplayWorkflow(
           try {
             val encodedValues = ctx.createEncodedValues(input)
             catchAllHandler(signalName, encodedValues)
-            // Notify condition waiters after signal is processed
-            ctx.notifyConditionWaiters()
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
           }
