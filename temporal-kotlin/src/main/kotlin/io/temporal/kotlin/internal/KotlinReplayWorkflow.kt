@@ -181,7 +181,15 @@ internal class KotlinReplayWorkflow(
           try {
             val parameters = signalMethod.parameters
             val args = if (input.isPresent && parameters.size > 1) {
-              deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
+              val paramTypes = parameters.drop(1).map { param ->
+                val classifier = param.type.classifier
+                when (classifier) {
+                  is KClass<*> -> classifier.java
+                  is Class<*> -> classifier
+                  else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
+                }
+              }
+              deserializeArguments(input.get(), paramTypes)
             } else {
               emptyArray()
             }
@@ -191,6 +199,8 @@ internal class KotlinReplayWorkflow(
             } else {
               signalMethod.call(instance, *args)
             }
+            // Notify condition waiters after signal is processed
+            ctx.notifyConditionWaiters()
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
           }

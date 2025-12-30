@@ -32,6 +32,8 @@ import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.workflow.ChildWorkflowOptions
+import io.temporal.workflow.QueryMethod
+import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import org.junit.Assert.assertEquals
@@ -467,6 +469,61 @@ class KotlinCoroutineFeaturesIntegrationTest {
     }
   }
 
+  // ==================== Annotation-Based Signal and Query Workflow ====================
+
+  /**
+   * Workflow interface with annotation-based signal and query methods.
+   * This demonstrates the declarative approach to defining handlers.
+   */
+  @WorkflowInterface
+  interface AnnotatedSignalQueryWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+
+    @SignalMethod
+    suspend fun approve(value: Boolean)
+
+    @SignalMethod(name = "addMessage")
+    suspend fun addMessageSignal(message: String)
+
+    @QueryMethod
+    fun getStatus(): String
+
+    @QueryMethod(name = "getMessageCount")
+    fun messageCount(): Int
+
+    @QueryMethod
+    fun getMessages(): List<String>
+  }
+
+  class AnnotatedSignalQueryWorkflowImpl : AnnotatedSignalQueryWorkflow {
+    private var status = "waiting"
+    private var approved = false
+    private val messages = mutableListOf<String>()
+
+    override suspend fun execute(): String {
+      // Wait for approval using condition
+      KWorkflow.condition { approved }
+
+      return "Workflow completed with ${messages.size} messages"
+    }
+
+    override suspend fun approve(value: Boolean) {
+      approved = value
+      status = if (value) "approved" else "rejected"
+    }
+
+    override suspend fun addMessageSignal(message: String) {
+      messages.add(message)
+    }
+
+    override fun getStatus(): String = status
+
+    override fun messageCount(): Int = messages.size
+
+    override fun getMessages(): List<String> = messages.toList()
+  }
+
   // ==================== Signal and Query Tests ====================
 
   @Test(timeout = 10000)
@@ -572,5 +629,75 @@ class KotlinCoroutineFeaturesIntegrationTest {
     assertEquals(3, result["eventA"])
     assertEquals(1, result["eventB"])
     assertEquals(1, result["eventC"])
+  }
+
+  // ==================== Annotation-Based Signal and Query Tests ====================
+
+  @Test(timeout = 10000)
+  fun `annotation-based workflow can handle signals`() {
+    setupKotlinWorkflows(AnnotatedSignalQueryWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AnnotatedSignalQueryWorkflow", options)
+    stub.start()
+
+    // Send signals using annotation-defined names
+    stub.signal("addMessage", "Hello")
+    stub.signal("addMessage", "World")
+    stub.signal("approve", true)
+
+    val result = stub.getResult(String::class.java)
+    assertEquals("Workflow completed with 2 messages", result)
+  }
+
+  @Test(timeout = 10000)
+  fun `annotation-based workflow can handle queries`() {
+    setupKotlinWorkflows(AnnotatedSignalQueryWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AnnotatedSignalQueryWorkflow", options)
+    stub.start()
+
+    // Wait for workflow to start
+    Thread.sleep(500)
+
+    // Query initial status
+    val initialStatus = stub.query("getStatus", String::class.java)
+    assertEquals("waiting", initialStatus)
+
+    // Send signals
+    stub.signal("addMessage", "Test1")
+    stub.signal("addMessage", "Test2")
+    stub.signal("addMessage", "Test3")
+
+    // Give time for signals to be processed
+    Thread.sleep(500)
+
+    // Query using custom name
+    val messageCount = stub.query("getMessageCount", Int::class.java)
+    assertEquals(3, messageCount)
+
+    // Query messages (order may vary due to signal batching)
+    @Suppress("UNCHECKED_CAST")
+    val messages = stub.query("getMessages", List::class.java) as List<String>
+    assertEquals(setOf("Test1", "Test2", "Test3"), messages.toSet())
+
+    // Approve to complete workflow
+    stub.signal("approve", true)
+
+    // Query final status
+    val finalStatus = stub.query("getStatus", String::class.java)
+    assertEquals("approved", finalStatus)
+
+    val result = stub.getResult(String::class.java)
+    assertEquals("Workflow completed with 3 messages", result)
   }
 }
