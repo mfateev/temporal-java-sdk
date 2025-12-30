@@ -23,6 +23,7 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.activity.ActivityOptions
+import io.temporal.activity.LocalActivityOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
@@ -374,6 +375,101 @@ public object KWorkflow {
    */
   public fun condition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
     return Workflow.await(timeout) { condition() }
+  }
+
+  // ==================== Local Activity Methods ====================
+
+  /**
+   * Executes a local activity by name and waits for the result.
+   *
+   * Local activities are short-lived activities that execute in the same
+   * worker process as the workflow. They are optimized for low-latency
+   * operations and don't require a separate activity task queue.
+   *
+   * Example:
+   * ```kotlin
+   * val result: String = KWorkflow.executeLocalActivity(
+   *   "validateInput",
+   *   options = LocalActivityOptions {
+   *     setStartToCloseTimeout(Duration.ofSeconds(5))
+   *   },
+   *   inputData
+   * )
+   * ```
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param options the local activity options
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend inline fun <reified R> executeLocalActivity(
+    activityName: String,
+    options: LocalActivityOptions,
+    vararg args: Any?
+  ): R {
+    return executeLocalActivity(activityName, R::class.java, options, *args)
+  }
+
+  /**
+   * Executes a local activity by name and waits for the result.
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param resultClass the class of the expected result type
+   * @param options the local activity options
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend fun <R> executeLocalActivity(
+    activityName: String,
+    resultClass: Class<R>,
+    options: LocalActivityOptions,
+    vararg args: Any?
+  ): R {
+    val stub = Workflow.newUntypedLocalActivityStub(options)
+    val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
+    return promise.await()
+  }
+
+  /**
+   * Starts a local activity asynchronously and returns a handle to await or cancel it.
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param options the local activity options
+   * @param args arguments to pass to the activity
+   * @return a handle that can be used to await or cancel the activity
+   */
+  public inline fun <reified R> startLocalActivity(
+    activityName: String,
+    options: LocalActivityOptions,
+    vararg args: Any?
+  ): KActivityHandle<R> {
+    return startLocalActivity(activityName, R::class.java, options, *args)
+  }
+
+  /**
+   * Starts a local activity asynchronously and returns a handle to await or cancel it.
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param resultClass the class of the expected result type
+   * @param options the local activity options
+   * @param args arguments to pass to the activity
+   * @return a handle that can be used to await or cancel the activity
+   */
+  public fun <R> startLocalActivity(
+    activityName: String,
+    resultClass: Class<R>,
+    options: LocalActivityOptions,
+    vararg args: Any?
+  ): KActivityHandle<R> {
+    val stub = Workflow.newUntypedLocalActivityStub(options)
+    val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
+    return PromiseActivityHandle(promise)
   }
 }
 
