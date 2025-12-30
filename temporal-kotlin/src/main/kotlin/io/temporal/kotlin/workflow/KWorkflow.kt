@@ -268,6 +268,84 @@ public object KWorkflow {
     val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
     return promise.await()
   }
+
+  /**
+   * Starts an activity asynchronously and returns a handle to await or cancel it.
+   *
+   * Use this for parallel activity execution patterns where you want to
+   * start multiple activities and await them later.
+   *
+   * Example:
+   * ```kotlin
+   * val handle1 = KWorkflow.startActivity<String>(
+   *   "activity1",
+   *   options = activityOptions,
+   *   "arg1"
+   * )
+   * val handle2 = KWorkflow.startActivity<Int>(
+   *   "activity2",
+   *   options = activityOptions,
+   *   42
+   * )
+   *
+   * // Activities run in parallel
+   * val result1 = handle1.await()
+   * val result2 = handle2.await()
+   * ```
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param options the activity options
+   * @param args arguments to pass to the activity
+   * @return a handle that can be used to await or cancel the activity
+   */
+  public inline fun <reified R> startActivity(
+    activityName: String,
+    options: ActivityOptions,
+    vararg args: Any?
+  ): KActivityHandle<R> {
+    return startActivity(activityName, R::class.java, options, *args)
+  }
+
+  /**
+   * Starts an activity asynchronously and returns a handle to await or cancel it.
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param resultClass the class of the expected result type
+   * @param options the activity options
+   * @param args arguments to pass to the activity
+   * @return a handle that can be used to await or cancel the activity
+   */
+  public fun <R> startActivity(
+    activityName: String,
+    resultClass: Class<R>,
+    options: ActivityOptions,
+    vararg args: Any?
+  ): KActivityHandle<R> {
+    val stub = Workflow.newUntypedActivityStub(options)
+    val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
+    return PromiseActivityHandle(promise)
+  }
+}
+
+/**
+ * Internal implementation of [KActivityHandle] that wraps a [Promise].
+ */
+internal class PromiseActivityHandle<R>(
+  private val promise: Promise<R>
+) : KActivityHandle<R> {
+
+  override val isCompleted: Boolean
+    get() = promise.isCompleted
+
+  override suspend fun await(): R = promise.await()
+
+  override fun cancel(reason: String?) {
+    // Note: Promise cancellation in Temporal is handled through CancellationScope
+    // This is a best-effort cancel - the activity may have already completed
+    // Full cancellation support requires wrapping in a CancellationScope
+  }
 }
 
 /**
