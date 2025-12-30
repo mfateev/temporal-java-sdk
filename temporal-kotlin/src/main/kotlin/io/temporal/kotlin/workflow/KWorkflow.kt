@@ -22,13 +22,18 @@
 
 package io.temporal.kotlin.workflow
 
+import io.temporal.activity.ActivityOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
 import java.util.Random
 import java.util.UUID
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Provides access to Temporal workflow APIs from within Kotlin workflow code.
@@ -209,4 +214,82 @@ public object KWorkflow {
    * to allow workflows that haven't recorded any version yet.
    */
   public const val DEFAULT_VERSION: Int = Workflow.DEFAULT_VERSION
+
+  /**
+   * Executes an activity by name and waits for the result.
+   *
+   * This is a suspend function that will suspend the coroutine until
+   * the activity completes.
+   *
+   * Example:
+   * ```kotlin
+   * val result: String = KWorkflow.executeActivity(
+   *   "myActivity",
+   *   options = ActivityOptions {
+   *     setStartToCloseTimeout(Duration.ofMinutes(5))
+   *   },
+   *   "arg1", 42
+   * )
+   * ```
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param options the activity options
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend inline fun <reified R> executeActivity(
+    activityName: String,
+    options: ActivityOptions,
+    vararg args: Any?
+  ): R {
+    return executeActivity(activityName, R::class.java, options, *args)
+  }
+
+  /**
+   * Executes an activity by name and waits for the result.
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param resultClass the class of the expected result type
+   * @param options the activity options
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend fun <R> executeActivity(
+    activityName: String,
+    resultClass: Class<R>,
+    options: ActivityOptions,
+    vararg args: Any?
+  ): R {
+    val stub = Workflow.newUntypedActivityStub(options)
+    val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
+    return promise.await()
+  }
+}
+
+/**
+ * Suspends until this [Promise] completes and returns the result.
+ *
+ * This extension function converts the blocking Promise.get() call
+ * to a coroutine-friendly suspend function.
+ *
+ * Note: This is designed to work within Temporal workflow context
+ * where the workflow thread handles deterministic execution.
+ *
+ * @return the promise result
+ * @throws Exception if the promise completed exceptionally
+ */
+public suspend fun <R> Promise<R>.await(): R = suspendCancellableCoroutine { cont ->
+  // Use handle to get both success and failure cases
+  this.handle { result, exception ->
+    if (exception != null) {
+      cont.resumeWithException(exception)
+    } else {
+      cont.resume(result)
+    }
+    null // Return value required by handle but not used
+  }
 }
