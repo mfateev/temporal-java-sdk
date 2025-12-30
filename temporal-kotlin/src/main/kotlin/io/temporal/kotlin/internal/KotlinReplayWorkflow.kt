@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.reflect.KClass
 import kotlin.reflect.full.callSuspend
 
 /**
@@ -121,7 +122,16 @@ internal class KotlinReplayWorkflow(
     // Deserialize input arguments
     val args = if (input.isPresent && parameters.size > 1) {
       // First parameter is 'this' for instance methods
-      deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
+      // Convert KClass to Java Class for deserialization
+      val paramTypes = parameters.drop(1).map { param ->
+        val classifier = param.type.classifier
+        when (classifier) {
+          is KClass<*> -> classifier.java
+          is Class<*> -> classifier
+          else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
+        }
+      }
+      deserializeArguments(input.get(), paramTypes)
     } else {
       emptyArray()
     }
