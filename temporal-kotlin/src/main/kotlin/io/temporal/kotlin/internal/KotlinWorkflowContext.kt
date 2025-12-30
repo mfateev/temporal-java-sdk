@@ -20,19 +20,33 @@
 
 package io.temporal.kotlin.internal
 
+import io.temporal.activity.ActivityCancellationType
+import io.temporal.activity.ActivityOptions
+import io.temporal.activity.LocalActivityOptions
+import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes
+import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes
+import io.temporal.api.common.v1.ActivityType
 import io.temporal.api.common.v1.Payloads
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.common.v1.WorkflowType
 import io.temporal.api.failure.v1.Failure
 import io.temporal.api.sdk.v1.UserMetadata
+import io.temporal.api.taskqueue.v1.TaskQueue
+import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse
+import io.temporal.common.RetryOptions
+import io.temporal.common.converter.DataConverter
+import io.temporal.internal.common.ProtobufTimeUtils
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.statemachines.ExecuteActivityParameters
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters
 import io.temporal.internal.statemachines.LocalActivityCallback
 import io.temporal.internal.statemachines.StartChildWorkflowExecutionParameters
+import io.temporal.workflow.ChildWorkflowCancellationType
+import io.temporal.workflow.ChildWorkflowOptions
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Duration
+import java.time.Instant
 import java.util.Optional
 import java.util.Random
 import java.util.UUID
@@ -47,7 +61,8 @@ import kotlin.coroutines.resumeWithException
  */
 @InternalTemporalApi
 internal class KotlinWorkflowContext(
-  internal val replayContext: ReplayWorkflowContext
+  internal val replayContext: ReplayWorkflowContext,
+  internal val dataConverter: DataConverter = DataConverter.getDefaultInstance()
 ) {
   /**
    * Returns the workflow execution info.
@@ -196,10 +211,14 @@ internal class KotlinWorkflowContext(
   suspend fun startChildWorkflow(
     parameters: StartChildWorkflowExecutionParameters
   ): Pair<WorkflowExecution, Optional<Payloads>> {
+    // Use a holder to pass the completion result/exception between callbacks
+    var completionResult: Optional<Payloads>? = null
+    var completionException: Exception? = null
+    var completionCont: CancellableContinuation<Optional<Payloads>>? = null
+    var completed = false
+
     // First, wait for the child to start
     val execution = suspendCancellableCoroutine<WorkflowExecution> { startCont ->
-      var completionCont: CancellableContinuation<Optional<Payloads>>? = null
-
       val cancellationHandle = replayContext.startChildWorkflow(
         parameters,
         { execution: WorkflowExecution?, startException: Exception? ->
@@ -209,10 +228,15 @@ internal class KotlinWorkflowContext(
             startCont.resume(execution)
           }
         },
-        { result: Optional<Payloads>, completionException: Exception? ->
+        { result: Optional<Payloads>, exception: Exception? ->
+          // Store completion data
+          completionResult = result
+          completionException = exception
+          completed = true
+          // If completion continuation is already waiting, resume it
           completionCont?.let { cont ->
-            if (completionException != null) {
-              cont.resumeWithException(completionException)
+            if (exception != null) {
+              cont.resumeWithException(exception)
             } else {
               cont.resume(result)
             }
@@ -230,9 +254,17 @@ internal class KotlinWorkflowContext(
 
     // Then wait for completion
     val result = suspendCancellableCoroutine<Optional<Payloads>> { cont ->
-      // The completion callback was already registered above
-      // This is a simplified implementation - full implementation would need
-      // to properly wire the completion callback
+      // If already completed (e.g., during replay), resume immediately
+      if (completed) {
+        if (completionException != null) {
+          cont.resumeWithException(completionException!!)
+        } else {
+          cont.resume(completionResult!!)
+        }
+      } else {
+        // Store continuation for the completion callback to use
+        completionCont = cont
+      }
     }
 
     return Pair(execution, result)
@@ -292,5 +324,215 @@ internal class KotlinWorkflowContext(
    */
   fun failWorkflowTask(failure: Throwable) {
     replayContext.failWorkflowTask(failure)
+  }
+
+  // ==================== Higher-Level Activity Methods ====================
+
+  /**
+   * Executes an activity by name with options.
+   *
+   * @param activityName the activity type name
+   * @param options the activity options
+   * @param resultClass the expected result class
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   */
+  suspend fun <R> executeActivityByName(
+    activityName: String,
+    options: ActivityOptions,
+    resultClass: Class<R>,
+    vararg args: Any?
+  ): R {
+    val input = serializeArgs(*args)
+    val parameters = buildActivityParameters(activityName, options, input)
+    val resultPayloads = executeActivity(parameters)
+    return deserializeResult(resultPayloads, resultClass)
+  }
+
+  /**
+   * Executes a local activity by name with options.
+   *
+   * @param activityName the activity type name
+   * @param options the local activity options
+   * @param resultClass the expected result class
+   * @param args arguments to pass to the activity
+   * @return the activity result
+   */
+  suspend fun <R> executeLocalActivityByName(
+    activityName: String,
+    options: LocalActivityOptions,
+    resultClass: Class<R>,
+    vararg args: Any?
+  ): R {
+    val input = serializeArgs(*args)
+    val parameters = buildLocalActivityParameters(activityName, options, input)
+    val resultPayloads = executeLocalActivity(parameters)
+    return deserializeResult(resultPayloads, resultClass)
+  }
+
+  /**
+   * Executes a child workflow by type name with options.
+   *
+   * @param workflowType the child workflow type name
+   * @param options the child workflow options
+   * @param resultClass the expected result class
+   * @param args arguments to pass to the child workflow
+   * @return the child workflow result
+   */
+  suspend fun <R> executeChildWorkflowByName(
+    workflowType: String,
+    options: ChildWorkflowOptions,
+    resultClass: Class<R>,
+    vararg args: Any?
+  ): R {
+    val input = serializeArgs(*args)
+    val parameters = buildChildWorkflowParameters(workflowType, options, input)
+    val (_, resultPayloads) = startChildWorkflow(parameters)
+    return deserializeResult(resultPayloads, resultClass)
+  }
+
+  // ==================== Helper Methods ====================
+
+  private fun serializeArgs(vararg args: Any?): Optional<Payloads> {
+    return if (args.isEmpty()) {
+      Optional.empty()
+    } else {
+      dataConverter.toPayloads(*args)
+    }
+  }
+
+  private fun <R> deserializeResult(payloads: Optional<Payloads>, resultClass: Class<R>): R {
+    @Suppress("UNCHECKED_CAST")
+    return if (payloads.isPresent && resultClass != Unit::class.java && resultClass != Void.TYPE) {
+      dataConverter.fromPayload(payloads.get().getPayloads(0), resultClass, resultClass) as R
+    } else {
+      null as R
+    }
+  }
+
+  private fun buildActivityParameters(
+    activityName: String,
+    options: ActivityOptions,
+    input: Optional<Payloads>
+  ): ExecuteActivityParameters {
+    val taskQueue = options.taskQueue ?: replayContext.taskQueue
+    val attributes = ScheduleActivityTaskCommandAttributes.newBuilder()
+      .setActivityType(ActivityType.newBuilder().setName(activityName))
+      .setTaskQueue(TaskQueue.newBuilder().setName(taskQueue))
+
+    options.scheduleToStartTimeout?.let {
+      attributes.setScheduleToStartTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.startToCloseTimeout?.let {
+      attributes.setStartToCloseTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.scheduleToCloseTimeout?.let {
+      attributes.setScheduleToCloseTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.heartbeatTimeout?.let {
+      attributes.setHeartbeatTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+
+    input.ifPresent { attributes.setInput(it) }
+
+    options.retryOptions?.let { retryOptions ->
+      attributes.setRetryPolicy(toRetryPolicy(retryOptions))
+    }
+
+    val cancellationType = options.cancellationType ?: ActivityCancellationType.TRY_CANCEL
+    return ExecuteActivityParameters(attributes, cancellationType, null)
+  }
+
+  private fun buildLocalActivityParameters(
+    activityName: String,
+    options: LocalActivityOptions,
+    input: Optional<Payloads>
+  ): ExecuteLocalActivityParameters {
+    val validatedOptions = LocalActivityOptions.newBuilder(options).validateAndBuildWithDefaults()
+    val originalScheduledTime = replayContext.currentTimeMillis()
+
+    val activityTask = PollActivityTaskQueueResponse.newBuilder()
+      .setActivityId(replayContext.randomUUID().toString())
+      .setWorkflowNamespace(replayContext.namespace)
+      .setWorkflowType(replayContext.workflowType)
+      .setWorkflowExecution(replayContext.workflowExecution)
+      .setScheduledTime(ProtobufTimeUtils.toProtoTimestamp(Instant.ofEpochMilli(originalScheduledTime)))
+      .setActivityType(ActivityType.newBuilder().setName(activityName))
+      .setAttempt(1)
+
+    validatedOptions.scheduleToCloseTimeout?.let {
+      activityTask.setScheduleToCloseTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    validatedOptions.startToCloseTimeout?.let {
+      activityTask.setStartToCloseTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+
+    input.ifPresent { activityTask.setInput(it) }
+
+    validatedOptions.retryOptions?.let { retryOptions ->
+      activityTask.setRetryPolicy(toRetryPolicy(RetryOptions.newBuilder(retryOptions).validateBuildWithDefaults()))
+    }
+
+    val localRetryThreshold = validatedOptions.localRetryThreshold
+      ?: replayContext.workflowTaskTimeout.multipliedBy(3)
+
+    return ExecuteLocalActivityParameters(
+      activityTask,
+      validatedOptions.scheduleToStartTimeout,
+      originalScheduledTime,
+      null, // previousLocalExecutionFailure
+      validatedOptions.isDoNotIncludeArgumentsIntoMarker,
+      localRetryThreshold,
+      null // metadata
+    )
+  }
+
+  private fun buildChildWorkflowParameters(
+    workflowType: String,
+    options: ChildWorkflowOptions,
+    input: Optional<Payloads>
+  ): StartChildWorkflowExecutionParameters {
+    val workflowId = options.workflowId ?: "${replayContext.workflowId}_${replayContext.randomUUID()}"
+    val taskQueue = options.taskQueue ?: replayContext.taskQueue
+
+    val attributes = StartChildWorkflowExecutionCommandAttributes.newBuilder()
+      .setWorkflowId(workflowId)
+      .setWorkflowType(WorkflowType.newBuilder().setName(workflowType).build())
+      .setTaskQueue(TaskQueue.newBuilder().setName(taskQueue))
+
+    input.ifPresent { attributes.setInput(it) }
+
+    options.workflowExecutionTimeout?.let {
+      attributes.setWorkflowExecutionTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.workflowRunTimeout?.let {
+      attributes.setWorkflowRunTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.workflowTaskTimeout?.let {
+      attributes.setWorkflowTaskTimeout(ProtobufTimeUtils.toProtoDuration(it))
+    }
+
+    val cancellationType = options.cancellationType ?: ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED
+
+    return StartChildWorkflowExecutionParameters(attributes, cancellationType, null)
+  }
+
+  private fun toRetryPolicy(options: RetryOptions): io.temporal.api.common.v1.RetryPolicy {
+    val builder = io.temporal.api.common.v1.RetryPolicy.newBuilder()
+
+    options.initialInterval?.let {
+      builder.setInitialInterval(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    options.maximumInterval?.let {
+      builder.setMaximumInterval(ProtobufTimeUtils.toProtoDuration(it))
+    }
+    builder.setBackoffCoefficient(options.backoffCoefficient)
+    builder.setMaximumAttempts(options.maximumAttempts)
+
+    options.doNotRetry?.let { doNotRetry ->
+      builder.addAllNonRetryableErrorTypes(doNotRetry.toList())
+    }
+
+    return builder.build()
   }
 }

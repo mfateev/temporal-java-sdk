@@ -70,7 +70,7 @@ internal class KotlinReplayWorkflow(
 
   override fun start(event: HistoryEvent, context: ReplayWorkflowContext) {
     this.replayContext = context
-    this.workflowContext = KotlinWorkflowContext(context)
+    this.workflowContext = KotlinWorkflowContext(context, dataConverter)
     this.dispatcher = KotlinCoroutineDispatcher(workflowContext!!)
 
     // Create coroutine scope with our deterministic dispatcher
@@ -276,7 +276,10 @@ internal class KotlinReplayWorkflow(
       return false
     }
 
-    return workflowCompleted.get() || disp.isDone()
+    // Only return true when the workflow has actually completed.
+    // When suspended waiting for activities/timers, we return false
+    // to indicate more work is expected after external events.
+    return workflowCompleted.get()
   }
 
   override fun getOutput(): Optional<Payloads> {

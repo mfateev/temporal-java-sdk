@@ -20,6 +20,7 @@
 
 package io.temporal.kotlin.internal
 
+import io.temporal.kotlin.workflow.KWorkflow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.DisposableHandle
@@ -51,6 +52,21 @@ internal class KotlinCoroutineDispatcher(
   private val readyQueue = LinkedList<Runnable>()
   private var closed = false
   private var currentlyExecuting = false
+
+  /**
+   * Returns true if dispatch is needed.
+   *
+   * When already executing within the workflow context (during a callback),
+   * we return false to allow immediate resumption without queuing.
+   * This is crucial for activity/timer callbacks that need to resume
+   * the coroutine synchronously.
+   */
+  override fun isDispatchNeeded(context: CoroutineContext): Boolean {
+    return lock.withLock {
+      // If we're already executing a workflow task, don't dispatch - run immediately
+      !currentlyExecuting
+    }
+  }
 
   /**
    * Dispatches a coroutine for execution.
@@ -134,9 +150,14 @@ internal class KotlinCoroutineDispatcher(
     }
 
     val startTime = System.nanoTime()
+    // Set the workflow context for KWorkflow APIs before running the task
+    val previousContext = KWorkflow.currentContext.get()
+    KWorkflow.currentContext.set(workflowContext)
     try {
       task.run()
     } finally {
+      // Restore previous context (usually null)
+      KWorkflow.currentContext.set(previousContext)
       lock.withLock {
         currentlyExecuting = false
       }
