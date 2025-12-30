@@ -21,10 +21,10 @@ import io.temporal.common.metadata.POJOWorkflowMethodMetadata;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.env.ReflectionUtils;
 import io.temporal.internal.replay.ReplayWorkflow;
-import io.temporal.internal.replay.ReplayWorkflowFactory;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowExecutorCache;
+import io.temporal.internal.worker.WorkflowImplementationFactory;
 import io.temporal.payload.context.WorkflowSerializationContext;
 import io.temporal.worker.TypeAlreadyRegisteredException;
 import io.temporal.worker.WorkflowImplementationOptions;
@@ -35,16 +35,18 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class POJOWorkflowImplementationFactory implements ReplayWorkflowFactory {
+public final class POJOWorkflowImplementationFactory implements WorkflowImplementationFactory {
   private static final Logger log =
       LoggerFactory.getLogger(POJOWorkflowImplementationFactory.class);
 
@@ -308,6 +310,15 @@ public final class POJOWorkflowImplementationFactory implements ReplayWorkflowFa
   @Override
   public boolean isAnyTypeSupported() {
     return !workflowDefinitions.isEmpty() || dynamicWorkflowImplementationFactory != null;
+  }
+
+  @Nonnull
+  @Override
+  public Set<String> getRegisteredWorkflowTypes() {
+    // Return a copy to ensure thread-safety and immutability for callers
+    synchronized (workflowDefinitions) {
+      return new HashSet<>(workflowDefinitions.keySet());
+    }
   }
 
   private class POJOWorkflowImplementation implements SyncWorkflowDefinition {

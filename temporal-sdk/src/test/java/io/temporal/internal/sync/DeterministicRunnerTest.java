@@ -17,6 +17,7 @@ import io.temporal.common.RetryOptions;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.Signal;
 import io.temporal.internal.replay.*;
+import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import io.temporal.internal.worker.WorkflowRunLockManager;
 import io.temporal.serviceclient.MetricsTag;

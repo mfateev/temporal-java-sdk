@@ -10,6 +10,7 @@ import io.temporal.common.converter.EncodedValues;
 import io.temporal.internal.activity.ActivityExecutionContextFactory;
 import io.temporal.internal.activity.ActivityTaskHandlerImpl;
 import io.temporal.internal.activity.LocalActivityExecutionContextFactoryImpl;
+import io.temporal.internal.replay.ReplayWorkflowFactory;
 import io.temporal.internal.replay.ReplayWorkflowTaskHandler;
 import io.temporal.internal.sync.POJOWorkflowImplementationFactory;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
@@ -22,6 +23,7 @@ import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
 import java.lang.reflect.Type;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.*;
@@ -68,7 +70,8 @@ public class SyncWorkflowWorker implements SuspendableWorker {
       @Nonnull WorkflowThreadExecutor workflowThreadExecutor,
       @Nonnull EagerActivityDispatcher eagerActivityDispatcher,
       @Nonnull SlotSupplier<WorkflowSlotInfo> slotSupplier,
-      @Nonnull SlotSupplier<LocalActivitySlotInfo> laSlotSupplier) {
+      @Nonnull SlotSupplier<LocalActivitySlotInfo> laSlotSupplier,
+      @Nonnull List<WorkflowImplementationFactory> customFactories) {
     this.identity = singleWorkerOptions.getIdentity();
     this.namespace = namespace;
     this.taskQueue = taskQueue;
@@ -81,6 +84,10 @@ public class SyncWorkflowWorker implements SuspendableWorker {
             singleWorkerOptions.getWorkerInterceptors(),
             cache,
             namespace);
+
+    // Create the composite factory that delegates to custom factories first, then default
+    ReplayWorkflowFactory compositeFactory =
+        new CompositeReplayWorkflowFactory(customFactories, factory);
 
     ActivityExecutionContextFactory laActivityExecutionContextFactory =
         new LocalActivityExecutionContextFactoryImpl(client);
@@ -103,7 +110,7 @@ public class SyncWorkflowWorker implements SuspendableWorker {
     WorkflowTaskHandler taskHandler =
         new ReplayWorkflowTaskHandler(
             namespace,
-            factory,
+            compositeFactory,
             cache,
             singleWorkerOptions,
             stickyTaskQueue,
@@ -129,7 +136,7 @@ public class SyncWorkflowWorker implements SuspendableWorker {
     WorkflowTaskHandler nonStickyReplayTaskHandler =
         new ReplayWorkflowTaskHandler(
             namespace,
-            factory,
+            compositeFactory,
             null,
             singleWorkerOptions,
             null,

@@ -16,12 +16,15 @@ import io.temporal.failure.TemporalFailure;
 import io.temporal.internal.sync.WorkflowInternal;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
 import io.temporal.internal.worker.*;
+import io.temporal.internal.worker.WorkflowImplementationFactory;
 import io.temporal.serviceclient.MetricsTag;
 import io.temporal.worker.tuning.*;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.WorkflowMethod;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +49,13 @@ public final class Worker {
   final SyncActivityWorker activityWorker;
   final SyncNexusWorker nexusWorker;
   private final AtomicBoolean started = new AtomicBoolean();
+
+  /**
+   * Registry of workflow implementation factories. Custom factories are consulted in registration
+   * order before falling back to the default POJO factory.
+   */
+  private final List<WorkflowImplementationFactory> workflowImplementationFactories =
+      new ArrayList<>();
 
   /**
    * Creates worker that connects to an instance of the Temporal Service.
@@ -155,7 +165,8 @@ public final class Worker {
             workflowThreadExecutor,
             eagerActivityDispatcher,
             workflowSlotSupplier,
-            localActivitySlotSupplier);
+            localActivitySlotSupplier,
+            workflowImplementationFactories);
   }
 
   /**
@@ -204,6 +215,44 @@ public final class Worker {
         "registerWorkflowImplementationTypes is not allowed after worker has started");
 
     workflowWorker.registerWorkflowImplementationTypes(options, workflowImplementationClasses);
+  }
+
+  /**
+   * Registers a custom workflow implementation factory with this worker.
+   *
+   * <p>This method allows external modules (such as temporal-kotlin) to provide alternative
+   * workflow execution models. Custom factories are consulted in registration order when creating
+   * workflow instances. If no custom factory can handle a workflow type, the default POJO factory
+   * is used.
+   *
+   * <p>This is part of the SDK's Service Provider Interface (SPI) for pluggable workflow execution
+   * models. Most users should use {@link #registerWorkflowImplementationTypes(Class[])} instead.
+   *
+   * <p>Must be called before the worker is started.
+   *
+   * @param factory the workflow implementation factory to register
+   * @throws IllegalStateException if the worker has already been started
+   * @throws NullPointerException if factory is null
+   * @see WorkflowImplementationFactory
+   */
+  public void registerWorkflowImplementationFactory(WorkflowImplementationFactory factory) {
+    Objects.requireNonNull(factory, "factory cannot be null");
+    Preconditions.checkState(
+        !started.get(),
+        "registerWorkflowImplementationFactory is not allowed after worker has started");
+    workflowImplementationFactories.add(factory);
+  }
+
+  /**
+   * Returns an unmodifiable view of the registered workflow implementation factories.
+   *
+   * <p>This method is intended for internal use by the worker infrastructure to access the
+   * registered factories when creating the composite factory.
+   *
+   * @return unmodifiable list of registered factories in registration order
+   */
+  List<WorkflowImplementationFactory> getWorkflowImplementationFactories() {
+    return Collections.unmodifiableList(workflowImplementationFactories);
   }
 
   /**

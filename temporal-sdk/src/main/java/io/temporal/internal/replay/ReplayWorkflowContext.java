@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ * Copyright (C) 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this material except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.temporal.internal.replay;
 
 import com.uber.m3.tally.Scope;
@@ -10,6 +30,7 @@ import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.common.RetryOptions;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.statemachines.*;
+import io.temporal.internal.worker.WorkflowImplementationFactory;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Functions.Func;
 import io.temporal.workflow.Functions.Func1;
@@ -22,15 +43,46 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Represents the context of workflow for workflow code. Should only be used within the scope of
- * workflow code, meaning any code which is not part of activity implementations. Provides access to
- * state machine operations and information that should be accessible to the workflow code.
- * Accumulates some state from the workflow execution like search attributes, continue-as-new.
+ * Internal interface for workflow execution context.
  *
- * <p>TODO(maxim): Get rid of any Exceptions in the callbacks. They should only return Failure.
+ * <p>This interface provides the context for workflow code execution, giving access to workflow
+ * state, timing, and the ability to schedule workflow operations such as activities, child
+ * workflows, timers, and signals. It is passed to {@link ReplayWorkflow#start} and should be used
+ * by workflow execution implementations to interact with the Temporal workflow state machine.
+ *
+ * <h2>Purpose</h2>
+ *
+ * <p>Implementations of {@link ReplayWorkflow} receive this context to:
+ *
+ * <ul>
+ *   <li>Access workflow execution metadata (workflow ID, run ID, type, etc.)
+ *   <li>Schedule activities and local activities
+ *   <li>Start child workflows and Nexus operations
+ *   <li>Create timers
+ *   <li>Signal external workflows
+ *   <li>Manage workflow state (search attributes, memos, continue-as-new)
+ *   <li>Access deterministic random and UUID generation
+ *   <li>Track workflow task completion and cancellation state
+ * </ul>
+ *
+ * <h2>Thread Safety</h2>
+ *
+ * <p>This context is designed to be accessed from within workflow code. The methods on this
+ * interface should only be called during workflow execution (within the workflow event loop). They
+ * are not thread-safe and should not be accessed from multiple threads concurrently.
+ *
+ * <h2>Determinism</h2>
+ *
+ * <p>Many methods on this interface (such as {@link #currentTimeMillis()}, {@link #newRandom()},
+ * {@link #randomUUID()}) provide deterministic values that are safe to use in workflow code. These
+ * return the same values during replay to ensure workflow determinism.
+ *
+ * @see ReplayWorkflow
+ * @see WorkflowImplementationFactory
  */
 public interface ReplayWorkflowContext extends ReplayAware {
 
+  /** Output structure returned when scheduling an activity task. */
   class ScheduleActivityTaskOutput {
     private final String activityId;
     private final Functions.Proc1<Exception> cancellationHandle;
