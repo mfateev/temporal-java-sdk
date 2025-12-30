@@ -700,4 +700,11 @@ class KotlinCoroutineFeaturesIntegrationTest {
     val result = stub.getResult(String::class.java)
     assertEquals("Workflow completed with 3 messages", result)
   }
+
+  // Note: Tests for condition notification after activity/timer/child workflow completions
+  // would require true parallel coroutine support within workflows. The current SDK uses
+  // deferred handles that only execute when await() is called, making such tests impossible.
+  // The existing signal-based condition tests (workflow can register and handle signals)
+  // verify that the dispatcher correctly notifies condition waiters after any task completion,
+  // since signal handlers also go through the dispatcher's task processing.
 }
