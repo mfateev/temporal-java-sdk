@@ -135,13 +135,23 @@ inline fun <reified T : Any> Worker.registerWorkflowImplementationFactory(
  * - Suspend function workflows are registered with [KotlinWorkflowImplementationFactory]
  * - Non-suspend workflows are registered with the standard Java SDK factory
  *
- * Example:
+ * **Recommended approach:** Instead of using this extension function, register [KotlinPlugin]
+ * with [WorkerFactoryOptions.Builder.addPlugin] and use the standard
+ * [Worker.registerWorkflowImplementationTypes] method. The plugin will automatically detect
+ * and handle suspend workflows.
+ *
  * ```kotlin
- * val plugin = KotlinPlugin()
- * worker.registerKotlinWorkflowImplementationTypes(
- *   plugin,
- *   MyWorkflowImpl::class,
- *   AnotherWorkflowImpl::class
+ * // Recommended approach
+ * val factory = WorkerFactory.newInstance(
+ *     client,
+ *     WorkerFactoryOptions.newBuilder()
+ *         .addPlugin(KotlinPlugin())
+ *         .build()
+ * )
+ * val worker = factory.newWorker("task-queue")
+ * worker.registerWorkflowImplementationTypes(
+ *     MyWorkflowImpl::class.java,
+ *     AnotherWorkflowImpl::class.java
  * )
  * ```
  *
@@ -150,6 +160,10 @@ inline fun <reified T : Any> Worker.registerWorkflowImplementationFactory(
  * @throws IllegalArgumentException if a class doesn't implement a valid workflow interface
  * @see KotlinPlugin
  */
+@Deprecated(
+  message = "Use KotlinPlugin with WorkerFactoryOptions.addPlugin() and standard registerWorkflowImplementationTypes()",
+  replaceWith = ReplaceWith("registerWorkflowImplementationTypes(*workflowImplementationClasses.map { it.java }.toTypedArray())")
+)
 fun Worker.registerKotlinWorkflowImplementationTypes(
   plugin: KotlinPlugin,
   vararg workflowImplementationClasses: KClass<*>
@@ -169,7 +183,10 @@ fun Worker.registerKotlinWorkflowImplementationTypes(
 
   // Register suspend workflows with Kotlin factory
   if (suspendWorkflows.isNotEmpty()) {
-    val factory = plugin.createFactory(DataConverter.getDefaultInstance())
+    val factory = KotlinWorkflowImplementationFactory(
+      dataConverter = DataConverter.getDefaultInstance(),
+      deadlockDetectionTimeoutMs = plugin.deadlockDetectionTimeout
+    )
     suspendWorkflows.forEach { factory.registerWorkflowImplementationType(it) }
     registerWorkflowImplementationFactory(factory)
   }
@@ -185,17 +202,19 @@ fun Worker.registerKotlinWorkflowImplementationTypes(
  *
  * This is a convenience overload that uses default plugin options.
  *
- * Example:
- * ```kotlin
- * worker.registerKotlinWorkflowImplementationTypes(
- *   MyWorkflowImpl::class,
- *   AnotherWorkflowImpl::class
- * )
- * ```
+ * **Recommended approach:** Instead of using this extension function, register [KotlinPlugin]
+ * with [WorkerFactoryOptions.Builder.addPlugin] and use the standard
+ * [Worker.registerWorkflowImplementationTypes] method. The plugin will automatically detect
+ * and handle suspend workflows.
  *
  * @param workflowImplementationClasses the workflow implementation classes to register
  * @throws IllegalArgumentException if a class doesn't implement a valid workflow interface
  */
+@Deprecated(
+  message = "Use KotlinPlugin with WorkerFactoryOptions.addPlugin() and standard registerWorkflowImplementationTypes()",
+  replaceWith = ReplaceWith("registerWorkflowImplementationTypes(*workflowImplementationClasses.map { it.java }.toTypedArray())")
+)
+@Suppress("DEPRECATION")
 fun Worker.registerKotlinWorkflowImplementationTypes(
   vararg workflowImplementationClasses: KClass<*>
 ) {

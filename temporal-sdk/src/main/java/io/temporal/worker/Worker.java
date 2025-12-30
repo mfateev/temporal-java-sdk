@@ -17,6 +17,7 @@ import io.temporal.internal.sync.WorkflowInternal;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
 import io.temporal.internal.worker.*;
 import io.temporal.internal.worker.WorkflowImplementationFactory;
+import io.temporal.plugin.WorkerPlugin;
 import io.temporal.serviceclient.MetricsTag;
 import io.temporal.worker.tuning.*;
 import io.temporal.workflow.Functions;
@@ -57,6 +58,12 @@ public final class Worker {
   private final List<WorkflowImplementationFactory> workflowImplementationFactories =
       new ArrayList<>();
 
+  /** Plugins registered with the WorkerFactory. */
+  private final List<WorkerPlugin> plugins;
+
+  /** DataConverter from the WorkflowClient for plugin use. */
+  private final DataConverter dataConverter;
+
   /**
    * Creates worker that connects to an instance of the Temporal Service.
    *
@@ -66,6 +73,8 @@ public final class Worker {
    * @param options Options (like {@link DataConverter} override) for configuring worker.
    * @param useStickyTaskQueue if sticky task queue should be used
    * @param workflowThreadExecutor workflow methods thread executor
+   * @param plugins plugins from the WorkerFactory for workflow type interception
+   * @param dataConverter DataConverter from the WorkflowClient for plugin use
    */
   Worker(
       WorkflowClient client,
@@ -77,13 +86,17 @@ public final class Worker {
       @Nonnull WorkflowExecutorCache cache,
       boolean useStickyTaskQueue,
       WorkflowThreadExecutor workflowThreadExecutor,
-      List<ContextPropagator> contextPropagators) {
+      List<ContextPropagator> contextPropagators,
+      List<WorkerPlugin> plugins,
+      DataConverter dataConverter) {
 
     Objects.requireNonNull(client, "client should not be null");
     Preconditions.checkArgument(
         !Strings.isNullOrEmpty(taskQueue), "taskQueue should not be an empty string");
     this.taskQueue = taskQueue;
     this.options = WorkerOptions.newBuilder(options).validateAndBuildWithDefaults();
+    this.plugins = plugins;
+    this.dataConverter = dataConverter;
     factoryOptions = WorkerFactoryOptions.newBuilder(factoryOptions).validateAndBuildWithDefaults();
     WorkflowClientOptions clientOptions = client.getOptions();
     String namespace = clientOptions.getNamespace();
@@ -182,14 +195,14 @@ public final class Worker {
    * types dynamically. It can be useful for implementing DSL based workflows. Only a single type
    * that implements DynamicWorkflow can be registered per worker.
    *
+   * <p>Plugins registered with the WorkerFactory are consulted for each workflow type. If a plugin
+   * returns a factory for a type, that factory handles the workflow. Otherwise, the default POJO
+   * factory is used.
+   *
    * @throws TypeAlreadyRegisteredException if one of the workflow types is already registered
    */
   public void registerWorkflowImplementationTypes(Class<?>... workflowImplementationClasses) {
-    Preconditions.checkState(
-        !started.get(),
-        "registerWorkflowImplementationTypes is not allowed after worker has started");
-
-    workflowWorker.registerWorkflowImplementationTypes(
+    registerWorkflowImplementationTypes(
         WorkflowImplementationOptions.newBuilder().build(), workflowImplementationClasses);
   }
 
@@ -206,6 +219,10 @@ public final class Worker {
    * types dynamically. It can be useful for implementing DSL based workflows. Only a single type
    * that implements DynamicWorkflow can be registered per worker.
    *
+   * <p>Plugins registered with the WorkerFactory are consulted for each workflow type. If a plugin
+   * returns a factory for a type, that factory handles the workflow. Otherwise, the default POJO
+   * factory is used.
+   *
    * @throws TypeAlreadyRegisteredException if one of the workflow types is already registered
    */
   public void registerWorkflowImplementationTypes(
@@ -214,7 +231,27 @@ public final class Worker {
         !started.get(),
         "registerWorkflowImplementationTypes is not allowed after worker has started");
 
-    workflowWorker.registerWorkflowImplementationTypes(options, workflowImplementationClasses);
+    for (Class<?> clazz : workflowImplementationClasses) {
+      WorkflowImplementationFactory factory = null;
+
+      // Consult plugins to find a factory for this type
+      for (WorkerPlugin plugin : plugins) {
+        factory = plugin.getFactoryForType(clazz, dataConverter);
+        if (factory != null) {
+          break;
+        }
+      }
+
+      if (factory != null) {
+        // Plugin handled this type - ensure factory is registered (deduplicated)
+        if (!workflowImplementationFactories.contains(factory)) {
+          workflowImplementationFactories.add(factory);
+        }
+      } else {
+        // No plugin handled it - use default POJO registration
+        workflowWorker.registerWorkflowImplementationTypes(options, new Class<?>[] {clazz});
+      }
+    }
   }
 
   /**

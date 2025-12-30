@@ -14,6 +14,7 @@ import io.temporal.internal.task.VirtualThreadDelegate;
 import io.temporal.internal.worker.ShutdownManager;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import io.temporal.internal.worker.WorkflowRunLockManager;
+import io.temporal.plugin.WorkerPlugin;
 import io.temporal.serviceclient.MetricsTag;
 import java.util.HashMap;
 import java.util.Map;
@@ -140,19 +141,35 @@ public final class WorkerFactory {
     // Only one worker can exist for a task queue
     Worker existingWorker = workers.get(taskQueue);
     if (existingWorker == null) {
+      // Let plugins configure worker options
+      WorkerOptions.Builder optionsBuilder = WorkerOptions.newBuilder(options);
+      for (WorkerPlugin plugin : factoryOptions.getPlugins()) {
+        optionsBuilder = plugin.configureWorker(optionsBuilder);
+      }
+      WorkerOptions configuredOptions = optionsBuilder.build();
+
+      DataConverter dataConverter = workflowClient.getOptions().getDataConverter();
       Worker worker =
           new Worker(
               workflowClient,
               taskQueue,
               factoryOptions,
-              options,
+              configuredOptions,
               metricsScope,
               runLocks,
               cache,
               true,
               workflowThreadExecutor,
-              workflowClient.getOptions().getContextPropagators());
+              workflowClient.getOptions().getContextPropagators(),
+              factoryOptions.getPlugins(),
+              dataConverter);
       workers.put(taskQueue, worker);
+
+      // Notify plugins of worker creation (for activity registration and other setup)
+      for (WorkerPlugin plugin : factoryOptions.getPlugins()) {
+        plugin.onWorkerCreated(worker, dataConverter);
+      }
+
       return worker;
     } else {
       log.warn(

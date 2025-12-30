@@ -18,12 +18,18 @@
  * limitations under the License.
  */
 
+@file:OptIn(InternalTemporalApi::class)
+
 package io.temporal.kotlin.worker
 
 import io.temporal.common.converter.DataConverter
+import io.temporal.internal.worker.WorkflowImplementationFactory
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KotlinWorkflowDefinition
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.plugin.WorkerPlugin
+import io.temporal.worker.WorkerOptions
 
 /**
  * Plugin for enabling Kotlin coroutine support in Temporal workflows.
@@ -31,37 +37,79 @@ import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
  * This plugin provides configuration for Kotlin coroutine-based workflow execution,
  * enabling the use of suspend functions in workflow definitions.
  *
- * Example usage:
- * ```kotlin
- * val plugin = KotlinPlugin {
- *   deadlockDetectionTimeout = 1500L
- * }
+ * When registered with a WorkerFactory, this plugin automatically detects Kotlin
+ * suspend workflows during registration and routes them to the Kotlin coroutine
+ * execution runtime. Non-suspend workflows are handled by the default Java factory.
  *
- * // Use with worker
- * worker.registerKotlinWorkflowImplementationTypes(
- *   plugin,
- *   MyWorkflowImpl::class
+ * Usage:
+ * ```kotlin
+ * val factory = WorkerFactory.newInstance(
+ *     client,
+ *     WorkerFactoryOptions.newBuilder()
+ *         .addPlugin(KotlinPlugin { deadlockDetectionTimeout = 1500L })
+ *         .build()
+ * )
+ * val worker = factory.newWorker("task-queue")
+ *
+ * // Suspend workflows auto-detected and routed to Kotlin factory
+ * // Non-suspend workflows use default Java factory
+ * worker.registerWorkflowImplementationTypes(
+ *     MySuspendWorkflowImpl::class.java,
+ *     MyJavaWorkflowImpl::class.java
  * )
  * ```
  *
  * @see KotlinPluginOptions
+ * @see WorkerPlugin
  */
 public class KotlinPlugin private constructor(
   private val options: KotlinPluginOptions
-) {
+) : WorkerPlugin {
+
+  /** Lazily created factory - shared across all workflow types handled by this plugin. */
+  private var factory: KotlinWorkflowImplementationFactory? = null
 
   /**
-   * Creates a new KotlinWorkflowImplementationFactory configured with this plugin's options.
-   *
-   * @param dataConverter the data converter to use for serialization
-   * @return a new factory instance
+   * Configures worker options before worker creation.
+   * Sets deadlock detection timeout if configured.
    */
-  @InternalTemporalApi
-  internal fun createFactory(dataConverter: DataConverter): KotlinWorkflowImplementationFactory {
-    return KotlinWorkflowImplementationFactory(
-      dataConverter = dataConverter,
-      deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout
-    )
+  override fun configureWorker(builder: WorkerOptions.Builder): WorkerOptions.Builder {
+    if (options.configureDeadlockDetection) {
+      builder.setDefaultDeadlockDetectionTimeout(options.deadlockDetectionTimeout)
+    }
+    return builder
+  }
+
+  /**
+   * Called for each workflow type during registration.
+   *
+   * If the workflow uses Kotlin suspend functions, this plugin handles it by:
+   * 1. Creating/reusing a KotlinWorkflowImplementationFactory
+   * 2. Registering the type with that factory
+   * 3. Returning the factory
+   *
+   * For non-suspend workflows, returns null to let the default POJO factory handle them.
+   */
+  override fun getFactoryForType(
+    workflowImplementationType: Class<*>,
+    dataConverter: DataConverter
+  ): WorkflowImplementationFactory? {
+    // Check if this is a Kotlin suspend workflow
+    if (!KotlinWorkflowDefinition.isSuspendWorkflow(workflowImplementationType)) {
+      return null // Not a suspend workflow, let default factory handle it
+    }
+
+    // Lazily create the factory
+    if (factory == null) {
+      factory = KotlinWorkflowImplementationFactory(
+        dataConverter = dataConverter,
+        deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout
+      )
+    }
+
+    // Register the workflow type with our factory
+    factory!!.registerWorkflowImplementationType(workflowImplementationType)
+    return factory
   }
 
   /**
@@ -101,7 +149,14 @@ public class KotlinPluginOptions(
    * Timeout in milliseconds for deadlock detection in workflow code.
    * Default is 1000ms.
    */
-  public val deadlockDetectionTimeout: Long = DEFAULT_DEADLOCK_DETECTION_TIMEOUT
+  public val deadlockDetectionTimeout: Long = DEFAULT_DEADLOCK_DETECTION_TIMEOUT,
+
+  /**
+   * Whether to configure worker's deadlock detection timeout from this plugin.
+   * Set to false if you want to manage the timeout separately via WorkerOptions.
+   * Default is true.
+   */
+  public val configureDeadlockDetection: Boolean = true
 ) {
   public companion object {
     public const val DEFAULT_DEADLOCK_DETECTION_TIMEOUT: Long = 1000L
@@ -117,8 +172,14 @@ public class KotlinPluginOptions(
      */
     public var deadlockDetectionTimeout: Long = DEFAULT_DEADLOCK_DETECTION_TIMEOUT
 
+    /**
+     * Whether to configure worker's deadlock detection timeout from this plugin.
+     */
+    public var configureDeadlockDetection: Boolean = true
+
     public fun build(): KotlinPluginOptions = KotlinPluginOptions(
-      deadlockDetectionTimeout = deadlockDetectionTimeout
+      deadlockDetectionTimeout = deadlockDetectionTimeout,
+      configureDeadlockDetection = configureDeadlockDetection
     )
   }
 }

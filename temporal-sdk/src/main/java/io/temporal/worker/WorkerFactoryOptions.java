@@ -4,7 +4,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.temporal.common.Experimental;
 import io.temporal.common.interceptors.WorkerInterceptor;
+import io.temporal.plugin.WorkerPlugin;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 
@@ -40,6 +45,7 @@ public class WorkerFactoryOptions {
     private boolean enableLoggingInReplay;
     private boolean usingVirtualWorkflowThreads;
     private ExecutorService overrideLocalActivityTaskExecutor;
+    private List<WorkerPlugin> plugins = new ArrayList<>();
 
     private Builder() {}
 
@@ -55,6 +61,7 @@ public class WorkerFactoryOptions {
       this.enableLoggingInReplay = options.enableLoggingInReplay;
       this.usingVirtualWorkflowThreads = options.usingVirtualWorkflowThreads;
       this.overrideLocalActivityTaskExecutor = options.overrideLocalActivityTaskExecutor;
+      this.plugins = new ArrayList<>(options.plugins);
     }
 
     /**
@@ -135,6 +142,26 @@ public class WorkerFactoryOptions {
       return this;
     }
 
+    /**
+     * Adds a plugin that will be applied to all workers created by this factory.
+     *
+     * <p>Plugins are called in the order they are added. Each plugin can:
+     *
+     * <ul>
+     *   <li>Modify worker options before worker creation via {@link
+     *       WorkerPlugin#configureWorker(WorkerOptions.Builder)}
+     *   <li>Register workflow/activity implementations after worker creation via {@link
+     *       WorkerPlugin#onWorkerCreated(Worker, io.temporal.common.converter.DataConverter)}
+     * </ul>
+     *
+     * @param plugin the plugin to add
+     * @return this builder for chaining
+     */
+    public Builder addPlugin(WorkerPlugin plugin) {
+      this.plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
+      return this;
+    }
+
     public WorkerFactoryOptions build() {
       return new WorkerFactoryOptions(
           workflowCacheSize,
@@ -144,6 +171,7 @@ public class WorkerFactoryOptions {
           enableLoggingInReplay,
           usingVirtualWorkflowThreads,
           overrideLocalActivityTaskExecutor,
+          plugins,
           false);
     }
 
@@ -156,6 +184,7 @@ public class WorkerFactoryOptions {
           enableLoggingInReplay,
           usingVirtualWorkflowThreads,
           overrideLocalActivityTaskExecutor,
+          plugins,
           true);
     }
   }
@@ -167,6 +196,7 @@ public class WorkerFactoryOptions {
   private final boolean enableLoggingInReplay;
   private final boolean usingVirtualWorkflowThreads;
   private final ExecutorService overrideLocalActivityTaskExecutor;
+  private final List<WorkerPlugin> plugins;
 
   private WorkerFactoryOptions(
       int workflowCacheSize,
@@ -176,6 +206,7 @@ public class WorkerFactoryOptions {
       boolean enableLoggingInReplay,
       boolean usingVirtualWorkflowThreads,
       ExecutorService overrideLocalActivityTaskExecutor,
+      List<WorkerPlugin> plugins,
       boolean validate) {
     if (validate) {
       Preconditions.checkState(workflowCacheSize >= 0, "negative workflowCacheSize");
@@ -204,6 +235,10 @@ public class WorkerFactoryOptions {
     this.enableLoggingInReplay = enableLoggingInReplay;
     this.usingVirtualWorkflowThreads = usingVirtualWorkflowThreads;
     this.overrideLocalActivityTaskExecutor = overrideLocalActivityTaskExecutor;
+    this.plugins =
+        plugins != null
+            ? Collections.unmodifiableList(new ArrayList<>(plugins))
+            : Collections.emptyList();
   }
 
   public int getWorkflowCacheSize() {
@@ -240,6 +275,15 @@ public class WorkerFactoryOptions {
    */
   ExecutorService getOverrideLocalActivityTaskExecutor() {
     return overrideLocalActivityTaskExecutor;
+  }
+
+  /**
+   * Returns the list of plugins registered with this factory.
+   *
+   * @return an unmodifiable list of plugins
+   */
+  public List<WorkerPlugin> getPlugins() {
+    return plugins;
   }
 
   /**
