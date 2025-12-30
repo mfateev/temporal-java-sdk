@@ -72,6 +72,8 @@ internal class KotlinReplayWorkflow(
     this.replayContext = context
     this.workflowContext = KotlinWorkflowContext(context, dataConverter)
     this.dispatcher = KotlinCoroutineDispatcher(workflowContext!!)
+    // Set dispatcher reference for explicit dispatch operations
+    this.workflowContext!!.dispatcher = this.dispatcher
 
     // Create coroutine scope with our deterministic dispatcher
     val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
@@ -167,35 +169,73 @@ internal class KotlinReplayWorkflow(
     eventId: Long,
     header: Header
   ) {
+    val instance = workflowInstance.get() ?: return
+    val ctx = workflowContext ?: return
+
+    // First check for annotation-based signal handler
     val signalMethod = workflowDefinition.signalMethods[signalName]
-    if (signalMethod == null) {
-      // Unknown signal - could log or handle dynamically
+    if (signalMethod != null) {
+      // Execute annotation-based signal handler
+      dispatcher?.executeImmediately {
+        coroutineScope?.launch {
+          try {
+            val parameters = signalMethod.parameters
+            val args = if (input.isPresent && parameters.size > 1) {
+              deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
+            } else {
+              emptyArray()
+            }
+
+            if (signalMethod.isSuspend) {
+              signalMethod.callSuspend(instance, *args)
+            } else {
+              signalMethod.call(instance, *args)
+            }
+          } catch (e: Throwable) {
+            workflowContext?.failWorkflowTask(e)
+          }
+        }
+      }
       return
     }
 
-    val instance = workflowInstance.get() ?: return
-
-    // Execute signal handler in the workflow context
-    dispatcher?.executeImmediately {
-      coroutineScope?.launch {
-        try {
-          val parameters = signalMethod.parameters
-          val args = if (input.isPresent && parameters.size > 1) {
-            deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
-          } else {
-            emptyArray()
+    // Check for dynamically registered signal handler
+    val dynamicHandler = ctx.signalHandlers[signalName]
+    if (dynamicHandler != null) {
+      dispatcher?.executeImmediately {
+        coroutineScope?.launch {
+          try {
+            val encodedValues = ctx.createEncodedValues(input)
+            dynamicHandler(encodedValues)
+            // Notify condition waiters after signal is processed
+            ctx.notifyConditionWaiters()
+          } catch (e: Throwable) {
+            workflowContext?.failWorkflowTask(e)
           }
-
-          if (signalMethod.isSuspend) {
-            signalMethod.callSuspend(instance, *args)
-          } else {
-            signalMethod.call(instance, *args)
-          }
-        } catch (e: Throwable) {
-          workflowContext?.failWorkflowTask(e)
         }
       }
+      return
     }
+
+    // Check for catch-all dynamic signal handler
+    val catchAllHandler = ctx.dynamicSignalHandler
+    if (catchAllHandler != null) {
+      dispatcher?.executeImmediately {
+        coroutineScope?.launch {
+          try {
+            val encodedValues = ctx.createEncodedValues(input)
+            catchAllHandler(signalName, encodedValues)
+            // Notify condition waiters after signal is processed
+            ctx.notifyConditionWaiters()
+          } catch (e: Throwable) {
+            workflowContext?.failWorkflowTask(e)
+          }
+        }
+      }
+      return
+    }
+
+    // Unknown signal with no handler - ignore (could log warning)
   }
 
   override fun handleUpdate(
@@ -303,11 +343,8 @@ internal class KotlinReplayWorkflow(
 
   override fun query(query: WorkflowQuery): Optional<Payloads> {
     val queryName = query.queryType
-    val queryMethod = workflowDefinition.queryMethods[queryName]
-      ?: throw IllegalArgumentException("Unknown query: $queryName")
-
-    val instance = workflowInstance.get()
-      ?: throw IllegalStateException("Workflow instance not initialized")
+    val ctx = workflowContext
+      ?: throw IllegalStateException("Workflow context not initialized")
 
     val input = if (query.hasQueryArgs()) {
       Optional.of(query.queryArgs)
@@ -315,21 +352,56 @@ internal class KotlinReplayWorkflow(
       Optional.empty()
     }
 
-    val parameters = queryMethod.parameters
-    val args = if (input.isPresent && parameters.size > 1) {
-      deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
-    } else {
-      emptyArray()
+    // First check for annotation-based query handler
+    val queryMethod = workflowDefinition.queryMethods[queryName]
+    if (queryMethod != null) {
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
+
+      val parameters = queryMethod.parameters
+      val args = if (input.isPresent && parameters.size > 1) {
+        deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
+      } else {
+        emptyArray()
+      }
+
+      // Query methods should not be suspend functions
+      val result = queryMethod.call(instance, *args)
+
+      return if (result != null && result != Unit) {
+        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
+      } else {
+        Optional.empty()
+      }
     }
 
-    // Query methods should not be suspend functions
-    val result = queryMethod.call(instance, *args)
+    // Check for dynamically registered query handler
+    val dynamicHandler = ctx.queryHandlers[queryName]
+    if (dynamicHandler != null) {
+      val encodedValues = ctx.createEncodedValues(input)
+      val result = dynamicHandler(encodedValues)
 
-    return if (result != null && result != Unit) {
-      Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
-    } else {
-      Optional.empty()
+      return if (result != null && result != Unit) {
+        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
+      } else {
+        Optional.empty()
+      }
     }
+
+    // Check for catch-all dynamic query handler
+    val catchAllHandler = ctx.dynamicQueryHandler
+    if (catchAllHandler != null) {
+      val encodedValues = ctx.createEncodedValues(input)
+      val result = catchAllHandler(queryName, encodedValues)
+
+      return if (result != null && result != Unit) {
+        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
+      } else {
+        Optional.empty()
+      }
+    }
+
+    throw IllegalArgumentException("Unknown query: $queryName")
   }
 
   override fun getWorkflowContext(): WorkflowContext {

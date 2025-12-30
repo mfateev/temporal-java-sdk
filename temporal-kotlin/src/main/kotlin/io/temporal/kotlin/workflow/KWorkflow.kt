@@ -24,6 +24,7 @@ package io.temporal.kotlin.workflow
 
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.LocalActivityOptions
+import io.temporal.common.converter.EncodedValues
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
@@ -359,8 +360,15 @@ public object KWorkflow {
    *
    * @param condition the condition to wait for
    */
-  public fun condition(condition: () -> Boolean) {
-    Workflow.await { condition() }
+  public suspend fun condition(condition: () -> Boolean) {
+    val context = currentContext.get()
+    if (context != null) {
+      // Use our Kotlin-native condition waiting
+      context.awaitCondition(condition)
+    } else {
+      // Fallback to Java SDK (for non-suspend workflows)
+      Workflow.await { condition() }
+    }
   }
 
   /**
@@ -370,8 +378,8 @@ public object KWorkflow {
    * @param condition the condition to wait for
    * @return true if condition was satisfied, false if timeout expired
    */
-  public fun condition(timeout: Duration, condition: () -> Boolean): Boolean {
-    return Workflow.await(timeout.toJava()) { condition() }
+  public suspend fun condition(timeout: Duration, condition: () -> Boolean): Boolean {
+    return condition(timeout.toJava(), condition)
   }
 
   /**
@@ -381,8 +389,15 @@ public object KWorkflow {
    * @param condition the condition to wait for
    * @return true if condition was satisfied, false if timeout expired
    */
-  public fun condition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
-    return Workflow.await(timeout) { condition() }
+  public suspend fun condition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
+    val context = currentContext.get()
+    return if (context != null) {
+      // Use our Kotlin-native condition waiting with timeout
+      context.awaitCondition(timeout, condition)
+    } else {
+      // Fallback to Java SDK (for non-suspend workflows)
+      Workflow.await(timeout) { condition() }
+    }
   }
 
   // ==================== Local Activity Methods ====================
@@ -646,6 +661,187 @@ public object KWorkflow {
   internal fun currentTimeMillisInternal(): Long {
     val context = currentContext.get()
     return context?.currentTimeMillis ?: Workflow.currentTimeMillis()
+  }
+
+  // ==================== Signal Handler Registration ====================
+
+  /**
+   * Registers a signal handler for a specific signal name.
+   *
+   * Signal handlers are invoked when the workflow receives a signal with the
+   * matching name. The handler receives the signal arguments as [EncodedValues]
+   * which can be decoded to the expected types.
+   *
+   * Example:
+   * ```kotlin
+   * class MyWorkflowImpl : MyWorkflow {
+   *   private var approved = false
+   *
+   *   override suspend fun execute(): String {
+   *     // Register signal handler
+   *     KWorkflow.registerSignalHandler("approve") { args ->
+   *       approved = args.get(0, Boolean::class.java)
+   *     }
+   *
+   *     // Wait for approval
+   *     KWorkflow.condition { approved }
+   *     return "Approved!"
+   *   }
+   * }
+   * ```
+   *
+   * @param signalName the name of the signal to handle
+   * @param handler the suspend function to invoke when the signal is received
+   * @throws IllegalArgumentException if a handler is already registered for this signal
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerSignalHandler(
+    signalName: String,
+    handler: suspend (EncodedValues) -> Unit
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerSignalHandler must be called from within workflow code")
+    context.registerSignalHandler(signalName, handler)
+  }
+
+  /**
+   * Registers a signal handler with no arguments for a specific signal name.
+   *
+   * This is a convenience method for signals that don't require arguments.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerSignalHandler("cancel") {
+   *   shouldCancel = true
+   * }
+   * ```
+   *
+   * @param signalName the name of the signal to handle
+   * @param handler the suspend function to invoke when the signal is received
+   */
+  public fun registerSignalHandler(
+    signalName: String,
+    handler: suspend () -> Unit
+  ) {
+    registerSignalHandler(signalName) { _ -> handler() }
+  }
+
+  /**
+   * Registers a dynamic signal handler for all unhandled signals.
+   *
+   * The dynamic handler is invoked for any signal that doesn't have a specific
+   * handler registered. Only one dynamic handler can be registered per workflow.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerDynamicSignalHandler { signalName, args ->
+   *   println("Received signal: $signalName with ${args.size} arguments")
+   * }
+   * ```
+   *
+   * @param handler the suspend function to invoke for unhandled signals
+   * @throws IllegalArgumentException if a dynamic handler is already registered
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerDynamicSignalHandler(
+    handler: suspend (signalName: String, args: EncodedValues) -> Unit
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerDynamicSignalHandler must be called from within workflow code")
+    context.registerDynamicSignalHandler(handler)
+  }
+
+  // ==================== Query Handler Registration ====================
+
+  /**
+   * Registers a query handler for a specific query name.
+   *
+   * Query handlers are invoked synchronously when the workflow is queried.
+   * They must NOT be suspend functions and should return quickly without
+   * blocking or performing side effects.
+   *
+   * Example:
+   * ```kotlin
+   * class MyWorkflowImpl : MyWorkflow {
+   *   private var status = "pending"
+   *
+   *   override suspend fun execute(): String {
+   *     // Register query handler
+   *     KWorkflow.registerQueryHandler<String>("getStatus") { args ->
+   *       status
+   *     }
+   *
+   *     // ... workflow logic ...
+   *     return "done"
+   *   }
+   * }
+   * ```
+   *
+   * @param R the return type of the query
+   * @param queryName the name of the query to handle
+   * @param handler the function to invoke when the query is received
+   * @throws IllegalArgumentException if a handler is already registered for this query
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun <R> registerQueryHandler(
+    queryName: String,
+    handler: (EncodedValues) -> R
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerQueryHandler must be called from within workflow code")
+    context.registerQueryHandler(queryName, handler)
+  }
+
+  /**
+   * Registers a query handler with no arguments for a specific query name.
+   *
+   * This is a convenience method for queries that don't require arguments.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerQueryHandler<String>("getStatus") {
+   *   currentStatus
+   * }
+   * ```
+   *
+   * @param R the return type of the query
+   * @param queryName the name of the query to handle
+   * @param handler the function to invoke when the query is received
+   */
+  public fun <R> registerQueryHandler(
+    queryName: String,
+    handler: () -> R
+  ) {
+    registerQueryHandler<R>(queryName) { _ -> handler() }
+  }
+
+  /**
+   * Registers a dynamic query handler for all unhandled queries.
+   *
+   * The dynamic handler is invoked for any query that doesn't have a specific
+   * handler registered. Only one dynamic handler can be registered per workflow.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerDynamicQueryHandler { queryName, args ->
+   *   when (queryName) {
+   *     "status" -> currentStatus
+   *     "count" -> itemCount
+   *     else -> "Unknown query: $queryName"
+   *   }
+   * }
+   * ```
+   *
+   * @param handler the function to invoke for unhandled queries
+   * @throws IllegalArgumentException if a dynamic handler is already registered
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerDynamicQueryHandler(
+    handler: (queryName: String, args: EncodedValues) -> Any?
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerDynamicQueryHandler must be called from within workflow code")
+    context.registerDynamicQueryHandler(handler)
   }
 }
 

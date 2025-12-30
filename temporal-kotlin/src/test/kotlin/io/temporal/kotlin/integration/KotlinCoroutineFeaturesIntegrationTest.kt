@@ -387,4 +387,190 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
     assertEquals("Hello, Step1! -> Hello, Step2!", result)
   }
+
+  // ==================== Signal and Query Workflow ====================
+
+  @WorkflowInterface
+  interface SignalQueryWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+  }
+
+  class SignalQueryWorkflowImpl : SignalQueryWorkflow {
+    private var status = "waiting"
+    private var approved = false
+    private var messages = mutableListOf<String>()
+
+    override suspend fun execute(): String {
+      // Register signal handlers
+      KWorkflow.registerSignalHandler("approve") { args ->
+        approved = args.get(0, Boolean::class.java)
+        status = if (approved) "approved" else "rejected"
+      }
+
+      KWorkflow.registerSignalHandler("addMessage") { args ->
+        val message = args.get(0, String::class.java)
+        messages.add(message)
+      }
+
+      // Register query handlers (explicitly use no-arg form)
+      KWorkflow.registerQueryHandler("getStatus") { -> status }
+
+      KWorkflow.registerQueryHandler("getMessageCount") { -> messages.size }
+
+      KWorkflow.registerQueryHandler("getMessages") { -> messages.toList() }
+
+      // Wait for approval
+      KWorkflow.condition { approved }
+
+      return "Workflow completed with ${messages.size} messages"
+    }
+  }
+
+  @WorkflowInterface
+  interface DynamicSignalWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): Map<String, Int>
+  }
+
+  class DynamicSignalWorkflowImpl : DynamicSignalWorkflow {
+    private val signalCounts = mutableMapOf<String, Int>()
+    private var done = false
+
+    override suspend fun execute(): Map<String, Int> {
+      // Register dynamic signal handler for any signal
+      KWorkflow.registerDynamicSignalHandler { signalName, args ->
+        if (signalName == "done") {
+          done = true
+        } else {
+          val count = signalCounts.getOrDefault(signalName, 0)
+          signalCounts[signalName] = count + 1
+        }
+      }
+
+      // Register dynamic query handler
+      KWorkflow.registerDynamicQueryHandler { queryName, args ->
+        when (queryName) {
+          "getCount" -> {
+            val signalName = args.get(0, String::class.java)
+            signalCounts.getOrDefault(signalName, 0)
+          }
+          "getAllCounts" -> signalCounts.toMap()
+          else -> null
+        }
+      }
+
+      // Wait for done signal
+      KWorkflow.condition { done }
+
+      return signalCounts.toMap()
+    }
+  }
+
+  // ==================== Signal and Query Tests ====================
+
+  @Test(timeout = 10000)
+  fun `workflow can register and handle signals`() {
+    setupKotlinWorkflows(SignalQueryWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("SignalQueryWorkflow", options)
+    stub.start()
+
+    // Send signals
+    stub.signal("addMessage", "Hello")
+    stub.signal("addMessage", "World")
+    stub.signal("approve", true)
+
+    val result = stub.getResult(String::class.java)
+    assertEquals("Workflow completed with 2 messages", result)
+  }
+
+  @Test(timeout = 10000)
+  fun `workflow can register and handle queries`() {
+    setupKotlinWorkflows(SignalQueryWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("SignalQueryWorkflow", options)
+    stub.start()
+
+    // Wait a bit for workflow to start and register handlers
+    Thread.sleep(500)
+
+    // Query initial status
+    val initialStatus = stub.query("getStatus", String::class.java)
+    assertEquals("waiting", initialStatus)
+
+    // Send signals
+    stub.signal("addMessage", "Test1")
+    stub.signal("addMessage", "Test2")
+    stub.signal("addMessage", "Test3")
+
+    // Give time for signals to be processed
+    Thread.sleep(500)
+
+    // Query message count
+    val messageCount = stub.query("getMessageCount", Int::class.java)
+    assertEquals(3, messageCount)
+
+    // Approve to complete workflow
+    stub.signal("approve", true)
+
+    // Query final status
+    val finalStatus = stub.query("getStatus", String::class.java)
+    assertEquals("approved", finalStatus)
+
+    val result = stub.getResult(String::class.java)
+    assertEquals("Workflow completed with 3 messages", result)
+  }
+
+  @Test(timeout = 10000)
+  fun `workflow can use dynamic signal and query handlers`() {
+    setupKotlinWorkflows(DynamicSignalWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("DynamicSignalWorkflow", options)
+    stub.start()
+
+    // Wait for workflow to start
+    Thread.sleep(500)
+
+    // Send various signals
+    stub.signal("eventA")
+    stub.signal("eventA")
+    stub.signal("eventB")
+    stub.signal("eventA")
+    stub.signal("eventC")
+
+    // Give time for signals to be processed
+    Thread.sleep(500)
+
+    // Query specific counts
+    val countA = stub.query("getCount", Int::class.java, "eventA")
+    assertEquals(3, countA)
+
+    val countB = stub.query("getCount", Int::class.java, "eventB")
+    assertEquals(1, countB)
+
+    // Complete workflow
+    stub.signal("done")
+
+    @Suppress("UNCHECKED_CAST")
+    val result = stub.getResult(Map::class.java) as Map<String, Int>
+    assertEquals(3, result["eventA"])
+    assertEquals(1, result["eventB"])
+    assertEquals(1, result["eventC"])
+  }
 }

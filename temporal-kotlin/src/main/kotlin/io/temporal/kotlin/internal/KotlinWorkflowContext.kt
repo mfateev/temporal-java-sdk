@@ -35,6 +35,7 @@ import io.temporal.api.taskqueue.v1.TaskQueue
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse
 import io.temporal.common.RetryOptions
 import io.temporal.common.converter.DataConverter
+import io.temporal.common.converter.EncodedValues
 import io.temporal.internal.common.ProtobufTimeUtils
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.statemachines.ExecuteActivityParameters
@@ -50,6 +51,7 @@ import java.time.Instant
 import java.util.Optional
 import java.util.Random
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -59,11 +61,68 @@ import kotlin.coroutines.resumeWithException
  * This class provides suspend function wrappers for Temporal workflow operations,
  * allowing Kotlin coroutine-based workflows to interact with the Temporal runtime.
  */
+/**
+ * Type alias for signal handlers.
+ * Signal handlers receive the signal name and encoded arguments.
+ */
+typealias SignalHandler = suspend (args: EncodedValues) -> Unit
+
+/**
+ * Type alias for dynamic signal handlers that handle any signal.
+ * Dynamic handlers receive both the signal name and encoded arguments.
+ */
+typealias DynamicSignalHandler = suspend (signalName: String, args: EncodedValues) -> Unit
+
+/**
+ * Type alias for query handlers.
+ * Query handlers receive the encoded arguments and return a result.
+ * Note: Query handlers are NOT suspend functions as queries must return immediately.
+ */
+typealias QueryHandler<R> = (args: EncodedValues) -> R
+
+/**
+ * Type alias for dynamic query handlers that handle any query.
+ * Dynamic handlers receive both the query name and encoded arguments.
+ */
+typealias DynamicQueryHandler = (queryName: String, args: EncodedValues) -> Any?
+
 @InternalTemporalApi
 internal class KotlinWorkflowContext(
   internal val replayContext: ReplayWorkflowContext,
   internal val dataConverter: DataConverter = DataConverter.getDefaultInstance()
 ) {
+
+  /**
+   * Reference to the dispatcher for explicit dispatch operations.
+   * Set by KotlinReplayWorkflow after construction.
+   */
+  @Volatile
+  internal var dispatcher: KotlinCoroutineDispatcher? = null
+
+  // ==================== Dynamic Handler Storage ====================
+
+  /**
+   * Registered signal handlers by signal name.
+   */
+  internal val signalHandlers = ConcurrentHashMap<String, SignalHandler>()
+
+  /**
+   * Dynamic signal handler for unhandled signals.
+   */
+  @Volatile
+  internal var dynamicSignalHandler: DynamicSignalHandler? = null
+
+  /**
+   * Registered query handlers by query name.
+   */
+  internal val queryHandlers = ConcurrentHashMap<String, QueryHandler<*>>()
+
+  /**
+   * Dynamic query handler for unhandled queries.
+   */
+  @Volatile
+  internal var dynamicQueryHandler: DynamicQueryHandler? = null
+
   /**
    * Returns the workflow execution info.
    */
@@ -534,5 +593,168 @@ internal class KotlinWorkflowContext(
     }
 
     return builder.build()
+  }
+
+  // ==================== Condition/Await Methods ====================
+
+  /**
+   * List of pending condition waiters that need to be notified when events arrive.
+   */
+  internal val conditionWaiters = mutableListOf<CancellableContinuation<Unit>>()
+
+  /**
+   * Awaits until the given condition evaluates to true.
+   *
+   * This method suspends the coroutine and checks the condition after each
+   * workflow event (signal, timer, activity completion, etc.).
+   *
+   * @param condition the condition to wait for
+   */
+  suspend fun awaitCondition(condition: () -> Boolean) {
+    // Check if condition is already true
+    while (!condition()) {
+      // Suspend until something happens (signal, timer, etc.)
+      suspendCancellableCoroutine<Unit> { cont ->
+        conditionWaiters.add(cont)
+        cont.invokeOnCancellation {
+          conditionWaiters.remove(cont)
+        }
+      }
+    }
+  }
+
+  /**
+   * Awaits until the given condition evaluates to true or timeout expires.
+   *
+   * @param timeout maximum time to wait
+   * @param condition the condition to wait for
+   * @return true if condition was satisfied, false if timeout expired
+   */
+  suspend fun awaitCondition(timeout: Duration, condition: () -> Boolean): Boolean {
+    // Check if condition is already true
+    if (condition()) return true
+
+    val startTime = currentTimeMillis
+    val timeoutMillis = timeout.toMillis()
+
+    while (!condition()) {
+      val elapsed = currentTimeMillis - startTime
+      if (elapsed >= timeoutMillis) {
+        return false
+      }
+
+      // Wait for either the condition to be signaled or timeout
+      // Use the same conditionWaiters list but with Unit type
+      suspendCancellableCoroutine<Unit> { cont ->
+        conditionWaiters.add(cont)
+
+        // Also set up a timer to wake us up for timeout check
+        val remaining = timeoutMillis - elapsed
+        val timerDuration = Duration.ofMillis(remaining.coerceAtMost(100)) // Check every 100ms at most
+        replayContext.newTimer(timerDuration, null) { exception ->
+          // When timer fires, resume to re-check the condition
+          if (cont.isActive) {
+            conditionWaiters.remove(cont)
+            if (exception != null) {
+              cont.resumeWithException(exception)
+            } else {
+              cont.resume(Unit)
+            }
+          }
+        }
+
+        cont.invokeOnCancellation {
+          conditionWaiters.remove(cont)
+        }
+      }
+    }
+
+    return true
+  }
+
+  /**
+   * Notifies all condition waiters that they should re-check their conditions.
+   * Called after processing signals, timers, activity completions, etc.
+   *
+   * Uses explicit dispatch to add resumptions to the end of the queue,
+   * ensuring all pending signal handlers complete before condition waiters
+   * re-check their conditions.
+   */
+  fun notifyConditionWaiters() {
+    val waiters = conditionWaiters.toList()
+    conditionWaiters.clear()
+    val disp = dispatcher
+    waiters.forEach { cont ->
+      if (cont.isActive) {
+        // Explicitly dispatch to add to end of queue, avoiding inline execution
+        // This ensures other pending work (like signal handlers) completes first
+        if (disp != null) {
+          disp.dispatch(cont.context, Runnable { cont.resume(Unit) })
+        } else {
+          cont.resume(Unit)
+        }
+      }
+    }
+  }
+
+  // ==================== Signal Handler Registration ====================
+
+  /**
+   * Registers a signal handler for a specific signal name.
+   *
+   * @param signalName the name of the signal to handle
+   * @param handler the handler function to invoke when the signal is received
+   */
+  fun registerSignalHandler(signalName: String, handler: SignalHandler) {
+    if (signalHandlers.containsKey(signalName)) {
+      throw IllegalArgumentException("Signal handler already registered for: $signalName")
+    }
+    signalHandlers[signalName] = handler
+  }
+
+  /**
+   * Registers a dynamic signal handler for all unhandled signals.
+   *
+   * @param handler the handler function to invoke for unhandled signals
+   */
+  fun registerDynamicSignalHandler(handler: DynamicSignalHandler) {
+    if (dynamicSignalHandler != null) {
+      throw IllegalArgumentException("Dynamic signal handler already registered")
+    }
+    dynamicSignalHandler = handler
+  }
+
+  // ==================== Query Handler Registration ====================
+
+  /**
+   * Registers a query handler for a specific query name.
+   *
+   * @param queryName the name of the query to handle
+   * @param handler the handler function to invoke when the query is received
+   */
+  fun <R> registerQueryHandler(queryName: String, handler: QueryHandler<R>) {
+    if (queryHandlers.containsKey(queryName)) {
+      throw IllegalArgumentException("Query handler already registered for: $queryName")
+    }
+    queryHandlers[queryName] = handler
+  }
+
+  /**
+   * Registers a dynamic query handler for all unhandled queries.
+   *
+   * @param handler the handler function to invoke for unhandled queries
+   */
+  fun registerDynamicQueryHandler(handler: DynamicQueryHandler) {
+    if (dynamicQueryHandler != null) {
+      throw IllegalArgumentException("Dynamic query handler already registered")
+    }
+    dynamicQueryHandler = handler
+  }
+
+  /**
+   * Creates EncodedValues from an Optional<Payloads>.
+   */
+  fun createEncodedValues(payloads: Optional<Payloads>): EncodedValues {
+    return EncodedValues(payloads, dataConverter)
   }
 }
