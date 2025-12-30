@@ -18,13 +18,14 @@
  * limitations under the License.
  */
 
-@file:OptIn(InternalTemporalApi::class)
+@file:OptIn(InternalTemporalApi::class, kotlin.time.ExperimentalTime::class)
 
 package io.temporal.kotlin.workflow
 
 import io.temporal.activity.ActivityOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.toJava
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
@@ -34,6 +35,7 @@ import java.util.Random
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
 
 /**
  * Provides access to Temporal workflow APIs from within Kotlin workflow code.
@@ -326,6 +328,52 @@ public object KWorkflow {
     val stub = Workflow.newUntypedActivityStub(options)
     val promise: Promise<R> = stub.executeAsync(activityName, resultClass, *args)
     return PromiseActivityHandle(promise)
+  }
+
+  /**
+   * Suspends until the given condition evaluates to true.
+   *
+   * The condition is evaluated whenever the workflow receives a new event
+   * such as a signal, timer firing, or activity completion.
+   *
+   * Example:
+   * ```kotlin
+   * var approved = false
+   *
+   * // In signal handler:
+   * approved = true
+   *
+   * // In workflow:
+   * KWorkflow.condition { approved }
+   * // Continues after approved becomes true
+   * ```
+   *
+   * @param condition the condition to wait for
+   */
+  public fun condition(condition: () -> Boolean) {
+    Workflow.await { condition() }
+  }
+
+  /**
+   * Suspends until the given condition evaluates to true or the timeout expires.
+   *
+   * @param timeout maximum time to wait for the condition
+   * @param condition the condition to wait for
+   * @return true if condition was satisfied, false if timeout expired
+   */
+  public fun condition(timeout: Duration, condition: () -> Boolean): Boolean {
+    return Workflow.await(timeout.toJava()) { condition() }
+  }
+
+  /**
+   * Suspends until the given condition evaluates to true or the timeout expires.
+   *
+   * @param timeout maximum time to wait for the condition (Java Duration)
+   * @param condition the condition to wait for
+   * @return true if condition was satisfied, false if timeout expired
+   */
+  public fun condition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
+    return Workflow.await(timeout) { condition() }
   }
 }
 
