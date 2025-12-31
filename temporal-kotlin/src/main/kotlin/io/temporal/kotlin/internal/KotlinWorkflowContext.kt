@@ -90,7 +90,20 @@ typealias QueryHandler<R> = (args: EncodedValues) -> R
  */
 typealias DynamicQueryHandler = (queryName: String, args: EncodedValues) -> Any?
 
+/**
+ * Type alias for dynamic update handlers.
+ * Dynamic handlers receive both the update name and encoded arguments.
+ */
+typealias DynamicUpdateHandler = suspend (updateName: String, args: EncodedValues) -> Any?
+
+/**
+ * Type alias for dynamic update validators.
+ * Validators receive both the update name and encoded arguments.
+ */
+typealias DynamicUpdateValidator = (updateName: String, args: EncodedValues) -> Unit
+
 @InternalTemporalApi
+@PublishedApi
 internal class KotlinWorkflowContext(
   internal val replayContext: ReplayWorkflowContext,
   internal val dataConverter: DataConverter = DataConverter.getDefaultInstance()
@@ -133,6 +146,18 @@ internal class KotlinWorkflowContext(
    */
   @Volatile
   internal var dynamicQueryHandler: DynamicQueryHandler? = null
+
+  /**
+   * Dynamic update handler for unhandled updates.
+   */
+  @Volatile
+  internal var dynamicUpdateHandler: DynamicUpdateHandler? = null
+
+  /**
+   * Dynamic update validator for unhandled updates.
+   */
+  @Volatile
+  internal var dynamicUpdateValidator: DynamicUpdateValidator? = null
 
   /**
    * Returns the workflow execution info.
@@ -767,6 +792,145 @@ internal class KotlinWorkflowContext(
    */
   fun createEncodedValues(payloads: Optional<Payloads>): EncodedValues {
     return EncodedValues(payloads, dataConverter)
+  }
+
+  // ==================== Update Handler Registration ====================
+
+  /**
+   * Registers a dynamic update handler for all unhandled updates.
+   *
+   * @param handler the handler function to invoke for unhandled updates
+   */
+  fun registerDynamicUpdateHandler(handler: DynamicUpdateHandler) {
+    if (dynamicUpdateHandler != null) {
+      throw IllegalArgumentException("Dynamic update handler already registered")
+    }
+    dynamicUpdateHandler = handler
+  }
+
+  /**
+   * Registers a dynamic update validator for all unhandled updates.
+   *
+   * @param validator the validator function to invoke for unhandled updates
+   */
+  fun registerDynamicUpdateValidator(validator: DynamicUpdateValidator) {
+    if (dynamicUpdateValidator != null) {
+      throw IllegalArgumentException("Dynamic update validator already registered")
+    }
+    dynamicUpdateValidator = validator
+  }
+
+  // ==================== Child Workflow Handle Methods ====================
+
+  /**
+   * Starts a child workflow and returns a handle for interaction.
+   *
+   * @param workflowType the child workflow type name
+   * @param options the child workflow options
+   * @param resultClass the expected result class
+   * @param args arguments to pass to the child workflow
+   * @return a handle for interacting with the child workflow
+   */
+  suspend fun <T, R> startChildWorkflowWithHandle(
+    workflowType: String,
+    options: ChildWorkflowOptions,
+    resultClass: Class<R>,
+    vararg args: Any?
+  ): io.temporal.kotlin.workflow.KChildWorkflowHandle<T, R> {
+    val input = serializeArgs(*args)
+    val parameters = buildChildWorkflowParameters(workflowType, options, input)
+
+    // Use a holder to pass the completion result/exception between callbacks
+    var completionResult: Optional<Payloads>? = null
+    var completionException: Exception? = null
+    var completionCont: CancellableContinuation<Optional<Payloads>>? = null
+    var completed = false
+
+    // First, wait for the child to start
+    val execution = suspendCancellableCoroutine<WorkflowExecution> { startCont ->
+      val cancellationHandle = replayContext.startChildWorkflow(
+        parameters,
+        { execution: WorkflowExecution?, startException: Exception? ->
+          if (startException != null) {
+            startCont.resumeWithException(startException)
+          } else if (execution != null) {
+            startCont.resume(execution)
+          }
+        },
+        { result: Optional<Payloads>, exception: Exception? ->
+          // Store completion data
+          completionResult = result
+          completionException = exception
+          completed = true
+          // If completion continuation is already waiting, resume it
+          completionCont?.let { cont ->
+            if (exception != null) {
+              cont.resumeWithException(exception)
+            } else {
+              cont.resume(result)
+            }
+          }
+        }
+      )
+
+      startCont.invokeOnCancellation { cause ->
+        cancellationHandle.apply(
+          cause as? Exception
+            ?: RuntimeException(cause?.message ?: "Child workflow cancelled")
+        )
+      }
+    }
+
+    // Create a suspend function that waits for completion
+    val resultProvider: suspend () -> Optional<Payloads> = {
+      if (completed) {
+        if (completionException != null) {
+          throw completionException!!
+        }
+        completionResult!!
+      } else {
+        suspendCancellableCoroutine { cont ->
+          completionCont = cont
+        }
+      }
+    }
+
+    return KChildWorkflowHandleImpl(
+      workflowId = execution.workflowId,
+      firstExecutionRunId = execution.runId,
+      resultClass = resultClass,
+      context = this,
+      dataConverter = dataConverter,
+      resultProvider = resultProvider
+    )
+  }
+
+  /**
+   * Gets a handle to an existing child workflow by workflow ID.
+   *
+   * @param workflowId the child workflow's workflow ID
+   * @param resultClass the expected result class
+   * @return a handle for interacting with the child workflow
+   */
+  fun <T, R> getChildWorkflowHandle(
+    workflowId: String,
+    resultClass: Class<R>
+  ): io.temporal.kotlin.workflow.KChildWorkflowHandle<T, R> {
+    // For existing child workflows, we don't have the result provider
+    // This is a simplified implementation that throws on result()
+    return KChildWorkflowHandleImpl(
+      workflowId = workflowId,
+      firstExecutionRunId = "", // Unknown for existing workflows
+      resultClass = resultClass,
+      context = this,
+      dataConverter = dataConverter,
+      resultProvider = {
+        throw UnsupportedOperationException(
+          "Cannot get result from a handle obtained via getChildWorkflowHandle. " +
+            "Use startChildWorkflow to get a handle that can await results."
+        )
+      }
+    )
   }
 
   // ==================== Async Execution ====================

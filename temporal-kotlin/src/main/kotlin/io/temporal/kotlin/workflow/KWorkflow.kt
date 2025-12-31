@@ -22,21 +22,31 @@
 
 package io.temporal.kotlin.workflow
 
-import io.temporal.activity.ActivityOptions
-import io.temporal.activity.LocalActivityOptions
+import io.temporal.activity.ActivityMethod
 import io.temporal.common.converter.EncodedValues
+import io.temporal.kotlin.activity.KActivityOptions
+import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
-import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
+import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import java.time.Instant
 import java.util.Random
 import java.util.UUID
+import kotlin.reflect.KFunction
+import kotlin.reflect.KFunction1
+import kotlin.reflect.KFunction2
+import kotlin.reflect.KFunction3
+import kotlin.reflect.KFunction4
+import kotlin.reflect.KFunction5
+import kotlin.reflect.KFunction6
+import kotlin.reflect.KFunction7
+import kotlin.reflect.jvm.javaMethod
 import kotlin.time.Duration
 
 /**
@@ -71,6 +81,7 @@ public object KWorkflow {
    * This is set by the workflow runner when executing workflow code.
    */
   @InternalTemporalApi
+  @PublishedApi
   internal val currentContext = ThreadLocal<KotlinWorkflowContext?>()
 
   /**
@@ -235,9 +246,7 @@ public object KWorkflow {
    * ```kotlin
    * val result: String = KWorkflow.executeActivity(
    *   "myActivity",
-   *   options = ActivityOptions {
-   *     setStartToCloseTimeout(Duration.ofMinutes(5))
-   *   },
+   *   options = KActivityOptions(startToCloseTimeout = 5.minutes),
    *   "arg1", 42
    * )
    * ```
@@ -251,7 +260,7 @@ public object KWorkflow {
    */
   public suspend inline fun <reified R> executeActivity(
     activityName: String,
-    options: ActivityOptions,
+    options: KActivityOptions,
     vararg args: Any?
   ): R {
     return executeActivity(activityName, R::class.java, options, *args)
@@ -271,12 +280,154 @@ public object KWorkflow {
   public suspend fun <R> executeActivity(
     activityName: String,
     resultClass: Class<R>,
-    options: ActivityOptions,
+    options: KActivityOptions,
     vararg args: Any?
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeActivity must be called from within workflow code")
-    return context.executeActivityByName(activityName, options, resultClass, *args)
+    return context.executeActivityByName(activityName, options.toJavaOptions(), resultClass, *args)
+  }
+
+  // ==================== Typed Activity Execution (Method Reference) ====================
+
+  /**
+   * Executes an activity using a method reference and waits for the result.
+   *
+   * This provides compile-time type safety for activity arguments and return types.
+   *
+   * Example:
+   * ```kotlin
+   * val result = KWorkflow.executeActivity(
+   *   GreetingActivities::composeGreeting,
+   *   KActivityOptions(startToCloseTimeout = 30.seconds),
+   *   "Hello", "World"
+   * )
+   * ```
+   *
+   * @param T the activity interface type
+   * @param R the return type of the activity
+   * @param activity the activity method reference
+   * @param options the activity options
+   * @return the activity result
+   */
+  public suspend fun <T, R> executeActivity(
+    activity: KFunction1<T, R>,
+    options: KActivityOptions
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes an activity using a method reference with 1 argument.
+   *
+   * @param T the activity interface type
+   * @param A1 the type of the first argument
+   * @param R the return type of the activity
+   * @param activity the activity method reference
+   * @param options the activity options
+   * @param arg1 the first argument
+   * @return the activity result
+   */
+  public suspend fun <T, A1, R> executeActivity(
+    activity: KFunction2<T, A1, R>,
+    options: KActivityOptions,
+    arg1: A1
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes an activity using a method reference with 2 arguments.
+   *
+   * @param T the activity interface type
+   * @param A1 the type of the first argument
+   * @param A2 the type of the second argument
+   * @param R the return type of the activity
+   * @param activity the activity method reference
+   * @param options the activity options
+   * @param arg1 the first argument
+   * @param arg2 the second argument
+   * @return the activity result
+   */
+  public suspend fun <T, A1, A2, R> executeActivity(
+    activity: KFunction3<T, A1, A2, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes an activity using a method reference with 3 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, R> executeActivity(
+    activity: KFunction4<T, A1, A2, A3, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes an activity using a method reference with 4 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, R> executeActivity(
+    activity: KFunction5<T, A1, A2, A3, A4, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes an activity using a method reference with 5 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeActivity(
+    activity: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  /**
+   * Executes an activity using a method reference with 6 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeActivity(
+    activity: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
   }
 
   /**
@@ -352,9 +503,7 @@ public object KWorkflow {
    * ```kotlin
    * val result: String = KWorkflow.executeLocalActivity(
    *   "validateInput",
-   *   options = LocalActivityOptions {
-   *     setStartToCloseTimeout(Duration.ofSeconds(5))
-   *   },
+   *   options = KLocalActivityOptions(startToCloseTimeout = 5.seconds),
    *   inputData
    * )
    * ```
@@ -368,7 +517,7 @@ public object KWorkflow {
    */
   public suspend inline fun <reified R> executeLocalActivity(
     activityName: String,
-    options: LocalActivityOptions,
+    options: KLocalActivityOptions,
     vararg args: Any?
   ): R {
     return executeLocalActivity(activityName, R::class.java, options, *args)
@@ -388,12 +537,125 @@ public object KWorkflow {
   public suspend fun <R> executeLocalActivity(
     activityName: String,
     resultClass: Class<R>,
-    options: LocalActivityOptions,
+    options: KLocalActivityOptions,
     vararg args: Any?
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeLocalActivity must be called from within workflow code")
-    return context.executeLocalActivityByName(activityName, options, resultClass, *args)
+    return context.executeLocalActivityByName(activityName, options.toJavaOptions(), resultClass, *args)
+  }
+
+  // ==================== Typed Local Activity Execution (Method Reference) ====================
+
+  /**
+   * Executes a local activity using a method reference and waits for the result.
+   *
+   * @param T the activity interface type
+   * @param R the return type of the activity
+   * @param activity the activity method reference
+   * @param options the local activity options
+   * @return the activity result
+   */
+  public suspend fun <T, R> executeLocalActivity(
+    activity: KFunction1<T, R>,
+    options: KLocalActivityOptions
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 1 argument.
+   */
+  public suspend fun <T, A1, R> executeLocalActivity(
+    activity: KFunction2<T, A1, R>,
+    options: KLocalActivityOptions,
+    arg1: A1
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 2 arguments.
+   */
+  public suspend fun <T, A1, A2, R> executeLocalActivity(
+    activity: KFunction3<T, A1, A2, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 3 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, R> executeLocalActivity(
+    activity: KFunction4<T, A1, A2, A3, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 4 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, R> executeLocalActivity(
+    activity: KFunction5<T, A1, A2, A3, A4, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 5 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeLocalActivity(
+    activity: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  /**
+   * Executes a local activity using a method reference with 6 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeLocalActivity(
+    activity: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
   }
 
   // ==================== Child Workflow Methods ====================
@@ -408,9 +670,7 @@ public object KWorkflow {
    * ```kotlin
    * val result: String = KWorkflow.executeChildWorkflow(
    *   "ChildWorkflow",
-   *   options = ChildWorkflowOptions {
-   *     setWorkflowId("child-workflow-id")
-   *   },
+   *   options = KChildWorkflowOptions(workflowId = "child-workflow-id"),
    *   "arg1", 42
    * )
    * ```
@@ -424,7 +684,7 @@ public object KWorkflow {
    */
   public suspend inline fun <reified R> executeChildWorkflow(
     workflowType: String,
-    options: ChildWorkflowOptions,
+    options: KChildWorkflowOptions,
     vararg args: Any?
   ): R {
     return executeChildWorkflow(workflowType, R::class.java, options, *args)
@@ -444,12 +704,220 @@ public object KWorkflow {
   public suspend fun <R> executeChildWorkflow(
     workflowType: String,
     resultClass: Class<R>,
-    options: ChildWorkflowOptions,
+    options: KChildWorkflowOptions,
     vararg args: Any?
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeChildWorkflow must be called from within workflow code")
-    return context.executeChildWorkflowByName(workflowType, options, resultClass, *args)
+    return context.executeChildWorkflowByName(workflowType, options.toJavaOptions(), resultClass, *args)
+  }
+
+  // ==================== Typed Child Workflow Execution (Method Reference) ====================
+
+  /**
+   * Executes a child workflow using a method reference and waits for the result.
+   *
+   * Example:
+   * ```kotlin
+   * val result = KWorkflow.executeChildWorkflow(
+   *   ChildWorkflow::processOrder,
+   *   KChildWorkflowOptions(workflowId = "child-123"),
+   *   order
+   * )
+   * ```
+   *
+   * @param T the workflow interface type
+   * @param R the return type of the workflow
+   * @param workflow the workflow method reference
+   * @param options the child workflow options
+   * @return the child workflow result
+   */
+  public suspend fun <T, R> executeChildWorkflow(
+    workflow: KFunction1<T, R>,
+    options: KChildWorkflowOptions
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes a child workflow using a method reference with 1 argument.
+   */
+  public suspend fun <T, A1, R> executeChildWorkflow(
+    workflow: KFunction2<T, A1, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes a child workflow using a method reference with 2 arguments.
+   */
+  public suspend fun <T, A1, A2, R> executeChildWorkflow(
+    workflow: KFunction3<T, A1, A2, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes a child workflow using a method reference with 3 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
+    workflow: KFunction4<T, A1, A2, A3, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes a child workflow using a method reference with 4 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
+    workflow: KFunction5<T, A1, A2, A3, A4, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes a child workflow using a method reference with 5 arguments.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
+    workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  // ==================== Child Workflow Handle Methods ====================
+
+  /**
+   * Starts a child workflow and returns a handle for interaction.
+   *
+   * Use this when you need to signal, query, or cancel the child workflow
+   * while it's running. For simple fire-and-wait cases, prefer
+   * [executeChildWorkflow] instead.
+   *
+   * Example:
+   * ```kotlin
+   * val handle = KWorkflow.startChildWorkflow(
+   *   ChildWorkflow::processOrder,
+   *   KChildWorkflowOptions(workflowId = "child-123"),
+   *   order
+   * )
+   * handle.signal(ChildWorkflow::updatePriority, Priority.HIGH)
+   * val result = handle.result()
+   * ```
+   *
+   * @param T the workflow interface type
+   * @param R the return type of the workflow
+   * @param workflow the workflow method reference
+   * @param options the child workflow options
+   * @return a handle for interacting with the child workflow
+   */
+  public suspend fun <T, R> startChildWorkflow(
+    workflow: KFunction1<T, R>,
+    options: KChildWorkflowOptions
+  ): KChildWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
+    @Suppress("UNCHECKED_CAST")
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>)
+  }
+
+  /**
+   * Starts a child workflow with 1 argument and returns a handle.
+   */
+  public suspend fun <T, A1, R> startChildWorkflow(
+    workflow: KFunction2<T, A1, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1
+  ): KChildWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
+    @Suppress("UNCHECKED_CAST")
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1)
+  }
+
+  /**
+   * Starts a child workflow with 2 arguments and returns a handle.
+   */
+  public suspend fun <T, A1, A2, R> startChildWorkflow(
+    workflow: KFunction3<T, A1, A2, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): KChildWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
+    @Suppress("UNCHECKED_CAST")
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1, arg2)
+  }
+
+  /**
+   * Starts a child workflow with 3 arguments and returns a handle.
+   */
+  public suspend fun <T, A1, A2, A3, R> startChildWorkflow(
+    workflow: KFunction4<T, A1, A2, A3, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): KChildWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
+    @Suppress("UNCHECKED_CAST")
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1, arg2, arg3)
+  }
+
+  /**
+   * Gets a handle to an existing child workflow by workflow ID.
+   *
+   * Use this to interact with a child workflow started earlier in the
+   * same workflow execution.
+   *
+   * @param T the child workflow interface type
+   * @param R the expected result type
+   * @param workflowId the child workflow's workflow ID
+   * @return a handle for interacting with the child workflow
+   */
+  public inline fun <reified T, reified R> getChildWorkflowHandle(
+    workflowId: String
+  ): KChildWorkflowHandle<T, R> {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getChildWorkflowHandle must be called from within workflow code")
+    return context.getChildWorkflowHandle(workflowId, R::class.java)
   }
 
   // ==================== Signal Handler Registration ====================
@@ -631,6 +1099,139 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicQueryHandler must be called from within workflow code")
     context.registerDynamicQueryHandler(handler)
+  }
+
+  // ==================== Update Handler Registration ====================
+
+  // Update handlers in Kotlin workflows should be suspend functions.
+  // This allows them to use KWorkflow.executeActivity, KWorkflow.delay,
+  // and other suspend-based workflow APIs.
+  //
+  // Example using @UpdateMethod annotation:
+  // ```kotlin
+  // @WorkflowInterface
+  // interface MyWorkflow {
+  //   @UpdateMethod
+  //   suspend fun processUpdate(data: String): String
+  //
+  //   @UpdateValidatorMethod(updateName = "processUpdate")
+  //   fun validateUpdate(data: String) // Validators are NOT suspend
+  // }
+  //
+  // class MyWorkflowImpl : MyWorkflow {
+  //   override suspend fun processUpdate(data: String): String {
+  //     // Can call activities, delay, etc. because this is a suspend function
+  //     return KWorkflow.executeActivity(
+  //       Activities::process,
+  //       KActivityOptions(startToCloseTimeout = 30.seconds),
+  //       data
+  //     )
+  //   }
+  //
+  //   override fun validateUpdate(data: String) {
+  //     require(data.isNotEmpty()) { "Data cannot be empty" }
+  //   }
+  // }
+  // ```
+
+  /**
+   * Registers a dynamic update handler for all unhandled updates.
+   *
+   * The dynamic handler is invoked for any update that doesn't have a specific
+   * handler registered via @UpdateMethod annotation. Only one dynamic handler
+   * can be registered per workflow.
+   *
+   * Update handlers should be suspend functions to allow calling activities,
+   * child workflows, and other workflow operations.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerDynamicUpdateHandler { updateName, args ->
+   *   when (updateName) {
+   *     "setConfig" -> {
+   *       val newConfig = args.get(0, Config::class.java)
+   *       // Can call activities since this is a suspend function
+   *       KWorkflow.executeActivity(
+   *         ConfigActivities::validateAndApply,
+   *         KActivityOptions(startToCloseTimeout = 30.seconds),
+   *         newConfig
+   *       )
+   *       config = newConfig
+   *       "Config updated"
+   *     }
+   *     else -> throw IllegalArgumentException("Unknown update: $updateName")
+   *   }
+   * }
+   * ```
+   *
+   * @param handler the suspend function to invoke for unhandled updates
+   * @throws IllegalArgumentException if a dynamic handler is already registered
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerDynamicUpdateHandler(
+    handler: suspend (updateName: String, args: EncodedValues) -> Any?
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerDynamicUpdateHandler must be called from within workflow code")
+    context.registerDynamicUpdateHandler(handler)
+  }
+
+  /**
+   * Registers a dynamic update validator for all unhandled updates.
+   *
+   * The validator is invoked before the update handler to validate inputs.
+   * If the validator throws an exception, the update is rejected.
+   *
+   * @param validator the function to validate update inputs
+   */
+  public fun registerDynamicUpdateValidator(
+    validator: (updateName: String, args: EncodedValues) -> Unit
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerDynamicUpdateValidator must be called from within workflow code")
+    context.registerDynamicUpdateValidator(validator)
+  }
+
+  // ==================== Internal Helper Functions ====================
+
+  /**
+   * Extracts activity name and return type from a KFunction reference.
+   */
+  private fun extractActivityMetadata(activity: KFunction<*>): Pair<String, Class<*>> {
+    val javaMethod = activity.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve activity method reference")
+
+    // Check for @ActivityMethod annotation for custom name
+    val activityMethod = javaMethod.getAnnotation(ActivityMethod::class.java)
+    val activityName = if (activityMethod != null && activityMethod.name.isNotEmpty()) {
+      activityMethod.name
+    } else {
+      // Default to method name with first letter capitalized (Temporal convention)
+      javaMethod.name.replaceFirstChar { it.uppercase() }
+    }
+
+    val returnType = javaMethod.returnType
+    return Pair(activityName, returnType)
+  }
+
+  /**
+   * Extracts workflow type name and return type from a KFunction reference.
+   */
+  private fun extractWorkflowMetadata(workflow: KFunction<*>): Pair<String, Class<*>> {
+    val javaMethod = workflow.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve workflow method reference")
+
+    // Check for @WorkflowMethod annotation for custom name
+    val workflowMethod = javaMethod.getAnnotation(WorkflowMethod::class.java)
+    val workflowType = if (workflowMethod != null && workflowMethod.name.isNotEmpty()) {
+      workflowMethod.name
+    } else {
+      // Default to declaring class simple name (Temporal convention)
+      javaMethod.declaringClass.simpleName
+    }
+
+    val returnType = javaMethod.returnType
+    return Pair(workflowType, returnType)
   }
 }
 
