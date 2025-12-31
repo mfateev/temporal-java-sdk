@@ -61,37 +61,37 @@ import kotlin.time.Duration
  *           Default is false.
  */
 public data class KActivityOptions(
-    val startToCloseTimeout: Duration? = null,
-    val scheduleToCloseTimeout: Duration? = null,
-    val scheduleToStartTimeout: Duration? = null,
-    val heartbeatTimeout: Duration? = null,
-    val taskQueue: String? = null,
-    val retryOptions: KRetryOptions? = null,
-    val cancellationType: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    val disableEagerExecution: Boolean = false
+  val startToCloseTimeout: Duration? = null,
+  val scheduleToCloseTimeout: Duration? = null,
+  val scheduleToStartTimeout: Duration? = null,
+  val heartbeatTimeout: Duration? = null,
+  val taskQueue: String? = null,
+  val retryOptions: KRetryOptions? = null,
+  val cancellationType: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+  val disableEagerExecution: Boolean = false
 ) {
-    init {
-        require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
-            "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
-        }
+  init {
+    require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
+      "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
     }
+  }
 
-    /**
-     * Converts this [KActivityOptions] to the Java SDK [ActivityOptions].
-     *
-     * This conversion happens once when the activity is scheduled,
-     * so there's no runtime overhead during workflow execution.
-     */
-    public fun toJavaOptions(): ActivityOptions {
-        return ActivityOptions.newBuilder().apply {
-            startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
-            scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
-            scheduleToStartTimeout?.let { setScheduleToStartTimeout(it.toJava()) }
-            heartbeatTimeout?.let { setHeartbeatTimeout(it.toJava()) }
-            taskQueue?.let { setTaskQueue(it) }
-            retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-            setCancellationType(cancellationType)
-            setDisableEagerExecution(disableEagerExecution)
-        }.build()
-    }
+  /**
+   * Converts this [KActivityOptions] to the Java SDK [ActivityOptions].
+   *
+   * This conversion happens once when the activity is scheduled,
+   * so there's no runtime overhead during workflow execution.
+   */
+  public fun toJavaOptions(): ActivityOptions {
+    return ActivityOptions.newBuilder().apply {
+      startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
+      scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
+      scheduleToStartTimeout?.let { setScheduleToStartTimeout(it.toJava()) }
+      heartbeatTimeout?.let { setHeartbeatTimeout(it.toJava()) }
+      taskQueue?.let { setTaskQueue(it) }
+      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
+      setCancellationType(cancellationType)
+      setDisableEagerExecution(disableEagerExecution)
+    }.build()
+  }
 }

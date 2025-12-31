@@ -55,29 +55,29 @@ import kotlin.time.Duration.Companion.seconds
  * @property doNotRetry List of exception type names that should not be retried.
  */
 public data class KRetryOptions(
-    val initialInterval: Duration = 1.seconds,
-    val backoffCoefficient: Double = 2.0,
-    val maximumInterval: Duration? = null,
-    val maximumAttempts: Int = 0,
-    val doNotRetry: List<String> = emptyList()
+  val initialInterval: Duration = 1.seconds,
+  val backoffCoefficient: Double = 2.0,
+  val maximumInterval: Duration? = null,
+  val maximumAttempts: Int = 0,
+  val doNotRetry: List<String> = emptyList()
 ) {
-    /**
-     * Converts this [KRetryOptions] to the Java SDK [RetryOptions].
-     *
-     * This conversion happens once when the activity/workflow is scheduled,
-     * so there's no runtime overhead during workflow execution.
-     */
-    public fun toJavaOptions(): RetryOptions {
-        return RetryOptions.newBuilder().apply {
-            setInitialInterval(initialInterval.toJava())
-            setBackoffCoefficient(backoffCoefficient)
-            maximumInterval?.let { setMaximumInterval(it.toJava()) }
-            if (maximumAttempts > 0) {
-                setMaximumAttempts(maximumAttempts)
-            }
-            if (doNotRetry.isNotEmpty()) {
-                setDoNotRetry(*doNotRetry.toTypedArray())
-            }
-        }.build()
-    }
+  /**
+   * Converts this [KRetryOptions] to the Java SDK [RetryOptions].
+   *
+   * This conversion happens once when the activity/workflow is scheduled,
+   * so there's no runtime overhead during workflow execution.
+   */
+  public fun toJavaOptions(): RetryOptions {
+    return RetryOptions.newBuilder().apply {
+      setInitialInterval(initialInterval.toJava())
+      setBackoffCoefficient(backoffCoefficient)
+      maximumInterval?.let { setMaximumInterval(it.toJava()) }
+      if (maximumAttempts > 0) {
+        setMaximumAttempts(maximumAttempts)
+      }
+      if (doNotRetry.isNotEmpty()) {
+        setDoNotRetry(*doNotRetry.toTypedArray())
+      }
+    }.build()
+  }
 }

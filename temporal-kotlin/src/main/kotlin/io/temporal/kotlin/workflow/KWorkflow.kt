@@ -1192,6 +1192,193 @@ public object KWorkflow {
     context.registerDynamicUpdateValidator(validator)
   }
 
+  // ==================== Continue-As-New ====================
+
+  /**
+   * Continues the workflow execution as a new run with the same workflow type.
+   *
+   * Continue-as-new completes the current workflow execution and immediately starts
+   * a new execution with fresh event history. This is useful for:
+   *
+   * - **Preventing history growth**: Long-running workflows accumulate event history.
+   *   Continue-as-new resets the history, preventing performance degradation.
+   * - **Periodic processing**: Workflows that process batches can continue-as-new
+   *   after each batch to maintain a clean state.
+   * - **Implementing loops**: Instead of infinite loops, use continue-as-new to
+   *   implement recurring behavior without history buildup.
+   *
+   * **Important**: This function never returns normally. It terminates the current
+   * workflow execution and signals the Temporal runtime to start a new execution.
+   *
+   * Example - Batch processing workflow:
+   * ```kotlin
+   * @WorkflowInterface
+   * interface BatchProcessor {
+   *   @WorkflowMethod
+   *   suspend fun processBatches(startOffset: Int)
+   * }
+   *
+   * class BatchProcessorImpl : BatchProcessor {
+   *   override suspend fun processBatches(startOffset: Int) {
+   *     val batchSize = 100
+   *     val items = KWorkflow.executeActivity(
+   *       DataActivities::fetchBatch,
+   *       KActivityOptions(startToCloseTimeout = 1.minutes),
+   *       startOffset, batchSize
+   *     )
+   *
+   *     if (items.isEmpty()) {
+   *       return // All done, workflow completes normally
+   *     }
+   *
+   *     // Process items...
+   *     for (item in items) {
+   *       KWorkflow.executeActivity(
+   *         DataActivities::processItem,
+   *         KActivityOptions(startToCloseTimeout = 30.seconds),
+   *         item
+   *       )
+   *     }
+   *
+   *     // Continue with the next batch
+   *     KWorkflow.continueAsNew(startOffset + batchSize)
+   *   }
+   * }
+   * ```
+   *
+   * Example - Long-running workflow with history check:
+   * ```kotlin
+   * override suspend fun execute(state: WorkflowState) {
+   *   while (true) {
+   *     // Check if history is getting too large
+   *     if (KWorkflow.getInfo().isContinueAsNewSuggested) {
+   *       KWorkflow.continueAsNew(state)
+   *     }
+   *
+   *     // Wait for signals and process...
+   *     KWorkflow.awaitCondition { hasNewWork }
+   *     processWork()
+   *   }
+   * }
+   * ```
+   *
+   * @param args Arguments to pass to the new workflow execution
+   */
+  public fun continueAsNew(vararg args: Any?): Nothing {
+    Workflow.continueAsNew(*args)
+    // The above call always throws, but Kotlin needs this for Nothing return type
+    throw IllegalStateException("continueAsNew should have thrown")
+  }
+
+  /**
+   * Continues the workflow execution as a new run with the same workflow type
+   * but with modified options.
+   *
+   * This variant allows you to change execution parameters like task queue,
+   * timeouts, or retry options for the new execution.
+   *
+   * **Important**: This function never returns normally. It terminates the current
+   * workflow execution and signals the Temporal runtime to start a new execution.
+   *
+   * Example - Changing task queue:
+   * ```kotlin
+   * // Move to a different task queue for the next execution
+   * KWorkflow.continueAsNew(
+   *   KContinueAsNewOptions(taskQueue = "high-priority-queue"),
+   *   nextBatchId
+   * )
+   * ```
+   *
+   * Example - Adjusting timeout:
+   * ```kotlin
+   * // Give more time for larger batches
+   * KWorkflow.continueAsNew(
+   *   KContinueAsNewOptions(workflowRunTimeout = 2.hours),
+   *   largeBatchData
+   * )
+   * ```
+   *
+   * @param options Options to override for the new execution. Null values inherit
+   *   from the current execution.
+   * @param args Arguments to pass to the new workflow execution
+   */
+  public fun continueAsNew(options: KContinueAsNewOptions, vararg args: Any?): Nothing {
+    Workflow.continueAsNew(options.toJavaOptions(), *args)
+    // The above call always throws, but Kotlin needs this for Nothing return type
+    throw IllegalStateException("continueAsNew should have thrown")
+  }
+
+  /**
+   * Continues as a different workflow type with specified options.
+   *
+   * This variant allows you to continue as a completely different workflow type,
+   * which is useful for:
+   * - **Workflow versioning**: Migrating to a new workflow implementation
+   * - **Workflow chaining**: Transitioning to a different processing phase
+   *
+   * **Important**: This function never returns normally. It terminates the current
+   * workflow execution and signals the Temporal runtime to start a new execution.
+   *
+   * Example - Version migration:
+   * ```kotlin
+   * // Continue as new version of the workflow
+   * KWorkflow.continueAsNew(
+   *   "OrderProcessorV2",
+   *   KContinueAsNewOptions(taskQueue = "orders-v2"),
+   *   orderId, migratedState
+   * )
+   * ```
+   *
+   * @param workflowType The workflow type name for the new execution
+   * @param options Options to override for the new execution. Null values inherit
+   *   from the current execution.
+   * @param args Arguments to pass to the new workflow execution
+   */
+  public fun continueAsNew(
+    workflowType: String,
+    options: KContinueAsNewOptions,
+    vararg args: Any?
+  ): Nothing {
+    Workflow.continueAsNew(workflowType, options.toJavaOptions(), *args)
+    // The above call always throws, but Kotlin needs this for Nothing return type
+    throw IllegalStateException("continueAsNew should have thrown")
+  }
+
+  /**
+   * Continues as a different workflow type using a method reference.
+   *
+   * This provides compile-time type safety when continuing as a different
+   * workflow type.
+   *
+   * **Important**: This function never returns normally. It terminates the current
+   * workflow execution and signals the Temporal runtime to start a new execution.
+   *
+   * Example:
+   * ```kotlin
+   * // Type-safe continue as different workflow
+   * KWorkflow.continueAsNew(
+   *   OrderProcessorV2::process,
+   *   KContinueAsNewOptions(),
+   *   orderId, updatedState
+   * )
+   * ```
+   *
+   * @param T the workflow interface type
+   * @param workflow the workflow method reference
+   * @param options Options to override for the new execution
+   * @param args Arguments to pass to the new workflow execution
+   */
+  public fun <T> continueAsNew(
+    workflow: KFunction<*>,
+    options: KContinueAsNewOptions,
+    vararg args: Any?
+  ): Nothing {
+    val (workflowType, _) = extractWorkflowMetadata(workflow)
+    Workflow.continueAsNew(workflowType, options.toJavaOptions(), *args)
+    // The above call always throws, but Kotlin needs this for Nothing return type
+    throw IllegalStateException("continueAsNew should have thrown")
+  }
+
   // ==================== Internal Helper Functions ====================
 
   /**

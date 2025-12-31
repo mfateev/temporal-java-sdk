@@ -71,53 +71,53 @@ import kotlin.time.Duration
  */
 @Suppress("DEPRECATION")
 public data class KChildWorkflowOptions(
-    val namespace: String? = null,
-    val workflowId: String? = null,
-    val workflowIdReusePolicy: WorkflowIdReusePolicy? = null,
-    val workflowRunTimeout: Duration? = null,
-    val workflowExecutionTimeout: Duration? = null,
-    val workflowTaskTimeout: Duration? = null,
-    val taskQueue: String? = null,
-    val retryOptions: KRetryOptions? = null,
-    val cronSchedule: String? = null,
-    val parentClosePolicy: ParentClosePolicy? = null,
-    val memo: Map<String, Any>? = null,
-    val typedSearchAttributes: SearchAttributes? = null,
-    val contextPropagators: List<ContextPropagator>? = null,
-    val cancellationType: ChildWorkflowCancellationType? = null,
-    @Deprecated("Worker Versioning is now deprecated, please migrate to the Worker Deployment API")
-    val versioningIntent: VersioningIntent? = null,
-    val staticSummary: String? = null,
-    val staticDetails: String? = null,
-    val priority: Priority? = null
+  val namespace: String? = null,
+  val workflowId: String? = null,
+  val workflowIdReusePolicy: WorkflowIdReusePolicy? = null,
+  val workflowRunTimeout: Duration? = null,
+  val workflowExecutionTimeout: Duration? = null,
+  val workflowTaskTimeout: Duration? = null,
+  val taskQueue: String? = null,
+  val retryOptions: KRetryOptions? = null,
+  val cronSchedule: String? = null,
+  val parentClosePolicy: ParentClosePolicy? = null,
+  val memo: Map<String, Any>? = null,
+  val typedSearchAttributes: SearchAttributes? = null,
+  val contextPropagators: List<ContextPropagator>? = null,
+  val cancellationType: ChildWorkflowCancellationType? = null,
+  @Deprecated("Worker Versioning is now deprecated, please migrate to the Worker Deployment API")
+  val versioningIntent: VersioningIntent? = null,
+  val staticSummary: String? = null,
+  val staticDetails: String? = null,
+  val priority: Priority? = null
 ) {
-    /**
-     * Converts this [KChildWorkflowOptions] to the Java SDK [ChildWorkflowOptions].
-     *
-     * This conversion happens once when the child workflow is scheduled,
-     * so there's no runtime overhead during workflow execution.
-     */
-    public fun toJavaOptions(): ChildWorkflowOptions {
-        return ChildWorkflowOptions.newBuilder().apply {
-            namespace?.let { setNamespace(it) }
-            workflowId?.let { setWorkflowId(it) }
-            workflowIdReusePolicy?.let { setWorkflowIdReusePolicy(it) }
-            workflowRunTimeout?.let { setWorkflowRunTimeout(it.toJava()) }
-            workflowExecutionTimeout?.let { setWorkflowExecutionTimeout(it.toJava()) }
-            workflowTaskTimeout?.let { setWorkflowTaskTimeout(it.toJava()) }
-            taskQueue?.let { setTaskQueue(it) }
-            retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-            cronSchedule?.let { setCronSchedule(it) }
-            parentClosePolicy?.let { setParentClosePolicy(it) }
-            memo?.let { setMemo(it) }
-            typedSearchAttributes?.let { setTypedSearchAttributes(it) }
-            contextPropagators?.let { setContextPropagators(it) }
-            cancellationType?.let { setCancellationType(it) }
-            @Suppress("DEPRECATION")
-            versioningIntent?.let { setVersioningIntent(it) }
-            staticSummary?.let { setStaticSummary(it) }
-            staticDetails?.let { setStaticDetails(it) }
-            priority?.let { setPriority(it) }
-        }.build()
-    }
+  /**
+   * Converts this [KChildWorkflowOptions] to the Java SDK [ChildWorkflowOptions].
+   *
+   * This conversion happens once when the child workflow is scheduled,
+   * so there's no runtime overhead during workflow execution.
+   */
+  public fun toJavaOptions(): ChildWorkflowOptions {
+    return ChildWorkflowOptions.newBuilder().apply {
+      namespace?.let { setNamespace(it) }
+      workflowId?.let { setWorkflowId(it) }
+      workflowIdReusePolicy?.let { setWorkflowIdReusePolicy(it) }
+      workflowRunTimeout?.let { setWorkflowRunTimeout(it.toJava()) }
+      workflowExecutionTimeout?.let { setWorkflowExecutionTimeout(it.toJava()) }
+      workflowTaskTimeout?.let { setWorkflowTaskTimeout(it.toJava()) }
+      taskQueue?.let { setTaskQueue(it) }
+      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
+      cronSchedule?.let { setCronSchedule(it) }
+      parentClosePolicy?.let { setParentClosePolicy(it) }
+      memo?.let { setMemo(it) }
+      typedSearchAttributes?.let { setTypedSearchAttributes(it) }
+      contextPropagators?.let { setContextPropagators(it) }
+      cancellationType?.let { setCancellationType(it) }
+      @Suppress("DEPRECATION")
+      versioningIntent?.let { setVersioningIntent(it) }
+      staticSummary?.let { setStaticSummary(it) }
+      staticDetails?.let { setStaticDetails(it) }
+      priority?.let { setPriority(it) }
+    }.build()
+  }
 }

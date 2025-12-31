@@ -55,29 +55,29 @@ import kotlin.time.Duration
  * @property retryOptions Retry policy for the Local Activity.
  */
 public data class KLocalActivityOptions(
-    val startToCloseTimeout: Duration? = null,
-    val scheduleToCloseTimeout: Duration? = null,
-    val localRetryThreshold: Duration? = null,
-    val retryOptions: KRetryOptions? = null
+  val startToCloseTimeout: Duration? = null,
+  val scheduleToCloseTimeout: Duration? = null,
+  val localRetryThreshold: Duration? = null,
+  val retryOptions: KRetryOptions? = null
 ) {
-    init {
-        require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
-            "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
-        }
+  init {
+    require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
+      "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
     }
+  }
 
-    /**
-     * Converts this [KLocalActivityOptions] to the Java SDK [LocalActivityOptions].
-     *
-     * This conversion happens once when the local activity is scheduled,
-     * so there's no runtime overhead during workflow execution.
-     */
-    public fun toJavaOptions(): LocalActivityOptions {
-        return LocalActivityOptions.newBuilder().apply {
-            startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
-            scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
-            localRetryThreshold?.let { setLocalRetryThreshold(it.toJava()) }
-            retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-        }.build()
-    }
+  /**
+   * Converts this [KLocalActivityOptions] to the Java SDK [LocalActivityOptions].
+   *
+   * This conversion happens once when the local activity is scheduled,
+   * so there's no runtime overhead during workflow execution.
+   */
+  public fun toJavaOptions(): LocalActivityOptions {
+    return LocalActivityOptions.newBuilder().apply {
+      startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
+      scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
+      localRetryThreshold?.let { setLocalRetryThreshold(it.toJava()) }
+      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
+    }.build()
+  }
 }
