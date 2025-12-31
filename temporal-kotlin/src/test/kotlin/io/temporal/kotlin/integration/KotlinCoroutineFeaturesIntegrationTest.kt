@@ -36,6 +36,7 @@ import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
+import kotlinx.coroutines.awaitAll
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -701,10 +702,247 @@ class KotlinCoroutineFeaturesIntegrationTest {
     assertEquals("Workflow completed with 3 messages", result)
   }
 
-  // Note: Tests for condition notification after activity/timer/child workflow completions
-  // would require true parallel coroutine support within workflows. The current SDK uses
-  // deferred handles that only execute when await() is called, making such tests impossible.
-  // The existing signal-based condition tests (workflow can register and handle signals)
-  // verify that the dispatcher correctly notifies condition waiters after any task completion,
-  // since signal handlers also go through the dispatcher's task processing.
+  // ==================== Async Workflow Tests ====================
+
+  /**
+   * Workflow demonstrating eager async execution with parallel activities.
+   */
+  @WorkflowInterface
+  interface AsyncParallelActivitiesWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): Int
+  }
+
+  class AsyncParallelActivitiesWorkflowImpl : AsyncParallelActivitiesWorkflow {
+    override suspend fun execute(): Int {
+      val options = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(10))
+        .build()
+
+      // Start activities in parallel using KWorkflow.async (eager execution)
+      val handle1 = KWorkflow.async {
+        KWorkflow.executeActivity<Int>("Add", options, 10, 20)
+      }
+      val handle2 = KWorkflow.async {
+        KWorkflow.executeActivity<Int>("Add", options, 5, 15)
+      }
+      val handle3 = KWorkflow.async {
+        KWorkflow.executeActivity<Int>("Add", options, 100, 200)
+      }
+
+      // All three activities are now running in parallel
+      // Await results
+      val result1 = handle1.await()
+      val result2 = handle2.await()
+      val result3 = handle3.await()
+
+      return result1 + result2 + result3 // 30 + 20 + 300 = 350
+    }
+  }
+
+  /**
+   * Workflow demonstrating async with condition waiting on isCompleted.
+   */
+  @WorkflowInterface
+  interface AsyncConditionWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+  }
+
+  class AsyncConditionWorkflowImpl : AsyncConditionWorkflow {
+    override suspend fun execute(): String {
+      val options = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(10))
+        .build()
+
+      var activityResult: String? = null
+
+      // Start activity asynchronously (eager)
+      val handle = KWorkflow.async {
+        activityResult = KWorkflow.executeActivity<String>("Greet", options, "AsyncWorld")
+        activityResult!!
+      }
+
+      // Wait for condition - works because isCompleted updates when coroutine finishes
+      KWorkflow.condition { handle.isCompleted }
+
+      return "Got: $activityResult"
+    }
+  }
+
+  /**
+   * Workflow demonstrating mixed async and sequential execution.
+   */
+  @WorkflowInterface
+  interface AsyncMixedExecutionWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+  }
+
+  class AsyncMixedExecutionWorkflowImpl : AsyncMixedExecutionWorkflow {
+    override suspend fun execute(): String {
+      val options = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(10))
+        .build()
+
+      // Start slow activity in background using async
+      val backgroundTask = KWorkflow.async {
+        KWorkflow.executeActivity<String>("SlowOperation", options, 100L)
+      }
+
+      // Do quick work while background task runs
+      val quickResult = KWorkflow.executeActivity<String>("Greet", options, "Quick")
+
+      // Now wait for background task
+      val slowResult = backgroundTask.await()
+
+      return "$quickResult + $slowResult"
+    }
+  }
+
+  /**
+   * Workflow demonstrating async error handling.
+   */
+  @WorkflowInterface
+  interface AsyncErrorHandlingWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+  }
+
+  class AsyncErrorHandlingWorkflowImpl : AsyncErrorHandlingWorkflow {
+    override suspend fun execute(): String {
+      val options = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(10))
+        .build()
+
+      // Start two async operations
+      val successHandle = KWorkflow.async {
+        KWorkflow.executeActivity<String>("Greet", options, "Success")
+      }
+
+      // Check isCompleted and isCancelled before waiting
+      val wasCompletedImmediately = successHandle.isCompleted
+
+      // Wait for result
+      val result = successHandle.await()
+
+      return if (!wasCompletedImmediately) {
+        "Async completed: $result"
+      } else {
+        "Unexpectedly completed immediately: $result"
+      }
+    }
+  }
+
+  // ==================== Async Tests ====================
+
+  @Test
+  fun `async enables parallel activity execution`() {
+    setupKotlinWorkflows(AsyncParallelActivitiesWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AsyncParallelActivitiesWorkflow", options)
+    stub.start()
+    val result = stub.getResult(Int::class.java)
+
+    assertEquals(350, result) // 30 + 20 + 300
+  }
+
+  /**
+   * Workflow demonstrating awaitAll for multiple deferred values.
+   */
+  @WorkflowInterface
+  interface AwaitAllWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): Int
+  }
+
+  class AwaitAllWorkflowImpl : AwaitAllWorkflow {
+    override suspend fun execute(): Int {
+      val options = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(10))
+        .build()
+
+      // Start activities in parallel
+      val handles = listOf(
+        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) },
+        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) },
+        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
+      )
+
+      // Await all using extension function
+      val results = handles.awaitAll()
+
+      return results.sum() // 30 + 20 + 300 = 350
+    }
+  }
+
+  @Test
+  fun `awaitAll waits for all deferreds`() {
+    setupKotlinWorkflows(AwaitAllWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AwaitAllWorkflow", options)
+    stub.start()
+    val result = stub.getResult(Int::class.java)
+
+    assertEquals(350, result)
+  }
+
+  @Test
+  fun `async works with condition waiting on isCompleted`() {
+    setupKotlinWorkflows(AsyncConditionWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AsyncConditionWorkflow", options)
+    stub.start()
+    val result = stub.getResult(String::class.java)
+
+    assertEquals("Got: Hello, AsyncWorld!", result)
+  }
+
+  @Test
+  fun `async supports mixed execution with background tasks`() {
+    setupKotlinWorkflows(AsyncMixedExecutionWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AsyncMixedExecutionWorkflow", options)
+    stub.start()
+    val result = stub.getResult(String::class.java)
+
+    assertEquals("Hello, Quick! + completed after 100ms", result)
+  }
+
+  @Test
+  fun `async deferred tracks completion state correctly`() {
+    setupKotlinWorkflows(AsyncErrorHandlingWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("AsyncErrorHandlingWorkflow", options)
+    stub.start()
+    val result = stub.getResult(String::class.java)
+
+    // The async should not complete immediately (activity needs to run)
+    assertEquals("Async completed: Hello, Success!", result)
+  }
 }

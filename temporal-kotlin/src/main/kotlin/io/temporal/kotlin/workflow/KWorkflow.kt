@@ -32,6 +32,7 @@ import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
 import java.util.Random
@@ -842,6 +843,44 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicQueryHandler must be called from within workflow code")
     context.registerDynamicQueryHandler(handler)
+  }
+
+  // ==================== Async Execution ====================
+
+  /**
+   * Launches a coroutine in the workflow context and returns immediately.
+   *
+   * The block starts executing immediately (eager execution), following
+   * standard Kotlin coroutines semantics. Returns a [KDeferred] that can
+   * be used to await the result or check completion status.
+   *
+   * This enables true parallel execution within workflows:
+   * ```kotlin
+   * // Start activities in parallel
+   * val handle1 = KWorkflow.async {
+   *   executeActivity<Int>("Add", options, 10, 20)
+   * }
+   * val handle2 = KWorkflow.async {
+   *   executeActivity<Int>("Add", options, 5, 15)
+   * }
+   *
+   * // Both activities are now running in parallel
+   * // Can wait on condition
+   * condition { handle1.isCompleted && handle2.isCompleted }
+   *
+   * // Get results (use kotlinx.coroutines.awaitAll for multiple)
+   * val sum = handle1.await() + handle2.await()
+   * ```
+   *
+   * @param T the result type
+   * @param block the suspend function to execute
+   * @return a [Deferred] representing the pending result
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun <T> async(block: suspend () -> T): Deferred<T> {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.async must be called from within workflow code")
+    return context.async(block)
   }
 }
 

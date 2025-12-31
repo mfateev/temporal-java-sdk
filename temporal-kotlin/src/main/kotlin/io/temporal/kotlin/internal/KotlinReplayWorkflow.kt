@@ -85,6 +85,9 @@ internal class KotlinReplayWorkflow(
       dispatcher!! + SupervisorJob() + exceptionHandler
     )
 
+    // Set coroutine scope reference for async operations
+    this.workflowContext!!.coroutineScope = this.coroutineScope
+
     // Create workflow instance
     val instance = workflowDefinition.createInstance()
     workflowInstance.set(instance)

@@ -45,6 +45,10 @@ import io.temporal.internal.statemachines.StartChildWorkflowExecutionParameters
 import io.temporal.workflow.ChildWorkflowCancellationType
 import io.temporal.workflow.ChildWorkflowOptions
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Duration
 import java.time.Instant
@@ -98,6 +102,13 @@ internal class KotlinWorkflowContext(
    */
   @Volatile
   internal var dispatcher: KotlinCoroutineDispatcher? = null
+
+  /**
+   * Reference to the coroutine scope for launching async coroutines.
+   * Set by KotlinReplayWorkflow after construction.
+   */
+  @Volatile
+  internal var coroutineScope: CoroutineScope? = null
 
   // ==================== Dynamic Handler Storage ====================
 
@@ -756,5 +767,24 @@ internal class KotlinWorkflowContext(
    */
   fun createEncodedValues(payloads: Optional<Payloads>): EncodedValues {
     return EncodedValues(payloads, dataConverter)
+  }
+
+  // ==================== Async Execution ====================
+
+  /**
+   * Launches a coroutine in the workflow context and returns immediately.
+   *
+   * The block starts executing immediately (eager execution).
+   * Returns a [Deferred] that can be used to await the result.
+   *
+   * @param block the suspend function to execute asynchronously
+   * @return a [Deferred] representing the result of the async operation
+   * @throws IllegalStateException if coroutine scope is not initialized
+   */
+  fun <T> async(block: suspend () -> T): Deferred<T> {
+    val scope = coroutineScope
+      ?: throw IllegalStateException("Coroutine scope not initialized")
+
+    return scope.async { block() }
   }
 }
