@@ -32,13 +32,11 @@ import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
 import java.util.Random
 import java.util.UUID
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration
 
 /**
@@ -282,66 +280,6 @@ public object KWorkflow {
   }
 
   /**
-   * Starts an activity asynchronously and returns a handle to await or cancel it.
-   *
-   * Use this for parallel activity execution patterns where you want to
-   * start multiple activities and await them later.
-   *
-   * Example:
-   * ```kotlin
-   * val handle1 = KWorkflow.startActivity<String>(
-   *   "activity1",
-   *   options = activityOptions,
-   *   "arg1"
-   * )
-   * val handle2 = KWorkflow.startActivity<Int>(
-   *   "activity2",
-   *   options = activityOptions,
-   *   42
-   * )
-   *
-   * // Activities run in parallel
-   * val result1 = handle1.await()
-   * val result2 = handle2.await()
-   * ```
-   *
-   * @param R the expected return type of the activity
-   * @param activityName the name of the activity to execute
-   * @param options the activity options
-   * @param args arguments to pass to the activity
-   * @return a handle that can be used to await or cancel the activity
-   */
-  public inline fun <reified R> startActivity(
-    activityName: String,
-    options: ActivityOptions,
-    vararg args: Any?
-  ): KActivityHandle<R> {
-    return startActivity(activityName, R::class.java, options, *args)
-  }
-
-  /**
-   * Starts an activity asynchronously and returns a handle to await or cancel it.
-   *
-   * @param R the expected return type of the activity
-   * @param activityName the name of the activity to execute
-   * @param resultClass the class of the expected result type
-   * @param options the activity options
-   * @param args arguments to pass to the activity
-   * @return a handle that can be used to await or cancel the activity
-   */
-  public fun <R> startActivity(
-    activityName: String,
-    resultClass: Class<R>,
-    options: ActivityOptions,
-    vararg args: Any?
-  ): KActivityHandle<R> {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.startActivity must be called from within workflow code")
-    // For async activity execution, we wrap the suspend function in a handle
-    return DeferredActivityHandle(context, activityName, options, resultClass, args)
-  }
-
-  /**
    * Suspends until the given condition evaluates to true.
    *
    * The condition is evaluated whenever the workflow receives a new event
@@ -458,44 +396,6 @@ public object KWorkflow {
     return context.executeLocalActivityByName(activityName, options, resultClass, *args)
   }
 
-  /**
-   * Starts a local activity asynchronously and returns a handle to await or cancel it.
-   *
-   * @param R the expected return type of the activity
-   * @param activityName the name of the activity to execute
-   * @param options the local activity options
-   * @param args arguments to pass to the activity
-   * @return a handle that can be used to await or cancel the activity
-   */
-  public inline fun <reified R> startLocalActivity(
-    activityName: String,
-    options: LocalActivityOptions,
-    vararg args: Any?
-  ): KActivityHandle<R> {
-    return startLocalActivity(activityName, R::class.java, options, *args)
-  }
-
-  /**
-   * Starts a local activity asynchronously and returns a handle to await or cancel it.
-   *
-   * @param R the expected return type of the activity
-   * @param activityName the name of the activity to execute
-   * @param resultClass the class of the expected result type
-   * @param options the local activity options
-   * @param args arguments to pass to the activity
-   * @return a handle that can be used to await or cancel the activity
-   */
-  public fun <R> startLocalActivity(
-    activityName: String,
-    resultClass: Class<R>,
-    options: LocalActivityOptions,
-    vararg args: Any?
-  ): KActivityHandle<R> {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.startLocalActivity must be called from within workflow code")
-    return DeferredLocalActivityHandle(context, activityName, options, resultClass, args)
-  }
-
   // ==================== Child Workflow Methods ====================
 
   /**
@@ -550,118 +450,6 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeChildWorkflow must be called from within workflow code")
     return context.executeChildWorkflowByName(workflowType, options, resultClass, *args)
-  }
-
-  /**
-   * Starts a child workflow asynchronously and returns a handle to await or cancel it.
-   *
-   * Use this for parallel child workflow execution patterns where you want to
-   * start multiple child workflows and await them later.
-   *
-   * Example:
-   * ```kotlin
-   * val handle1 = KWorkflow.startChildWorkflow<String>(
-   *   "ChildWorkflow1",
-   *   options = childOptions,
-   *   "arg1"
-   * )
-   * val handle2 = KWorkflow.startChildWorkflow<Int>(
-   *   "ChildWorkflow2",
-   *   options = childOptions,
-   *   42
-   * )
-   *
-   * // Child workflows run in parallel
-   * val result1 = handle1.await()
-   * val result2 = handle2.await()
-   * ```
-   *
-   * @param R the expected return type of the child workflow
-   * @param workflowType the type name of the child workflow
-   * @param options the child workflow options
-   * @param args arguments to pass to the child workflow
-   * @return a handle that can be used to await, cancel, or signal the child workflow
-   */
-  public inline fun <reified R> startChildWorkflow(
-    workflowType: String,
-    options: ChildWorkflowOptions,
-    vararg args: Any?
-  ): KChildWorkflowHandle<R> {
-    return startChildWorkflow(workflowType, R::class.java, options, *args)
-  }
-
-  /**
-   * Starts a child workflow asynchronously and returns a handle to await or cancel it.
-   *
-   * @param R the expected return type of the child workflow
-   * @param workflowType the type name of the child workflow
-   * @param resultClass the class of the expected result type
-   * @param options the child workflow options
-   * @param args arguments to pass to the child workflow
-   * @return a handle that can be used to await, cancel, or signal the child workflow
-   */
-  public fun <R> startChildWorkflow(
-    workflowType: String,
-    resultClass: Class<R>,
-    options: ChildWorkflowOptions,
-    vararg args: Any?
-  ): KChildWorkflowHandle<R> {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
-    return DeferredChildWorkflowHandle(context, workflowType, options, resultClass, args)
-  }
-
-  // ==================== Timer/Delay Methods ====================
-
-  /**
-   * Suspends the workflow for the specified duration.
-   *
-   * This is deterministic and will resume at the same point during replay.
-   * Must be used instead of [Thread.sleep] or [kotlinx.coroutines.delay]
-   * to ensure deterministic workflow execution.
-   *
-   * Example:
-   * ```kotlin
-   * // Wait for 5 minutes
-   * KWorkflow.delay(5.minutes)
-   *
-   * // Or with Java duration
-   * KWorkflow.delay(java.time.Duration.ofMinutes(5))
-   * ```
-   *
-   * @param duration the duration to sleep (Kotlin Duration)
-   */
-  public suspend fun delay(duration: Duration) {
-    delay(duration.toJava())
-  }
-
-  /**
-   * Suspends the workflow for the specified duration.
-   *
-   * @param duration the duration to sleep (Java Duration)
-   */
-  public suspend fun delay(duration: java.time.Duration) {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.delay must be called from within workflow code")
-    context.createTimer(duration)
-  }
-
-  /**
-   * Suspends the workflow for the specified number of milliseconds.
-   *
-   * @param millis the number of milliseconds to sleep
-   */
-  public suspend fun delay(millis: Long) {
-    delay(java.time.Duration.ofMillis(millis))
-  }
-
-  /**
-   * Returns the current workflow time in milliseconds.
-   * Uses the context if available, otherwise falls back to Workflow API.
-   */
-  internal fun currentTimeMillisInternal(): Long {
-    val context = currentContext.get()
-    return context?.currentTimeMillis ?: Workflow.currentTimeMillis()
   }
 
   // ==================== Signal Handler Registration ====================
@@ -844,200 +632,45 @@ public object KWorkflow {
       ?: throw IllegalStateException("KWorkflow.registerDynamicQueryHandler must be called from within workflow code")
     context.registerDynamicQueryHandler(handler)
   }
-
-  // ==================== Async Execution ====================
-
-  /**
-   * Launches a coroutine in the workflow context and returns immediately.
-   *
-   * The block starts executing immediately (eager execution), following
-   * standard Kotlin coroutines semantics. Returns a [KDeferred] that can
-   * be used to await the result or check completion status.
-   *
-   * This enables true parallel execution within workflows:
-   * ```kotlin
-   * // Start activities in parallel
-   * val handle1 = KWorkflow.async {
-   *   executeActivity<Int>("Add", options, 10, 20)
-   * }
-   * val handle2 = KWorkflow.async {
-   *   executeActivity<Int>("Add", options, 5, 15)
-   * }
-   *
-   * // Both activities are now running in parallel
-   * // Can wait on condition
-   * condition { handle1.isCompleted && handle2.isCompleted }
-   *
-   * // Get results (use kotlinx.coroutines.awaitAll for multiple)
-   * val sum = handle1.await() + handle2.await()
-   * ```
-   *
-   * @param T the result type
-   * @param block the suspend function to execute
-   * @return a [Deferred] representing the pending result
-   * @throws IllegalStateException if called outside of workflow code
-   */
-  public fun <T> async(block: suspend () -> T): Deferred<T> {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.async must be called from within workflow code")
-    return context.async(block)
-  }
 }
 
 /**
- * Internal implementation of [KActivityHandle] that wraps a [Promise].
+ * Converts this [Promise] to a standard [Deferred].
+ *
+ * This allows Temporal promises to work with all standard kotlinx.coroutines
+ * utilities like [awaitAll], structured concurrency, etc.
+ *
+ * Example:
+ * ```kotlin
+ * coroutineScope {
+ *   val d1 = async { executeActivity<Int>("Op1", options) }
+ *   val d2 = someJavaApi().toDeferred()
+ *   awaitAll(d1, d2)
+ * }
+ * ```
+ *
+ * @return a [Deferred] that completes when this promise completes
  */
-internal class PromiseActivityHandle<R>(
-  private val promise: Promise<R>
-) : KActivityHandle<R> {
-
-  override val isCompleted: Boolean
-    get() = promise.isCompleted
-
-  override suspend fun await(): R = promise.await()
-
-  override fun cancel(reason: String?) {
-    // Note: Promise cancellation in Temporal is handled through CancellationScope
-    // This is a best-effort cancel - the activity may have already completed
-    // Full cancellation support requires wrapping in a CancellationScope
+public fun <R> Promise<R>.toDeferred(): Deferred<R> {
+  val deferred = CompletableDeferred<R>()
+  this.handle { result, exception ->
+    if (exception != null) {
+      deferred.completeExceptionally(exception)
+    } else {
+      deferred.complete(result)
+    }
+    null // Return value required by handle but not used
   }
+  return deferred
 }
 
 /**
  * Suspends until this [Promise] completes and returns the result.
  *
- * This extension function converts the blocking Promise.get() call
- * to a coroutine-friendly suspend function.
- *
- * Note: This is designed to work within Temporal workflow context
- * where the workflow thread handles deterministic execution.
+ * This is a convenience extension that converts the Promise to a Deferred
+ * and awaits it.
  *
  * @return the promise result
  * @throws Exception if the promise completed exceptionally
  */
-public suspend fun <R> Promise<R>.await(): R = suspendCancellableCoroutine { cont ->
-  // Use handle to get both success and failure cases
-  this.handle { result, exception ->
-    if (exception != null) {
-      cont.resumeWithException(exception)
-    } else {
-      cont.resume(result)
-    }
-    null // Return value required by handle but not used
-  }
-}
-
-/**
- * Deferred activity handle that executes the activity when await() is called.
- */
-internal class DeferredActivityHandle<R>(
-  private val context: KotlinWorkflowContext,
-  private val activityName: String,
-  private val options: ActivityOptions,
-  private val resultClass: Class<R>,
-  private val args: Array<out Any?>
-) : KActivityHandle<R> {
-
-  @Volatile
-  private var completed = false
-
-  @Volatile
-  private var result: R? = null
-
-  override val isCompleted: Boolean
-    get() = completed
-
-  override suspend fun await(): R {
-    if (completed) {
-      @Suppress("UNCHECKED_CAST")
-      return result as R
-    }
-    val r = context.executeActivityByName(activityName, options, resultClass, *args)
-    result = r
-    completed = true
-    return r
-  }
-
-  override fun cancel(reason: String?) {
-    // Cancellation not supported for deferred activities
-  }
-}
-
-/**
- * Deferred local activity handle that executes the activity when await() is called.
- */
-internal class DeferredLocalActivityHandle<R>(
-  private val context: KotlinWorkflowContext,
-  private val activityName: String,
-  private val options: LocalActivityOptions,
-  private val resultClass: Class<R>,
-  private val args: Array<out Any?>
-) : KActivityHandle<R> {
-
-  @Volatile
-  private var completed = false
-
-  @Volatile
-  private var result: R? = null
-
-  override val isCompleted: Boolean
-    get() = completed
-
-  override suspend fun await(): R {
-    if (completed) {
-      @Suppress("UNCHECKED_CAST")
-      return result as R
-    }
-    val r = context.executeLocalActivityByName(activityName, options, resultClass, *args)
-    result = r
-    completed = true
-    return r
-  }
-
-  override fun cancel(reason: String?) {
-    // Cancellation not supported for deferred activities
-  }
-}
-
-/**
- * Deferred child workflow handle that executes the child workflow when await() is called.
- */
-internal class DeferredChildWorkflowHandle<R>(
-  private val context: KotlinWorkflowContext,
-  private val workflowType: String,
-  private val options: ChildWorkflowOptions,
-  private val resultClass: Class<R>,
-  private val args: Array<out Any?>
-) : KChildWorkflowHandle<R> {
-
-  @Volatile
-  private var completed = false
-
-  @Volatile
-  private var result: R? = null
-
-  override val isCompleted: Boolean
-    get() = completed
-
-  override suspend fun await(): R {
-    if (completed) {
-      @Suppress("UNCHECKED_CAST")
-      return result as R
-    }
-    val r = context.executeChildWorkflowByName(workflowType, options, resultClass, *args)
-    result = r
-    completed = true
-    return r
-  }
-
-  override suspend fun getExecution(): io.temporal.api.common.v1.WorkflowExecution {
-    // For deferred handles, the workflow starts when await() is called
-    // This is a simplified implementation
-    throw UnsupportedOperationException("getExecution is not supported for deferred child workflows")
-  }
-
-  override fun signal(signalName: String, vararg args: Any?) {
-    // Signaling not supported for deferred child workflows
-    throw UnsupportedOperationException("signal is not supported for deferred child workflows")
-  }
-}
+public suspend fun <R> Promise<R>.await(): R = toDeferred().await()

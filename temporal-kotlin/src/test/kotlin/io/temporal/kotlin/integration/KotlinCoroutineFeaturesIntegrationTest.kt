@@ -36,7 +36,10 @@ import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -120,17 +123,16 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      // Start activities in parallel (activity names are capitalized: add -> Add)
-      val handle1 = KWorkflow.startActivity<Int>("Add", options, 10, 20)
-      val handle2 = KWorkflow.startActivity<Int>("Add", options, 5, 15)
-      val handle3 = KWorkflow.startActivity<Int>("Add", options, 100, 200)
+      // Start activities in parallel using standard coroutines
+      return coroutineScope {
+        val d1 = async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) }
+        val d2 = async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) }
+        val d3 = async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
 
-      // Await all results
-      val result1 = handle1.await()
-      val result2 = handle2.await()
-      val result3 = handle3.await()
-
-      return result1 + result2 + result3 // 30 + 20 + 300 = 350
+        // Await all results using standard awaitAll
+        val results = awaitAll(d1, d2, d3)
+        results.sum() // 30 + 20 + 300 = 350
+      }
     }
   }
 
@@ -200,15 +202,15 @@ class KotlinCoroutineFeaturesIntegrationTest {
     override suspend fun execute(): String {
       val options = ChildWorkflowOptions.newBuilder().build()
 
-      // Start child workflows in parallel
-      val handle1 = KWorkflow.startChildWorkflow<String>("ChildWorkflow", options, "input1")
-      val handle2 = KWorkflow.startChildWorkflow<String>("ChildWorkflow", options, "input2")
+      // Start child workflows in parallel using standard coroutines
+      return coroutineScope {
+        val d1 = async { KWorkflow.executeChildWorkflow<String>("ChildWorkflow", options, "input1") }
+        val d2 = async { KWorkflow.executeChildWorkflow<String>("ChildWorkflow", options, "input2") }
 
-      // Await both
-      val result1 = handle1.await()
-      val result2 = handle2.await()
-
-      return "$result1 | $result2"
+        // Await both using standard awaitAll
+        val (result1, result2) = awaitAll(d1, d2)
+        "$result1 | $result2"
+      }
     }
   }
 
@@ -222,8 +224,8 @@ class KotlinCoroutineFeaturesIntegrationTest {
     override suspend fun execute(): Long {
       val startTime = KWorkflow.currentTimeMillis()
 
-      // Sleep for 100ms (will be fast in test environment)
-      KWorkflow.delay(100)
+      // Sleep for 100ms using standard delay (intercepted via Delay interface)
+      delay(100)
 
       val endTime = KWorkflow.currentTimeMillis()
       return endTime - startTime
@@ -245,8 +247,8 @@ class KotlinCoroutineFeaturesIntegrationTest {
       // Activity names are capitalized: greet -> Greet
       val result1: String = KWorkflow.executeActivity("Greet", options, "Step1")
 
-      // Wait between activities
-      KWorkflow.delay(Duration.ofMillis(50))
+      // Wait between activities using standard delay
+      delay(50)
 
       val result2: String = KWorkflow.executeActivity("Greet", options, "Step2")
 
@@ -719,24 +721,17 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      // Start activities in parallel using KWorkflow.async (eager execution)
-      val handle1 = KWorkflow.async {
-        KWorkflow.executeActivity<Int>("Add", options, 10, 20)
-      }
-      val handle2 = KWorkflow.async {
-        KWorkflow.executeActivity<Int>("Add", options, 5, 15)
-      }
-      val handle3 = KWorkflow.async {
-        KWorkflow.executeActivity<Int>("Add", options, 100, 200)
-      }
+      // Start activities in parallel using standard coroutines
+      return coroutineScope {
+        val d1 = async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) }
+        val d2 = async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) }
+        val d3 = async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
 
-      // All three activities are now running in parallel
-      // Await results
-      val result1 = handle1.await()
-      val result2 = handle2.await()
-      val result3 = handle3.await()
-
-      return result1 + result2 + result3 // 30 + 20 + 300 = 350
+        // All three activities are now running in parallel
+        // Await results using standard awaitAll
+        val results = awaitAll(d1, d2, d3)
+        results.sum() // 30 + 20 + 300 = 350
+      }
     }
   }
 
@@ -755,18 +750,17 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      var activityResult: String? = null
+      // Start activity asynchronously using standard coroutineScope/async
+      return coroutineScope {
+        val deferred = async {
+          KWorkflow.executeActivity<String>("Greet", options, "AsyncWorld")
+        }
 
-      // Start activity asynchronously (eager)
-      val handle = KWorkflow.async {
-        activityResult = KWorkflow.executeActivity<String>("Greet", options, "AsyncWorld")
-        activityResult!!
+        // With standard Deferred, can check isCompleted or just await
+        KWorkflow.condition { deferred.isCompleted }
+
+        "Got: ${deferred.await()}"
       }
-
-      // Wait for condition - works because isCompleted updates when coroutine finishes
-      KWorkflow.condition { handle.isCompleted }
-
-      return "Got: $activityResult"
     }
   }
 
@@ -785,18 +779,20 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      // Start slow activity in background using async
-      val backgroundTask = KWorkflow.async {
-        KWorkflow.executeActivity<String>("SlowOperation", options, 100L)
+      // Start slow activity in background using standard async
+      return coroutineScope {
+        val backgroundTask = async {
+          KWorkflow.executeActivity<String>("SlowOperation", options, 100L)
+        }
+
+        // Do quick work while background task runs
+        val quickResult = KWorkflow.executeActivity<String>("Greet", options, "Quick")
+
+        // Now wait for background task
+        val slowResult = backgroundTask.await()
+
+        "$quickResult + $slowResult"
       }
-
-      // Do quick work while background task runs
-      val quickResult = KWorkflow.executeActivity<String>("Greet", options, "Quick")
-
-      // Now wait for background task
-      val slowResult = backgroundTask.await()
-
-      return "$quickResult + $slowResult"
     }
   }
 
@@ -815,21 +811,23 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      // Start two async operations
-      val successHandle = KWorkflow.async {
-        KWorkflow.executeActivity<String>("Greet", options, "Success")
-      }
+      // Start async operation using standard coroutines
+      return coroutineScope {
+        val successDeferred = async {
+          KWorkflow.executeActivity<String>("Greet", options, "Success")
+        }
 
-      // Check isCompleted and isCancelled before waiting
-      val wasCompletedImmediately = successHandle.isCompleted
+        // Check isCompleted before waiting
+        val wasCompletedImmediately = successDeferred.isCompleted
 
-      // Wait for result
-      val result = successHandle.await()
+        // Wait for result
+        val result = successDeferred.await()
 
-      return if (!wasCompletedImmediately) {
-        "Async completed: $result"
-      } else {
-        "Unexpectedly completed immediately: $result"
+        if (!wasCompletedImmediately) {
+          "Async completed: $result"
+        } else {
+          "Unexpectedly completed immediately: $result"
+        }
       }
     }
   }
@@ -867,17 +865,18 @@ class KotlinCoroutineFeaturesIntegrationTest {
         .setStartToCloseTimeout(Duration.ofSeconds(10))
         .build()
 
-      // Start activities in parallel
-      val handles = listOf(
-        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) },
-        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) },
-        KWorkflow.async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
-      )
+      // Start activities in parallel using standard coroutines
+      return coroutineScope {
+        val deferreds = listOf(
+          async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) },
+          async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) },
+          async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
+        )
 
-      // Await all using extension function
-      val results = handles.awaitAll()
-
-      return results.sum() // 30 + 20 + 300 = 350
+        // Await all using standard awaitAll
+        val results = deferreds.awaitAll()
+        results.sum() // 30 + 20 + 300 = 350
+      }
     }
   }
 

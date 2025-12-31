@@ -1,169 +1,180 @@
-# KWorkflow.async Design Document
+# Kotlin SDK Concurrency Design
 
-## Overview
+## Design Principle
 
-This document describes the design for `KWorkflow.async {}` - a mechanism for eager parallel
-execution of workflow operations following standard Kotlin coroutines patterns.
+**Use idiomatic Kotlin language patterns wherever possible instead of custom APIs.**
 
-## Problem Statement
+The Kotlin SDK should feel natural to Kotlin developers by leveraging standard `kotlinx.coroutines`
+primitives. Custom APIs should only be introduced when Temporal-specific semantics cannot be
+achieved through standard patterns.
 
-The current `startActivity()` / `startChildWorkflow()` methods use **deferred/lazy execution**:
-- Activity doesn't start until `await()` is called
-- `isCompleted` is only true after `await()` completes
-- Cannot use `KWorkflow.condition { handle.isCompleted }` patterns
-- Not idiomatic Kotlin - standard `async {}` is eager
+## Standard Kotlin Patterns to Use
 
-## Solution
+| Pattern | Standard Kotlin | Temporal Integration |
+|---------|-----------------|----------------------|
+| Parallel execution | `coroutineScope { async { ... } }` | Works via deterministic dispatcher |
+| Await multiple | `awaitAll(d1, d2)` | Standard kotlinx.coroutines |
+| Sleep/delay | `delay(duration)` | Intercepted via `Delay` interface |
+| Deferred results | `Deferred<T>` | `Promise<T>.toDeferred()` |
 
-Add `KWorkflow.async` that launches a coroutine in the workflow context and returns a `KDeferred<T>`:
+## Implementation Strategy
 
-```kotlin
-// Usage example
-val handle = KWorkflow.async {
-  executeActivity<String>("Greet", options, "World")
-}
-// Activity is now running
-KWorkflow.condition { handle.isCompleted }  // Works!
-val result = handle.await()
-```
+### 1. Deterministic Delay via Dispatcher
 
-## API Design
-
-### KDeferred Interface
+The `KotlinCoroutineDispatcher` implements the `Delay` interface to intercept standard
+`kotlinx.coroutines.delay()` calls and route them through Temporal's deterministic timer:
 
 ```kotlin
-interface KDeferred<T> {
-  /** Returns true if this deferred has completed (successfully or exceptionally) */
-  val isCompleted: Boolean
-
-  /** Returns true if this deferred was cancelled */
-  val isCancelled: Boolean
-
-  /** Awaits completion and returns the result or throws the exception */
-  suspend fun await(): T
-
-  /** Returns the completion exception, or null if completed successfully or not yet completed */
-  fun getCompletionExceptionOrNull(): Throwable?
+class KotlinCoroutineDispatcher(...) : CoroutineDispatcher(), Delay {
+    override fun scheduleResumeAfterDelay(
+        timeMillis: Long,
+        continuation: CancellableContinuation<Unit>
+    ) {
+        // Schedule Temporal timer instead of Thread.sleep
+        workflowContext.scheduleTimer(timeMillis) {
+            continuation.resume(Unit)
+        }
+    }
 }
 ```
 
-### KWorkflow.async Method
+**Result:** Users write standard `delay(1.seconds)` and it's automatically deterministic.
+
+### 2. Promise to Deferred Conversion
+
+Provide an extension to convert Java SDK `Promise<T>` to standard `Deferred<T>`:
 
 ```kotlin
-object KWorkflow {
-  /**
-   * Launches a coroutine in the workflow context and returns immediately.
-   *
-   * The block starts executing immediately (eager execution).
-   * Returns a KDeferred that can be used to await the result.
-   *
-   * Example:
-   * ```kotlin
-   * val handle = KWorkflow.async {
-   *   executeActivity<String>("Greet", options, "World")
-   * }
-   * // Activity is now running
-   * val result = handle.await()
-   * ```
-   */
-  fun <T> async(block: suspend () -> T): KDeferred<T>
+fun <T> Promise<T>.toDeferred(): Deferred<T>
+```
+
+This allows Java SDK promises to work with all standard coroutine utilities like `awaitAll()`.
+
+### 3. Standard Async for Parallel Execution
+
+Instead of custom `KWorkflow.async` or `startActivity`, use standard coroutines:
+
+```kotlin
+// Parallel execution - standard Kotlin
+coroutineScope {
+    val d1 = async { KWorkflow.executeActivity<Int>("Add", options, 1, 2) }
+    val d2 = async { KWorkflow.executeActivity<Int>("Add", options, 3, 4) }
+    val results = awaitAll(d1, d2)  // Standard kotlinx.coroutines.awaitAll
 }
 ```
 
-## Usage Patterns
+## API Surface
 
-### Parallel Activity Execution
+### Keep (Temporal-specific semantics)
 
-```kotlin
-override suspend fun execute(): String {
-  val options = ActivityOptions.newBuilder()
-    .setStartToCloseTimeout(Duration.ofSeconds(10))
-    .build()
+| API | Reason |
+|-----|--------|
+| `KWorkflow.executeActivity<R>(...)` | Suspend function for activity execution |
+| `KWorkflow.executeLocalActivity<R>(...)` | Suspend function for local activity |
+| `KWorkflow.executeChildWorkflow<R>(...)` | Suspend function for child workflow |
+| `KWorkflow.condition { }` | Temporal-specific blocking pattern |
+| `KWorkflow.getInfo()` | Workflow metadata access |
+| `KWorkflow.getVersion(...)` | Temporal versioning |
+| `KWorkflow.sideEffect { }` | Non-deterministic operations |
+| Signal/Query registration | Temporal-specific handlers |
 
-  // Start activities in parallel
-  val handle1 = KWorkflow.async {
-    KWorkflow.executeActivity<Int>("Add", options, 10, 20)
-  }
-  val handle2 = KWorkflow.async {
-    KWorkflow.executeActivity<Int>("Add", options, 5, 15)
-  }
-  val handle3 = KWorkflow.async {
-    KWorkflow.executeActivity<Int>("Add", options, 100, 200)
-  }
+### Remove (redundant with standard Kotlin)
 
-  // All three activities are now running in parallel
-  // Await results
-  val sum = handle1.await() + handle2.await() + handle3.await()
-  return "Sum: $sum"  // Sum: 350
-}
-```
+| API | Replacement |
+|-----|-------------|
+| `KWorkflow.delay(...)` | Standard `delay()` (intercepted) |
+| `KWorkflow.async { }` | Standard `coroutineScope { async { } }` |
+| `KWorkflow.startActivity(...)` | `async { executeActivity(...) }` |
+| `KWorkflow.startLocalActivity(...)` | `async { executeLocalActivity(...) }` |
+| `KWorkflow.startChildWorkflow(...)` | `async { executeChildWorkflow(...) }` |
+| `KActivityHandle<R>` | Standard `Deferred<T>` |
+| `KChildWorkflowHandle<R>` | Standard `Deferred<T>` |
+| `Promise<T>.await()` | `Promise<T>.toDeferred().await()` |
 
-### Condition Waiting on Async Completion
+### Add
 
-```kotlin
-override suspend fun execute(): String {
-  var activityResult: String? = null
+| API | Purpose |
+|-----|---------|
+| `Promise<T>.toDeferred()` | Bridge Java promises to standard Deferred |
+| `Delay` implementation | Intercept standard delay() for determinism |
 
-  // Start activity asynchronously
-  val handle = KWorkflow.async {
-    activityResult = KWorkflow.executeActivity<String>("Greet", options, "World")
-    activityResult
-  }
+## Usage Examples
 
-  // Wait for condition - works because isCompleted updates when coroutine finishes
-  KWorkflow.condition { handle.isCompleted }
-
-  return "Got: $activityResult"
-}
-```
-
-### Mixed Async and Sequential
+### Sequential Execution
 
 ```kotlin
 override suspend fun execute(): String {
-  // Start long-running activity in background
-  val backgroundTask = KWorkflow.async {
-    KWorkflow.executeActivity<String>("SlowOperation", options, 5000)
-  }
-
-  // Do other work while it runs
-  val quickResult = KWorkflow.executeActivity<String>("QuickOperation", options)
-
-  // Now wait for background task
-  val slowResult = backgroundTask.await()
-
-  return "$quickResult + $slowResult"
+    val result1 = KWorkflow.executeActivity<Int>("Add", options, 1, 2)
+    delay(5.seconds)  // Standard Kotlin, deterministic!
+    val result2 = KWorkflow.executeActivity<Int>("Add", options, 3, 4)
+    return "Sum: ${result1 + result2}"
 }
 ```
 
-## Implementation Notes
+### Parallel Execution
 
-### Deterministic Execution
+```kotlin
+override suspend fun execute(): Int {
+    return coroutineScope {
+        val d1 = async { KWorkflow.executeActivity<Int>("Add", options, 10, 20) }
+        val d2 = async { KWorkflow.executeActivity<Int>("Add", options, 5, 15) }
+        val d3 = async { KWorkflow.executeActivity<Int>("Add", options, 100, 200) }
 
-The `async` block executes within the workflow's deterministic dispatcher. This ensures:
-- Replay safety - same execution order during replay
-- No threading issues - all coroutines run on the workflow thread
-- Deadlock detection still works
+        // Standard kotlinx.coroutines.awaitAll
+        val results = awaitAll(d1, d2, d3)
+        results.sum()  // 350
+    }
+}
+```
 
-### Condition Notification
+### Mixed Sequential and Parallel
 
-When a `KDeferred` completes, it triggers the dispatcher's condition notification mechanism,
-allowing any coroutines waiting on `KWorkflow.condition { deferred.isCompleted }` to wake up.
+```kotlin
+override suspend fun execute(): String {
+    // Start long-running task in background
+    val backgroundResult = coroutineScope {
+        val task = async {
+            KWorkflow.executeActivity<String>("SlowOperation", options)
+        }
 
-### Comparison with kotlinx.coroutines.async
+        // Do quick work while slow operation runs
+        val quickResult = KWorkflow.executeActivity<String>("QuickOperation", options)
 
-| Feature | kotlinx.coroutines.async | KWorkflow.async |
-|---------|--------------------------|-----------------|
-| Eager execution | Yes | Yes |
-| Returns | Deferred<T> | KDeferred<T> |
-| isCompleted | Yes | Yes |
-| await() | Yes | Yes |
-| cancel() | Yes | Not yet (future) |
-| CoroutineScope receiver | Yes | No (uses workflow context) |
+        // Wait for background task
+        "$quickResult + ${task.await()}"
+    }
+    return backgroundResult
+}
+```
 
-## Future Work
+### Working with Java SDK Promises
 
-- `awaitAll(vararg deferred)` - wait for multiple deferreds
-- `awaitAny(vararg deferred)` - wait for first completion
-- Cancellation support via `CancellationScope`
-- `supervisorAsync {}` for independent failure handling
+```kotlin
+// When interacting with Java SDK APIs that return Promise
+val javaPromise: Promise<String> = someJavaApi()
+val deferred = javaPromise.toDeferred()
+
+// Now works with all standard coroutine utilities
+coroutineScope {
+    val d1 = async { KWorkflow.executeActivity<Int>("Op1", options) }
+    val d2 = javaPromise.toDeferred()
+    awaitAll(d1, d2)
+}
+```
+
+## Determinism Guarantees
+
+All standard Kotlin coroutine patterns remain deterministic because:
+
+1. **Dispatcher inheritance**: All coroutines inherit the workflow's deterministic dispatcher
+2. **Delay interception**: Standard `delay()` routes through Temporal's timer
+3. **Single-threaded execution**: FIFO queue ensures consistent ordering
+4. **Replay safety**: Same execution order during replay
+
+## Benefits of This Approach
+
+1. **Familiar patterns**: Kotlin developers use patterns they already know
+2. **IDE support**: Full autocomplete and documentation for standard APIs
+3. **Ecosystem compatibility**: Works with existing coroutine libraries and utilities
+4. **Smaller API surface**: Less custom code to learn and maintain
+5. **Future-proof**: Benefits from kotlinx.coroutines improvements automatically
