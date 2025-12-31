@@ -426,7 +426,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
       KWorkflow.registerQueryHandler("getMessages") { -> messages.toList() }
 
       // Wait for approval
-      KWorkflow.condition { approved }
+      KWorkflow.awaitCondition { approved }
 
       return "Workflow completed with ${messages.size} messages"
     }
@@ -466,7 +466,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
       }
 
       // Wait for done signal
-      KWorkflow.condition { done }
+      KWorkflow.awaitCondition { done }
 
       return signalCounts.toMap()
     }
@@ -505,8 +505,8 @@ class KotlinCoroutineFeaturesIntegrationTest {
     private val messages = mutableListOf<String>()
 
     override suspend fun execute(): String {
-      // Wait for approval using condition
-      KWorkflow.condition { approved }
+      // Wait for approval using awaitCondition
+      KWorkflow.awaitCondition { approved }
 
       return "Workflow completed with ${messages.size} messages"
     }
@@ -757,7 +757,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
         }
 
         // With standard Deferred, can check isCompleted or just await
-        KWorkflow.condition { deferred.isCompleted }
+        KWorkflow.awaitCondition { deferred.isCompleted }
 
         "Got: ${deferred.await()}"
       }

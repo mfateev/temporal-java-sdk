@@ -293,13 +293,13 @@ public object KWorkflow {
    * approved = true
    *
    * // In workflow:
-   * KWorkflow.condition { approved }
+   * KWorkflow.awaitCondition { approved }
    * // Continues after approved becomes true
    * ```
    *
    * @param condition the condition to wait for
    */
-  public suspend fun condition(condition: () -> Boolean) {
+  public suspend fun awaitCondition(condition: () -> Boolean) {
     val context = currentContext.get()
     if (context != null) {
       // Use our Kotlin-native condition waiting
@@ -317,8 +317,8 @@ public object KWorkflow {
    * @param condition the condition to wait for
    * @return true if condition was satisfied, false if timeout expired
    */
-  public suspend fun condition(timeout: Duration, condition: () -> Boolean): Boolean {
-    return condition(timeout.toJava(), condition)
+  public suspend fun awaitCondition(timeout: Duration, condition: () -> Boolean): Boolean {
+    return awaitCondition(timeout.toJava(), condition)
   }
 
   /**
@@ -328,7 +328,7 @@ public object KWorkflow {
    * @param condition the condition to wait for
    * @return true if condition was satisfied, false if timeout expired
    */
-  public suspend fun condition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
+  public suspend fun awaitCondition(timeout: java.time.Duration, condition: () -> Boolean): Boolean {
     val context = currentContext.get()
     return if (context != null) {
       // Use our Kotlin-native condition waiting with timeout
@@ -473,7 +473,7 @@ public object KWorkflow {
    *     }
    *
    *     // Wait for approval
-   *     KWorkflow.condition { approved }
+   *     KWorkflow.awaitCondition { approved }
    *     return "Approved!"
    *   }
    * }
