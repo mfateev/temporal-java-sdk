@@ -24,14 +24,14 @@ package io.temporal.kotlin.integration
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
-import io.temporal.activity.ActivityOptions
-import io.temporal.activity.LocalActivityOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DataConverter
+import io.temporal.kotlin.activity.KActivityOptions
+import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.workflow.KChildWorkflowOptions
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.testing.internal.SDKTestWorkflowRule
-import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
@@ -44,7 +44,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * End-to-end integration tests for Kotlin coroutine workflow features.
@@ -97,9 +97,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class ActivityCallingWorkflowImpl : ActivityCallingWorkflow {
     override suspend fun execute(name: String): String {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Note: Activity names are capitalized (greet -> Greet)
       val result: String = KWorkflow.executeActivity(
@@ -119,9 +117,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class ParallelActivitiesWorkflowImpl : ParallelActivitiesWorkflow {
     override suspend fun execute(): Int {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start activities in parallel using standard coroutines
       return coroutineScope {
@@ -144,9 +140,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class LocalActivityWorkflowImpl : LocalActivityWorkflow {
     override suspend fun execute(a: Int, b: Int): Int {
-      val options = LocalActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(5))
-        .build()
+      val options = KLocalActivityOptions(startToCloseTimeout = 5.seconds)
 
       // Activity names are capitalized: add -> Add
       val result: Int = KWorkflow.executeLocalActivity(
@@ -179,8 +173,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class ParentWorkflowImpl : ParentWorkflow {
     override suspend fun execute(input: String): String {
-      val options = ChildWorkflowOptions.newBuilder()
-        .build()
+      val options = KChildWorkflowOptions()
 
       val childResult: String = KWorkflow.executeChildWorkflow(
         "ChildWorkflow",
@@ -200,7 +193,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class ParallelChildWorkflowsWorkflowImpl : ParallelChildWorkflowsWorkflow {
     override suspend fun execute(): String {
-      val options = ChildWorkflowOptions.newBuilder().build()
+      val options = KChildWorkflowOptions()
 
       // Start child workflows in parallel using standard coroutines
       return coroutineScope {
@@ -240,9 +233,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class ActivityWithDelayWorkflowImpl : ActivityWithDelayWorkflow {
     override suspend fun execute(): String {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Activity names are capitalized: greet -> Greet
       val result1: String = KWorkflow.executeActivity("Greet", options, "Step1")
@@ -717,9 +708,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class AsyncParallelActivitiesWorkflowImpl : AsyncParallelActivitiesWorkflow {
     override suspend fun execute(): Int {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start activities in parallel using standard coroutines
       return coroutineScope {
@@ -746,9 +735,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class AsyncConditionWorkflowImpl : AsyncConditionWorkflow {
     override suspend fun execute(): String {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start activity asynchronously using standard coroutineScope/async
       return coroutineScope {
@@ -775,9 +762,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class AsyncMixedExecutionWorkflowImpl : AsyncMixedExecutionWorkflow {
     override suspend fun execute(): String {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start slow activity in background using standard async
       return coroutineScope {
@@ -807,9 +792,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class AsyncErrorHandlingWorkflowImpl : AsyncErrorHandlingWorkflow {
     override suspend fun execute(): String {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start async operation using standard coroutines
       return coroutineScope {
@@ -861,9 +844,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   class AwaitAllWorkflowImpl : AwaitAllWorkflow {
     override suspend fun execute(): Int {
-      val options = ActivityOptions.newBuilder()
-        .setStartToCloseTimeout(Duration.ofSeconds(10))
-        .build()
+      val options = KActivityOptions(startToCloseTimeout = 10.seconds)
 
       // Start activities in parallel using standard coroutines
       return coroutineScope {

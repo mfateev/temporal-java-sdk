@@ -23,6 +23,8 @@ package io.temporal.kotlin.activity
 import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.client.ActivityCompletionClient
+import kotlinx.coroutines.CancellationException
+import kotlin.coroutines.coroutineContext
 
 /**
  * Provides access to Temporal activity APIs from within Kotlin activity code.
@@ -30,9 +32,11 @@ import io.temporal.client.ActivityCompletionClient
  * This object provides Kotlin-friendly wrappers for Temporal activity operations
  * including heartbeating, getting activity info, and accessing the execution context.
  *
- * All methods must be called from within activity code only.
+ * Supports both regular and suspend activities:
+ * - **Regular activities**: Use thread-local context from Java SDK
+ * - **Suspend activities**: Use coroutine context element
  *
- * Example:
+ * Example (regular activity):
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
@@ -49,22 +53,46 @@ import io.temporal.client.ActivityCompletionClient
  *   }
  * }
  * ```
+ *
+ * Example (suspend activity):
+ * ```kotlin
+ * class MySuspendActivityImpl : MySuspendActivity {
+ *   override suspend fun fetchData(url: String): Data {
+ *     val info = KActivity.getInfo()
+ *     println("Fetching in activity ${info.activityId}")
+ *
+ *     // Non-blocking heartbeat in suspend activity
+ *     for (i in 1..10) {
+ *       val chunk = httpClient.get(url).body()
+ *       KActivity.suspendHeartbeat(i)  // Non-blocking
+ *     }
+ *
+ *     return data
+ *   }
+ * }
+ * ```
  */
 public object KActivity {
 
   /**
    * Returns information about the current activity execution.
    *
+   * Works in both regular and suspend activities.
+   *
    * @return the activity information with Kotlin-friendly types
    * @throws IllegalStateException if called outside of activity code
    */
   public fun getInfo(): KActivityInfo {
+    // Try thread-local context (regular activities)
     val context = Activity.getExecutionContext()
     return KActivityInfoImpl(context.info)
   }
 
   /**
-   * Records a heartbeat for the current activity.
+   * Records a heartbeat for the current activity (blocking version).
+   *
+   * Use this in regular (non-suspend) activities. For suspend activities,
+   * use [suspendHeartbeat] instead for non-blocking operation.
    *
    * Heartbeats are used to:
    * 1. Report progress to the Temporal service
@@ -76,6 +104,40 @@ public object KActivity {
    */
   public fun heartbeat(details: Any?) {
     Activity.getExecutionContext().heartbeat(details)
+  }
+
+  /**
+   * Records a heartbeat for the current suspend activity (non-blocking version).
+   *
+   * This suspend function performs the heartbeat on a background dispatcher
+   * to avoid blocking the coroutine. Use this in suspend activities instead
+   * of the regular [heartbeat] function.
+   *
+   * If the activity has been cancelled, this function throws [CancellationException]
+   * which will cancel the coroutine and properly report cancellation to Temporal.
+   *
+   * Example:
+   * ```kotlin
+   * override suspend fun processItems(items: List<Item>): Result {
+   *     for ((index, item) in items.withIndex()) {
+   *         process(item)
+   *         KActivity.suspendHeartbeat(Progress(index, items.size))
+   *     }
+   *     return Result.success()
+   * }
+   * ```
+   *
+   * @param details progress details to record (optional)
+   * @throws CancellationException if the activity has been cancelled
+   * @throws IllegalStateException if called outside of a suspend activity
+   */
+  public suspend fun suspendHeartbeat(details: Any? = null) {
+    val suspendContext = coroutineContext[SuspendActivityContextElement]?.context
+      ?: throw IllegalStateException(
+        "suspendHeartbeat() must be called from within a suspend activity. " +
+          "For regular activities, use heartbeat() instead."
+      )
+    suspendContext.heartbeat(details)
   }
 
   /**

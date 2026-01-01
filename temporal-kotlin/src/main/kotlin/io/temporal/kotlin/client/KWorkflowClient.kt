@@ -37,6 +37,13 @@ import kotlin.reflect.KFunction4
 import kotlin.reflect.KFunction5
 import kotlin.reflect.KFunction6
 import kotlin.reflect.KFunction7
+import kotlin.reflect.KSuspendFunction1
+import kotlin.reflect.KSuspendFunction2
+import kotlin.reflect.KSuspendFunction3
+import kotlin.reflect.KSuspendFunction4
+import kotlin.reflect.KSuspendFunction5
+import kotlin.reflect.KSuspendFunction6
+import kotlin.reflect.KSuspendFunction7
 import kotlin.reflect.jvm.javaMethod
 
 /**
@@ -290,6 +297,135 @@ public class KWorkflowClient(
     arg6: A6
   ): R {
     val handle = startWorkflow(workflow, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    return handle.result()
+  }
+
+  // ========== Suspend Workflow Method Overloads ==========
+  // These overloads support workflow methods defined as suspend functions
+
+  /**
+   * Start a suspend workflow with no arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow0")
+  public suspend fun <T, R> executeWorkflow(
+    workflow: KSuspendFunction1<T, R>,
+    options: KWorkflowOptions
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions())
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with one argument and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow1")
+  public suspend fun <T, A1, R> executeWorkflow(
+    workflow: KSuspendFunction2<T, A1, R>,
+    options: KWorkflowOptions,
+    arg1: A1
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1)
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with two arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow2")
+  public suspend fun <T, A1, A2, R> executeWorkflow(
+    workflow: KSuspendFunction3<T, A1, A2, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2)
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with three arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow3")
+  public suspend fun <T, A1, A2, A3, R> executeWorkflow(
+    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3)
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with four arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow4")
+  public suspend fun <T, A1, A2, A3, A4, R> executeWorkflow(
+    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4)
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with five arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow5")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeWorkflow(
+    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5)
+    return handle.result()
+  }
+
+  /**
+   * Start a suspend workflow with six arguments and wait for its result.
+   */
+  @JvmName("executeSuspendWorkflow6")
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeWorkflow(
+    workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+
+    @Suppress("UNCHECKED_CAST")
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
     return handle.result()
   }
 
