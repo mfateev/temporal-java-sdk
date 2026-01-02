@@ -22,10 +22,17 @@
 
 package io.temporal.kotlin.workflow
 
+import io.temporal.internal.replay.ReplayWorkflowContext
+import io.temporal.kotlin.internal.KUpdateInfo
+import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.workflow.Workflow
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
+import org.mockito.Mockito.mock
 
 /**
  * Unit tests for [KWorkflow].
@@ -38,6 +45,12 @@ import org.junit.Test
  * workflow executions.
  */
 class KWorkflowTest {
+
+  @After
+  fun cleanup() {
+    // Reset the context after each test
+    KWorkflow.currentContext.remove()
+  }
 
   @Test
   fun `DEFAULT_VERSION matches Java SDK constant`() {
@@ -54,6 +67,50 @@ class KWorkflowTest {
   fun `currentContext ThreadLocal is initially null`() {
     // Verify the thread local starts as null
     assertEquals(null, KWorkflow.currentContext.get())
+  }
+
+  // ==================== getCurrentUpdateInfo Tests ====================
+
+  @Test
+  fun `getCurrentUpdateInfo throws when no context is set`() {
+    // Ensure no context is set
+    KWorkflow.currentContext.remove()
+
+    val exception = assertThrows(IllegalStateException::class.java) {
+      KWorkflow.getCurrentUpdateInfo()
+    }
+    assertEquals(
+      "KWorkflow.getCurrentUpdateInfo must be called from within workflow code",
+      exception.message
+    )
+  }
+
+  @Test
+  fun `getCurrentUpdateInfo returns null when not in update handler`() {
+    // Set up a context with mocked ReplayWorkflowContext
+    val mockReplayContext = mock(ReplayWorkflowContext::class.java)
+    val context = KotlinWorkflowContext(mockReplayContext)
+    KWorkflow.currentContext.set(context)
+
+    // When not in an update handler, should return null
+    assertNull(KWorkflow.getCurrentUpdateInfo())
+  }
+
+  @Test
+  fun `getCurrentUpdateInfo returns update info when in update handler`() {
+    // Set up a context with mocked ReplayWorkflowContext
+    val mockReplayContext = mock(ReplayWorkflowContext::class.java)
+    val context = KotlinWorkflowContext(mockReplayContext)
+    KWorkflow.currentContext.set(context)
+
+    // Simulate being in an update handler by setting the update info
+    val updateInfo = KUpdateInfo("myUpdate", "update-id-123")
+    context.currentUpdateInfo.set(updateInfo)
+
+    // Should return the update info
+    val result = KWorkflow.getCurrentUpdateInfo()
+    assertEquals("myUpdate", result?.updateName)
+    assertEquals("update-id-123", result?.updateId)
   }
 
   // Note: The following methods require a workflow execution context and
