@@ -33,9 +33,9 @@ import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
 import io.temporal.workflow.WorkflowMethod
-import org.slf4j.Logger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import org.slf4j.Logger
 import java.time.Instant
 import java.util.Random
 import java.util.UUID

@@ -31,8 +31,8 @@ import kotlin.coroutines.coroutineContext
 /**
  * Provides access to Temporal activity APIs from within Kotlin activity code.
  *
- * This object provides Kotlin-friendly wrappers for Temporal activity operations
- * including heartbeating, getting activity info, and accessing the execution context.
+ * Use [getContext] to obtain a [KActivityContext] for accessing activity APIs.
+ * This matches Java SDK's [Activity.getExecutionContext] pattern.
  *
  * Supports both regular and suspend activities:
  * - **Regular activities**: Use thread-local context from Java SDK
@@ -42,13 +42,14 @@ import kotlin.coroutines.coroutineContext
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val info = KActivity.getInfo()
+ *     val context = KActivity.getContext()
+ *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
  *     // Heartbeat during long operations
  *     for (i in 1..100) {
  *       doWork(i)
- *       KActivity.heartbeat(i)
+ *       context.heartbeat(i)
  *     }
  *
  *     return "done"
@@ -60,13 +61,13 @@ import kotlin.coroutines.coroutineContext
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val info = KActivity.getInfo()
- *     println("Fetching in activity ${info.activityId}")
+ *     val context = KActivity.getContext()
+ *     println("Fetching in activity ${context.info.activityId}")
  *
  *     // Non-blocking heartbeat in suspend activity
  *     for (i in 1..10) {
  *       val chunk = httpClient.get(url).body()
- *       KActivity.suspendHeartbeat(i)  // Non-blocking
+ *       context.suspendHeartbeat(i)  // Non-blocking
  *     }
  *
  *     return data
@@ -75,6 +76,19 @@ import kotlin.coroutines.coroutineContext
  * ```
  */
 public object KActivity {
+
+  /**
+   * Returns the activity execution context for the current activity.
+   *
+   * This is the primary entry point for accessing activity APIs, matching
+   * Java SDK's [Activity.getExecutionContext] pattern.
+   *
+   * @return the activity context with Kotlin-friendly APIs
+   * @throws IllegalStateException if called outside of activity code
+   */
+  public fun getContext(): KActivityContext {
+    return KActivityContextImpl(Activity.getExecutionContext())
+  }
 
   /**
    * Returns information about the current activity execution.

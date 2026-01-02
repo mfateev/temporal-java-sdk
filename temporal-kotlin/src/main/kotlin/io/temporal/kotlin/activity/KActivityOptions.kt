@@ -56,9 +56,9 @@ import kotlin.time.Duration
  *           If not specified, the Activity uses the workflow's task queue.
  * @property retryOptions Retry policy for the Activity.
  * @property cancellationType How the Activity is cancelled when its parent workflow or scope
- *           is cancelled. Default is [ActivityCancellationType.TRY_CANCEL].
+ *           is cancelled. If null, uses Java SDK default (TRY_CANCEL).
  * @property disableEagerExecution When true, disables eager activity execution.
- *           Default is false.
+ *           Default is false (matches Java SDK).
  */
 public data class KActivityOptions(
   val startToCloseTimeout: Duration? = null,
@@ -67,7 +67,7 @@ public data class KActivityOptions(
   val heartbeatTimeout: Duration? = null,
   val taskQueue: String? = null,
   val retryOptions: KRetryOptions? = null,
-  val cancellationType: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+  val cancellationType: ActivityCancellationType? = null,
   val disableEagerExecution: Boolean = false
 ) {
   init {
@@ -90,7 +90,7 @@ public data class KActivityOptions(
       heartbeatTimeout?.let { setHeartbeatTimeout(it.toJava()) }
       taskQueue?.let { setTaskQueue(it) }
       retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-      setCancellationType(cancellationType)
+      cancellationType?.let { setCancellationType(it) }
       setDisableEagerExecution(disableEagerExecution)
     }.build()
   }
