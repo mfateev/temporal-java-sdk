@@ -22,7 +22,11 @@
 
 package io.temporal.kotlin.workflow
 
+import com.uber.m3.tally.Scope
 import io.temporal.activity.ActivityMethod
+import io.temporal.common.SearchAttributeKey
+import io.temporal.common.SearchAttributeUpdate
+import io.temporal.common.SearchAttributes
 import io.temporal.common.converter.EncodedValues
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
@@ -30,6 +34,7 @@ import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
 import io.temporal.workflow.Promise
+import io.temporal.workflow.UpdateInfo
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
 import io.temporal.workflow.WorkflowMethod
@@ -265,6 +270,298 @@ public object KWorkflow {
     } catch (e: Exception) {
       false
     }
+  }
+
+  // ==================== Search Attributes ====================
+
+  /**
+   * Returns the current search attributes as a typed [SearchAttributes] object.
+   *
+   * @return the search attributes (empty if none set)
+   */
+  public fun getTypedSearchAttributes(): SearchAttributes {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getTypedSearchAttributes must be called from within workflow code")
+    return context.getTypedSearchAttributes()
+  }
+
+  /**
+   * Gets a single search attribute value by key.
+   *
+   * @param key the search attribute key
+   * @return the search attribute value, or null if not found
+   */
+  public fun <T> getSearchAttribute(key: SearchAttributeKey<T>): T? {
+    return getTypedSearchAttributes().get(key)
+  }
+
+  /**
+   * Updates search attributes by applying the given updates.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.upsertTypedSearchAttributes(
+   *     SearchAttributeKey.forKeyword("Status").valueSet("Processing"),
+   *     SearchAttributeKey.forLong("Count").valueSet(42L)
+   * )
+   * ```
+   *
+   * @param updates the search attribute updates to apply
+   */
+  public fun upsertTypedSearchAttributes(vararg updates: SearchAttributeUpdate<*>) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.upsertTypedSearchAttributes must be called from within workflow code")
+    context.upsertTypedSearchAttributes(*updates)
+  }
+
+  // ==================== Memo ====================
+
+  /**
+   * Gets a memo value by key.
+   *
+   * @param key the memo key
+   * @param valueClass the expected value class
+   * @return the memo value, or null if not found
+   */
+  public fun <T> getMemo(key: String, valueClass: Class<T>): T? {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getMemo must be called from within workflow code")
+    return context.getMemo(key, valueClass)
+  }
+
+  /**
+   * Gets a memo value by key using reified type.
+   *
+   * @param key the memo key
+   * @return the memo value, or null if not found
+   */
+  public inline fun <reified T> getMemo(key: String): T? {
+    return getMemo(key, T::class.java)
+  }
+
+  /**
+   * Updates workflow memo with the given key-value pairs.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.upsertMemo(mapOf(
+   *     "status" to "processing",
+   *     "count" to 42
+   * ))
+   * ```
+   *
+   * @param memo map of memo key-value pairs to upsert
+   */
+  public fun upsertMemo(memo: Map<String, Any?>) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.upsertMemo must be called from within workflow code")
+    context.upsertMemo(memo)
+  }
+
+  // ==================== Cron/Continue-As-New Support ====================
+
+  /**
+   * Gets the result from the last successful run of this workflow.
+   * Useful for cron workflows or continue-as-new chains.
+   *
+   * @param resultClass the expected result class
+   * @return the last completion result, or null if none
+   */
+  public fun <R> getLastCompletionResult(resultClass: Class<R>): R? {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getLastCompletionResult must be called from within workflow code")
+    return context.getLastCompletionResult(resultClass)
+  }
+
+  /**
+   * Gets the result from the last successful run of this workflow using reified type.
+   *
+   * @return the last completion result, or null if none
+   */
+  public inline fun <reified R> getLastCompletionResult(): R? {
+    return getLastCompletionResult(R::class.java)
+  }
+
+  /**
+   * Gets the failure from the previous run of this workflow, if any.
+   * Useful for cron workflows or continue-as-new chains.
+   *
+   * @return the previous run failure, or null if the previous run succeeded
+   */
+  public fun getPreviousRunFailure(): Exception? {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getPreviousRunFailure must be called from within workflow code")
+    return context.getPreviousRunFailure()
+  }
+
+  // ==================== Replay Detection ====================
+
+  /**
+   * Returns true if the workflow code is being replayed.
+   *
+   * Use this to conditionally skip operations that shouldn't be repeated during replay,
+   * such as logging or external notifications.
+   *
+   * Example:
+   * ```kotlin
+   * if (!KWorkflow.isReplaying()) {
+   *     logger.info("Processing order: $orderId")
+   * }
+   * ```
+   *
+   * @return true if replaying, false otherwise
+   */
+  public fun isReplaying(): Boolean {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.isReplaying must be called from within workflow code")
+    return context.isReplaying
+  }
+
+  // ==================== Metrics ====================
+
+  /**
+   * Returns the metrics scope for this workflow.
+   *
+   * Use this to emit custom metrics from workflow code.
+   *
+   * @return the metrics scope
+   */
+  public fun getMetricsScope(): Scope {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getMetricsScope must be called from within workflow code")
+    return context.getMetricsScope()
+  }
+
+  // ==================== Mutable Side Effect ====================
+
+  /**
+   * Executes a mutable side effect.
+   *
+   * Similar to [sideEffect], but only records a new marker if the value has changed.
+   * The function receives the previous value (if any) and returns the new value.
+   * This is useful for accessing dynamically changing configuration.
+   *
+   * Example:
+   * ```kotlin
+   * val config = KWorkflow.mutableSideEffect("config", Config::class.java) { previous ->
+   *     loadConfigFromDatabase() // Only recorded if different from previous
+   * }
+   * ```
+   *
+   * @param id unique identifier for this mutable side effect
+   * @param resultClass the expected result class
+   * @param func function that takes the previous value and returns the new value
+   * @return the result of the function
+   */
+  public fun <R> mutableSideEffect(
+    id: String,
+    resultClass: Class<R>,
+    func: (R?) -> R
+  ): R {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.mutableSideEffect must be called from within workflow code")
+    return context.mutableSideEffect(id, resultClass, func)
+  }
+
+  /**
+   * Executes a mutable side effect using reified type.
+   *
+   * @param id unique identifier for this mutable side effect
+   * @param func function that takes the previous value and returns the new value
+   * @return the result of the function
+   */
+  public inline fun <reified R> mutableSideEffect(
+    id: String,
+    noinline func: (R?) -> R
+  ): R {
+    return mutableSideEffect(id, R::class.java, func)
+  }
+
+  // ==================== Update Info ====================
+
+  /**
+   * Returns information about the currently executing update, if any.
+   *
+   * This is only available when called from within an update handler.
+   * Returns null if called from the main workflow method or a signal handler.
+   *
+   * Example:
+   * ```kotlin
+   * @UpdateMethod
+   * suspend fun processUpdate(data: String): String {
+   *     val updateInfo = KWorkflow.getCurrentUpdateInfo()
+   *     if (updateInfo != null) {
+   *         logger.info("Processing update: ${updateInfo.updateId}")
+   *     }
+   *     return "processed"
+   * }
+   * ```
+   *
+   * @return the current update info, or null if not in an update handler
+   */
+  public fun getCurrentUpdateInfo(): UpdateInfo? {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getCurrentUpdateInfo must be called from within workflow code")
+    return context.getCurrentUpdateInfo()
+  }
+
+  // ==================== Handler Completion Check ====================
+
+  /**
+   * Returns true if all signal and update handlers have completed.
+   *
+   * This is useful for ensuring graceful completion before continuing-as-new
+   * or completing the workflow. You can use this with [awaitCondition] to
+   * wait for all handlers to finish.
+   *
+   * Example:
+   * ```kotlin
+   * // Before continuing as new, wait for handlers to complete
+   * KWorkflow.awaitCondition { KWorkflow.isEveryHandlerFinished() }
+   * KWorkflow.continueAsNew(newState)
+   * ```
+   *
+   * @return true if all handlers have finished
+   */
+  public fun isEveryHandlerFinished(): Boolean {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.isEveryHandlerFinished must be called from within workflow code")
+    return context.isEveryHandlerFinished()
+  }
+
+  // ==================== Workflow Details ====================
+
+  /**
+   * Sets the current workflow details.
+   *
+   * Details are user-defined strings that provide additional context about
+   * the workflow's current state. They are visible in the Temporal UI and
+   * can be retrieved via the describe workflow API.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.setCurrentDetails("Processing batch 5 of 10")
+   * // ... do work ...
+   * KWorkflow.setCurrentDetails("Waiting for approval")
+   * ```
+   *
+   * @param details the details string to set, or null to clear
+   */
+  public fun setCurrentDetails(details: String?) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.setCurrentDetails must be called from within workflow code")
+    context.setCurrentDetails(details)
+  }
+
+  /**
+   * Gets the current workflow details.
+   *
+   * @return the current details, or null if not set
+   */
+  public fun getCurrentDetails(): String? {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.getCurrentDetails must be called from within workflow code")
+    return context.getCurrentDetails()
   }
 
   /**

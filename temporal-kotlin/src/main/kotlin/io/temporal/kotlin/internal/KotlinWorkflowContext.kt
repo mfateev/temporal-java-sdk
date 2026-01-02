@@ -20,12 +20,14 @@
 
 package io.temporal.kotlin.internal
 
+import com.uber.m3.tally.Scope
 import io.temporal.activity.ActivityCancellationType
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.LocalActivityOptions
 import io.temporal.api.command.v1.ScheduleActivityTaskCommandAttributes
 import io.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes
 import io.temporal.api.common.v1.ActivityType
+import io.temporal.api.common.v1.Memo
 import io.temporal.api.common.v1.Payloads
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.common.v1.WorkflowType
@@ -34,9 +36,12 @@ import io.temporal.api.sdk.v1.UserMetadata
 import io.temporal.api.taskqueue.v1.TaskQueue
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse
 import io.temporal.common.RetryOptions
+import io.temporal.common.SearchAttributeUpdate
+import io.temporal.common.SearchAttributes
 import io.temporal.common.converter.DataConverter
 import io.temporal.common.converter.EncodedValues
 import io.temporal.internal.common.ProtobufTimeUtils
+import io.temporal.internal.common.SearchAttributesUtil
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.statemachines.ExecuteActivityParameters
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters
@@ -44,6 +49,7 @@ import io.temporal.internal.statemachines.LocalActivityCallback
 import io.temporal.internal.statemachines.StartChildWorkflowExecutionParameters
 import io.temporal.workflow.ChildWorkflowCancellationType
 import io.temporal.workflow.ChildWorkflowOptions
+import io.temporal.workflow.UpdateInfo
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +62,8 @@ import java.util.Optional
 import java.util.Random
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -101,6 +109,17 @@ typealias DynamicUpdateHandler = suspend (updateName: String, args: EncodedValue
  * Validators receive both the update name and encoded arguments.
  */
 typealias DynamicUpdateValidator = (updateName: String, args: EncodedValues) -> Unit
+
+/**
+ * Simple implementation of [UpdateInfo] for tracking current update context.
+ */
+internal class KUpdateInfo(
+  private val updateName: String,
+  private val updateId: String
+) : UpdateInfo {
+  override fun getUpdateName(): String = updateName
+  override fun getUpdateId(): String = updateId
+}
 
 @InternalTemporalApi
 @PublishedApi
@@ -158,6 +177,29 @@ internal class KotlinWorkflowContext(
    */
   @Volatile
   internal var dynamicUpdateValidator: DynamicUpdateValidator? = null
+
+  // ==================== Handler Tracking ====================
+
+  /**
+   * Counter for running signal handlers.
+   */
+  internal val runningSignalHandlers = AtomicInteger(0)
+
+  /**
+   * Counter for running update handlers.
+   */
+  internal val runningUpdateHandlers = AtomicInteger(0)
+
+  /**
+   * Current update info (set during update handler execution).
+   */
+  internal val currentUpdateInfo = AtomicReference<UpdateInfo?>(null)
+
+  /**
+   * Current workflow details (user-settable).
+   */
+  @Volatile
+  internal var currentDetails: String? = null
 
   /**
    * Returns the workflow execution info.
@@ -419,6 +461,201 @@ internal class KotlinWorkflowContext(
    */
   fun failWorkflowTask(failure: Throwable) {
     replayContext.failWorkflowTask(failure)
+  }
+
+  // ==================== Search Attributes ====================
+
+  /**
+   * Returns the current search attributes as a typed [SearchAttributes] object.
+   */
+  fun getTypedSearchAttributes(): SearchAttributes {
+    val protoSearchAttributes = replayContext.searchAttributes
+    return SearchAttributesUtil.decodeTyped(protoSearchAttributes)
+  }
+
+  /**
+   * Updates search attributes by applying the given updates.
+   *
+   * @param updates the search attribute updates to apply
+   */
+  fun upsertTypedSearchAttributes(vararg updates: SearchAttributeUpdate<*>) {
+    val protoSearchAttributes = SearchAttributesUtil.encodeTypedUpdates(*updates)
+    replayContext.upsertSearchAttributes(protoSearchAttributes)
+  }
+
+  // ==================== Memo ====================
+
+  /**
+   * Gets a memo value by key.
+   *
+   * @param key the memo key
+   * @param valueClass the expected value class
+   * @return the memo value, or null if not found
+   */
+  fun <T> getMemo(key: String, valueClass: Class<T>): T? {
+    val payload = replayContext.getMemo(key) ?: return null
+    return dataConverter.fromPayload(payload, valueClass, valueClass)
+  }
+
+  /**
+   * Updates workflow memo with the given key-value pairs.
+   *
+   * @param memo map of memo key-value pairs to upsert
+   */
+  fun upsertMemo(memo: Map<String, Any?>) {
+    val memoBuilder = Memo.newBuilder()
+    for ((key, value) in memo) {
+      val payload = if (value != null) {
+        dataConverter.toPayload(value).orElse(null)
+      } else {
+        null
+      }
+      if (payload != null) {
+        memoBuilder.putFields(key, payload)
+      }
+    }
+    replayContext.upsertMemo(memoBuilder.build())
+  }
+
+  // ==================== Cron/Continue-As-New Support ====================
+
+  /**
+   * Gets the result from the last successful run of this workflow.
+   * Useful for cron workflows or continue-as-new chains.
+   *
+   * @param resultClass the expected result class
+   * @return the last completion result, or null if none
+   */
+  fun <R> getLastCompletionResult(resultClass: Class<R>): R? {
+    val payloads = replayContext.lastCompletionResult ?: return null
+    return dataConverter.fromPayloads(0, Optional.of(payloads), resultClass, resultClass)
+  }
+
+  /**
+   * Gets the failure from the previous run of this workflow, if any.
+   * Useful for cron workflows or continue-as-new chains.
+   *
+   * @return the previous run failure, or null if the previous run succeeded
+   */
+  fun getPreviousRunFailure(): Exception? {
+    val failure = replayContext.previousRunFailure ?: return null
+    return RuntimeException(failure.message)
+  }
+
+  // ==================== Replay and Metrics ====================
+
+  /**
+   * Returns the metrics scope for this workflow.
+   */
+  fun getMetricsScope(): Scope {
+    return replayContext.metricsScope
+  }
+
+  // ==================== Update Info ====================
+
+  /**
+   * Returns information about the currently executing update, if any.
+   *
+   * @return the current update info, or null if not in an update handler
+   */
+  fun getCurrentUpdateInfo(): UpdateInfo? {
+    return currentUpdateInfo.get()
+  }
+
+  // ==================== Handler Completion Check ====================
+
+  /**
+   * Returns true if all signal and update handlers have completed.
+   *
+   * This is useful for ensuring graceful completion before continuing-as-new
+   * or completing the workflow.
+   *
+   * @return true if all handlers have finished
+   */
+  fun isEveryHandlerFinished(): Boolean {
+    return runningSignalHandlers.get() == 0 && runningUpdateHandlers.get() == 0
+  }
+
+  // ==================== Workflow Details ====================
+
+  /**
+   * Sets the current workflow details.
+   *
+   * Details are user-defined strings that can be used to provide
+   * additional context about the workflow's current state.
+   *
+   * @param details the details string to set
+   */
+  fun setCurrentDetails(details: String?) {
+    currentDetails = details
+  }
+
+  /**
+   * Gets the current workflow details.
+   *
+   * @return the current details, or null if not set
+   */
+  fun getCurrentDetails(): String? {
+    return currentDetails
+  }
+
+  // ==================== Mutable Side Effect ====================
+
+  /**
+   * Executes a mutable side effect.
+   *
+   * Similar to [sideEffect], but only records a new marker if the value has changed.
+   * The function receives the previous value (if any) and returns the new value.
+   *
+   * @param id unique identifier for this mutable side effect
+   * @param resultClass the expected result class
+   * @param func function that takes the previous value and returns the new value
+   * @return the result of the function
+   */
+  fun <R> mutableSideEffect(
+    id: String,
+    resultClass: Class<R>,
+    func: (R?) -> R
+  ): R {
+    var unserializedResult: R? = null
+    val resultHolder = AtomicReference<Optional<Payloads>>(Optional.empty())
+
+    replayContext.mutableSideEffect(
+      id,
+      null, // userMetadata
+      { storedValue: Optional<Payloads> ->
+        // Deserialize previous value
+        val previousValue: R? = if (storedValue.isPresent) {
+          dataConverter.fromPayloads(0, storedValue, resultClass, resultClass)
+        } else {
+          null
+        }
+        // Execute user function
+        val newValue = func(previousValue)
+        unserializedResult = newValue
+
+        // If value changed, return serialized new value; otherwise empty
+        if (previousValue != newValue) {
+          dataConverter.toPayloads(newValue)
+        } else {
+          Optional.empty()
+        }
+      },
+      { resultPayloads: Optional<Payloads> ->
+        // Callback with the final result
+        resultHolder.set(resultPayloads)
+      }
+    )
+
+    // Return the unserialized result if we have it (optimization)
+    unserializedResult?.let { return it }
+
+    // Otherwise deserialize from the result
+    val resultPayloads = resultHolder.get()
+    if (!resultPayloads.isPresent) {
+      throw IllegalStateException("mutableSideEffect did not produce a result for id=$id")
+    }
+    return dataConverter.fromPayloads(0, resultPayloads, resultClass, resultClass)
   }
 
   // ==================== Higher-Level Activity Methods ====================

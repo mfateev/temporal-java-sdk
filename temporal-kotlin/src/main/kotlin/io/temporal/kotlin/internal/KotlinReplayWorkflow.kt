@@ -181,6 +181,7 @@ internal class KotlinReplayWorkflow(
       // Execute annotation-based signal handler
       dispatcher?.executeImmediately {
         coroutineScope?.launch {
+          ctx.runningSignalHandlers.incrementAndGet()
           try {
             val parameters = signalMethod.parameters
             val args = if (input.isPresent && parameters.size > 1) {
@@ -204,6 +205,8 @@ internal class KotlinReplayWorkflow(
             }
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
+          } finally {
+            ctx.runningSignalHandlers.decrementAndGet()
           }
         }
       }
@@ -215,11 +218,14 @@ internal class KotlinReplayWorkflow(
     if (dynamicHandler != null) {
       dispatcher?.executeImmediately {
         coroutineScope?.launch {
+          ctx.runningSignalHandlers.incrementAndGet()
           try {
             val encodedValues = ctx.createEncodedValues(input)
             dynamicHandler(encodedValues)
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
+          } finally {
+            ctx.runningSignalHandlers.decrementAndGet()
           }
         }
       }
@@ -231,11 +237,14 @@ internal class KotlinReplayWorkflow(
     if (catchAllHandler != null) {
       dispatcher?.executeImmediately {
         coroutineScope?.launch {
+          ctx.runningSignalHandlers.incrementAndGet()
           try {
             val encodedValues = ctx.createEncodedValues(input)
             catchAllHandler(signalName, encodedValues)
           } catch (e: Throwable) {
             workflowContext?.failWorkflowTask(e)
+          } finally {
+            ctx.runningSignalHandlers.decrementAndGet()
           }
         }
       }
@@ -265,9 +274,17 @@ internal class KotlinReplayWorkflow(
       return
     }
 
+    val ctx = workflowContext
+    if (ctx == null) {
+      callbacks.reject(createFailure("Workflow context not initialized"))
+      return
+    }
+
     // Execute update handler in the workflow context
     dispatcher?.executeImmediately {
       coroutineScope?.launch {
+        ctx.runningUpdateHandlers.incrementAndGet()
+        ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
         try {
           val parameters = updateMethod.parameters
           val args = if (input.isPresent && parameters.size > 1) {
@@ -295,6 +312,9 @@ internal class KotlinReplayWorkflow(
           callbacks.complete(resultPayloads, null)
         } catch (e: Throwable) {
           callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
+        } finally {
+          ctx.currentUpdateInfo.set(null)
+          ctx.runningUpdateHandlers.decrementAndGet()
         }
       }
     }
