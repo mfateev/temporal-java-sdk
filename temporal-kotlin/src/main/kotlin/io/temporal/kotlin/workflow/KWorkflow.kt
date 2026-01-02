@@ -33,6 +33,7 @@ import io.temporal.workflow.Promise
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInfo
 import io.temporal.workflow.WorkflowMethod
+import org.slf4j.Logger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import java.time.Instant
@@ -102,6 +103,37 @@ public object KWorkflow {
     // Once we have full Kotlin context integration, we can use our own context
     val javaInfo: WorkflowInfo = Workflow.getInfo()
     return KWorkflowInfoImpl(javaInfo)
+  }
+
+  /**
+   * Returns a logger for the current workflow.
+   *
+   * Uses the workflow type as the logger name.
+   *
+   * @return SLF4J logger for workflow logging
+   */
+  public fun logger(): Logger {
+    return Workflow.getLogger(Workflow.getInfo().workflowType)
+  }
+
+  /**
+   * Returns a logger with the specified name.
+   *
+   * @param name the logger name
+   * @return SLF4J logger for workflow logging
+   */
+  public fun logger(name: String): Logger {
+    return Workflow.getLogger(name)
+  }
+
+  /**
+   * Returns a logger for the specified class.
+   *
+   * @param clazz the class to use as the logger name
+   * @return SLF4J logger for workflow logging
+   */
+  public fun logger(clazz: Class<*>): Logger {
+    return Workflow.getLogger(clazz)
   }
 
   /**

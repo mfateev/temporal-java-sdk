@@ -24,6 +24,8 @@ import io.temporal.activity.Activity
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.client.ActivityCompletionClient
 import kotlinx.coroutines.CancellationException
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -86,6 +88,37 @@ public object KActivity {
     // Try thread-local context (regular activities)
     val context = Activity.getExecutionContext()
     return KActivityInfoImpl(context.info)
+  }
+
+  /**
+   * Returns a logger for the current activity.
+   *
+   * Uses the activity type as the logger name.
+   *
+   * @return SLF4J logger for activity logging
+   */
+  public fun logger(): Logger {
+    return LoggerFactory.getLogger(Activity.getExecutionContext().info.activityType)
+  }
+
+  /**
+   * Returns a logger with the specified name.
+   *
+   * @param name the logger name
+   * @return SLF4J logger for activity logging
+   */
+  public fun logger(name: String): Logger {
+    return LoggerFactory.getLogger(name)
+  }
+
+  /**
+   * Returns a logger for the specified class.
+   *
+   * @param clazz the class to use as the logger name
+   * @return SLF4J logger for activity logging
+   */
+  public fun logger(clazz: Class<*>): Logger {
+    return LoggerFactory.getLogger(clazz)
   }
 
   /**
