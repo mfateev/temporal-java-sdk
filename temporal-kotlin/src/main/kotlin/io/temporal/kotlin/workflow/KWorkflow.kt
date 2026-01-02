@@ -46,6 +46,13 @@ import kotlin.reflect.KFunction4
 import kotlin.reflect.KFunction5
 import kotlin.reflect.KFunction6
 import kotlin.reflect.KFunction7
+import kotlin.reflect.KSuspendFunction1
+import kotlin.reflect.KSuspendFunction2
+import kotlin.reflect.KSuspendFunction3
+import kotlin.reflect.KSuspendFunction4
+import kotlin.reflect.KSuspendFunction5
+import kotlin.reflect.KSuspendFunction6
+import kotlin.reflect.KSuspendFunction7
 import kotlin.reflect.jvm.javaMethod
 import kotlin.time.Duration
 
@@ -430,6 +437,129 @@ public object KWorkflow {
     return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
   }
 
+  // ==================== Typed Suspend Activity Execution (Method Reference) ====================
+  // These overloads support suspend activity methods (suspend fun in interfaces)
+
+  /**
+   * Executes a suspend activity using a method reference and waits for the result.
+   *
+   * Use this overload when the activity method is declared as a suspend function.
+   *
+   * @param T the activity interface type
+   * @param R the return type of the activity
+   * @param activity the suspend activity method reference
+   * @param options the activity options
+   * @return the activity result
+   */
+  @JvmName("executeSuspendActivity0")
+  public suspend fun <T, R> executeActivity(
+    activity: KSuspendFunction1<T, R>,
+    options: KActivityOptions
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 1 argument.
+   */
+  @JvmName("executeSuspendActivity1")
+  public suspend fun <T, A1, R> executeActivity(
+    activity: KSuspendFunction2<T, A1, R>,
+    options: KActivityOptions,
+    arg1: A1
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 2 arguments.
+   */
+  @JvmName("executeSuspendActivity2")
+  public suspend fun <T, A1, A2, R> executeActivity(
+    activity: KSuspendFunction3<T, A1, A2, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 3 arguments.
+   */
+  @JvmName("executeSuspendActivity3")
+  public suspend fun <T, A1, A2, A3, R> executeActivity(
+    activity: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 4 arguments.
+   */
+  @JvmName("executeSuspendActivity4")
+  public suspend fun <T, A1, A2, A3, A4, R> executeActivity(
+    activity: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 5 arguments.
+   */
+  @JvmName("executeSuspendActivity5")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeActivity(
+    activity: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  /**
+   * Executes a suspend activity using a method reference with 6 arguments.
+   */
+  @JvmName("executeSuspendActivity6")
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeActivity(
+    activity: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+  }
+
   /**
    * Suspends until the given condition evaluates to true.
    *
@@ -658,6 +788,129 @@ public object KWorkflow {
     return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
   }
 
+  // ==================== Typed Suspend Local Activity Execution (Method Reference) ====================
+  // These overloads support suspend local activity methods (suspend fun in interfaces)
+
+  /**
+   * Executes a suspend local activity using a method reference and waits for the result.
+   *
+   * Use this overload when the activity method is declared as a suspend function.
+   *
+   * @param T the activity interface type
+   * @param R the return type of the activity
+   * @param activity the suspend activity method reference
+   * @param options the local activity options
+   * @return the activity result
+   */
+  @JvmName("executeSuspendLocalActivity0")
+  public suspend fun <T, R> executeLocalActivity(
+    activity: KSuspendFunction1<T, R>,
+    options: KLocalActivityOptions
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 1 argument.
+   */
+  @JvmName("executeSuspendLocalActivity1")
+  public suspend fun <T, A1, R> executeLocalActivity(
+    activity: KSuspendFunction2<T, A1, R>,
+    options: KLocalActivityOptions,
+    arg1: A1
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 2 arguments.
+   */
+  @JvmName("executeSuspendLocalActivity2")
+  public suspend fun <T, A1, A2, R> executeLocalActivity(
+    activity: KSuspendFunction3<T, A1, A2, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 3 arguments.
+   */
+  @JvmName("executeSuspendLocalActivity3")
+  public suspend fun <T, A1, A2, A3, R> executeLocalActivity(
+    activity: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 4 arguments.
+   */
+  @JvmName("executeSuspendLocalActivity4")
+  public suspend fun <T, A1, A2, A3, A4, R> executeLocalActivity(
+    activity: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 5 arguments.
+   */
+  @JvmName("executeSuspendLocalActivity5")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeLocalActivity(
+    activity: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  /**
+   * Executes a suspend local activity using a method reference with 6 arguments.
+   */
+  @JvmName("executeSuspendLocalActivity6")
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeLocalActivity(
+    activity: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KLocalActivityOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): R {
+    val (activityName, resultClass) = extractActivityMetadata(activity)
+    @Suppress("UNCHECKED_CAST")
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+  }
+
   // ==================== Child Workflow Methods ====================
 
   /**
@@ -804,6 +1057,110 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+  }
+
+  // ==================== Typed Suspend Child Workflow Execution (Method Reference) ====================
+  // These overloads support suspend child workflow methods (suspend fun in interfaces)
+
+  /**
+   * Executes a suspend child workflow using a method reference and waits for the result.
+   *
+   * Use this overload when the child workflow method is declared as a suspend function.
+   *
+   * @param T the workflow interface type
+   * @param R the return type of the workflow
+   * @param workflow the suspend workflow method reference
+   * @param options the child workflow options
+   * @return the child workflow result
+   */
+  @JvmName("executeSuspendChildWorkflow0")
+  public suspend fun <T, R> executeChildWorkflow(
+    workflow: KSuspendFunction1<T, R>,
+    options: KChildWorkflowOptions
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options)
+  }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 1 argument.
+   */
+  @JvmName("executeSuspendChildWorkflow1")
+  public suspend fun <T, A1, R> executeChildWorkflow(
+    workflow: KSuspendFunction2<T, A1, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1)
+  }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 2 arguments.
+   */
+  @JvmName("executeSuspendChildWorkflow2")
+  public suspend fun <T, A1, A2, R> executeChildWorkflow(
+    workflow: KSuspendFunction3<T, A1, A2, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
+  }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 3 arguments.
+   */
+  @JvmName("executeSuspendChildWorkflow3")
+  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
+    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
+  }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 4 arguments.
+   */
+  @JvmName("executeSuspendChildWorkflow4")
+  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
+    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KChildWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 5 arguments.
+   */
+  @JvmName("executeSuspendChildWorkflow5")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
+    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
     options: KChildWorkflowOptions,
     arg1: A1,
     arg2: A2,

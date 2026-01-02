@@ -199,6 +199,121 @@ public class KWorkflowClient(
     return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
   }
 
+  // ========== Start Suspend Workflow (0-6 args) ==========
+  // These overloads support suspend workflow methods (suspend fun in interfaces)
+
+  /**
+   * Start a suspend workflow with no arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow0")
+  public suspend fun <T, R> startWorkflow(
+    workflow: KSuspendFunction1<T, R>,
+    options: KWorkflowOptions
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions())
+  }
+
+  /**
+   * Start a suspend workflow with one argument and return a handle.
+   */
+  @JvmName("startSuspendWorkflow1")
+  public suspend fun <T, A1, R> startWorkflow(
+    workflow: KSuspendFunction2<T, A1, R>,
+    options: KWorkflowOptions,
+    arg1: A1
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1)
+  }
+
+  /**
+   * Start a suspend workflow with two arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow2")
+  public suspend fun <T, A1, A2, R> startWorkflow(
+    workflow: KSuspendFunction3<T, A1, A2, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2)
+  }
+
+  /**
+   * Start a suspend workflow with three arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow3")
+  public suspend fun <T, A1, A2, A3, R> startWorkflow(
+    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3)
+  }
+
+  /**
+   * Start a suspend workflow with four arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow4")
+  public suspend fun <T, A1, A2, A3, A4, R> startWorkflow(
+    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4)
+  }
+
+  /**
+   * Start a suspend workflow with five arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow5")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> startWorkflow(
+    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5)
+  }
+
+  /**
+   * Start a suspend workflow with six arguments and return a handle.
+   */
+  @JvmName("startSuspendWorkflow6")
+  public suspend fun <T, A1, A2, A3, A4, A5, A6, R> startWorkflow(
+    workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
+  }
+
   // ========== Execute Workflow (0-6 args) ==========
 
   /**
