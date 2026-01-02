@@ -280,22 +280,33 @@ internal class KotlinReplayWorkflow(
       return
     }
 
+    // Deserialize arguments synchronously (needed for validation)
+    val parameters = updateMethod.parameters
+    val args = if (input.isPresent && parameters.size > 1) {
+      val paramTypes = parameters.drop(1).map { param ->
+        val classifier = param.type.classifier
+        when (classifier) {
+          is KClass<*> -> classifier.java
+          is Class<*> -> classifier
+          else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
+        }
+      }
+      deserializeArguments(input.get(), paramTypes)
+    } else {
+      emptyArray()
+    }
+
+    // Accept the update synchronously - this MUST happen during handleUpdate callback
+    // to properly integrate with the update protocol state machine.
+    // No other workflow code can run between validator and update handler.
+    callbacks.accept()
+
     // Execute update handler in the workflow context
     dispatcher?.executeImmediately {
       coroutineScope?.launch {
         ctx.runningUpdateHandlers.incrementAndGet()
         ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
         try {
-          val parameters = updateMethod.parameters
-          val args = if (input.isPresent && parameters.size > 1) {
-            deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
-          } else {
-            emptyArray()
-          }
-
-          // Accept the update (validation passed)
-          callbacks.accept()
-
           // Execute the update
           val result = if (updateMethod.isSuspend) {
             updateMethod.callSuspend(instance, *args)
