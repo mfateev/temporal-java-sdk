@@ -1759,9 +1759,9 @@ public object KWorkflow {
    * @param args Arguments to pass to the new workflow execution
    */
   public fun continueAsNew(vararg args: Any?): Nothing {
-    Workflow.continueAsNew(*args)
-    // The above call always throws, but Kotlin needs this for Nothing return type
-    throw IllegalStateException("continueAsNew should have thrown")
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
+    context.continueAsNew(null, null, *args)
   }
 
   /**
@@ -1797,9 +1797,9 @@ public object KWorkflow {
    * @param args Arguments to pass to the new workflow execution
    */
   public fun continueAsNew(options: KContinueAsNewOptions, vararg args: Any?): Nothing {
-    Workflow.continueAsNew(options.toJavaOptions(), *args)
-    // The above call always throws, but Kotlin needs this for Nothing return type
-    throw IllegalStateException("continueAsNew should have thrown")
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
+    context.continueAsNew(null, options.toJavaOptions(), *args)
   }
 
   /**
@@ -1833,9 +1833,9 @@ public object KWorkflow {
     options: KContinueAsNewOptions,
     vararg args: Any?
   ): Nothing {
-    Workflow.continueAsNew(workflowType, options.toJavaOptions(), *args)
-    // The above call always throws, but Kotlin needs this for Nothing return type
-    throw IllegalStateException("continueAsNew should have thrown")
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
+    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
   }
 
   /**
@@ -1868,9 +1868,9 @@ public object KWorkflow {
     vararg args: Any?
   ): Nothing {
     val (workflowType, _) = extractWorkflowMetadata(workflow)
-    Workflow.continueAsNew(workflowType, options.toJavaOptions(), *args)
-    // The above call always throws, but Kotlin needs this for Nothing return type
-    throw IllegalStateException("continueAsNew should have thrown")
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
+    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
   }
 
   // ==================== Internal Helper Functions ====================

@@ -951,4 +951,74 @@ internal class KotlinWorkflowContext(
 
     return scope.async { block() }
   }
+
+  // ==================== Continue-As-New ====================
+
+  /**
+   * Continues the workflow as a new execution with the given arguments.
+   *
+   * This method sets up the continue-as-new command and throws a
+   * [ContinueAsNewException] to signal the workflow should complete.
+   *
+   * @param workflowType optional workflow type (null uses current type)
+   * @param options optional continue-as-new options
+   * @param args arguments to pass to the new execution
+   * @throws ContinueAsNewException always
+   */
+  fun continueAsNew(
+    workflowType: String?,
+    options: io.temporal.workflow.ContinueAsNewOptions?,
+    vararg args: Any?
+  ): Nothing {
+    val attributes = io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes.newBuilder()
+
+    // Set workflow type (use current if not specified)
+    if (workflowType != null) {
+      attributes.setWorkflowType(WorkflowType.newBuilder().setName(workflowType))
+    }
+
+    // Apply options if provided
+    options?.let { opts ->
+      opts.workflowRunTimeout?.let {
+        attributes.setWorkflowRunTimeout(ProtobufTimeUtils.toProtoDuration(it))
+      }
+      opts.workflowTaskTimeout?.let {
+        attributes.setWorkflowTaskTimeout(ProtobufTimeUtils.toProtoDuration(it))
+      }
+      opts.taskQueue?.takeIf { it.isNotEmpty() }?.let {
+        attributes.setTaskQueue(TaskQueue.newBuilder().setName(it))
+      }
+      opts.retryOptions?.let { retryOpts ->
+        attributes.setRetryPolicy(toRetryPolicy(RetryOptions.newBuilder(retryOpts).validateBuildWithDefaults()))
+      }
+      opts.memo?.takeIf { it.isNotEmpty() }?.let { memo ->
+        attributes.setMemo(
+          io.temporal.api.common.v1.Memo.newBuilder()
+            .putAllFields(
+              memo.mapValues { (_, v) ->
+                dataConverter.toPayload(v).orElse(null)
+              }.filterValues { it != null }
+            )
+        )
+      }
+    }
+
+    // Serialize arguments
+    val input = serializeArgs(*args)
+    input.ifPresent { attributes.setInput(it) }
+
+    // Register continue-as-new with the replay context
+    replayContext.continueAsNewOnCompletion(attributes.build())
+
+    // Throw exception to unwind the coroutine stack
+    throw ContinueAsNewException("Workflow is continuing as new")
+  }
 }
+
+/**
+ * Exception thrown to signal that the workflow should continue as new.
+ * This exception is caught by the workflow runner and converted to a
+ * continue-as-new completion.
+ */
+@InternalTemporalApi
+class ContinueAsNewException(message: String) : CancellationException(message)
