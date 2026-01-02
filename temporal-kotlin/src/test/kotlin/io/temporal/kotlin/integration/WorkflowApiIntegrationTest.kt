@@ -25,6 +25,7 @@ package io.temporal.kotlin.integration
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.SearchAttributeKey
 import io.temporal.common.converter.DataConverter
+import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.testing.internal.SDKTestWorkflowRule
@@ -38,6 +39,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Integration tests for Kotlin workflow APIs.
@@ -114,6 +116,12 @@ class WorkflowApiIntegrationTest {
 
     @UpdateMethod
     suspend fun myUpdate(input: String): String
+  }
+
+  @WorkflowInterface
+  interface RetryWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
   }
 
   // ==================== Workflow Implementations ====================
@@ -257,6 +265,28 @@ class WorkflowApiIntegrationTest {
 
       updateResult = "update=$name, id=$id, input=$input"
       return updateResult!!
+    }
+  }
+
+  class RetryWorkflowImpl : RetryWorkflow {
+    override suspend fun execute(): String {
+      var attempts = 0
+
+      // Test retry with successful completion after failures
+      val result = KWorkflow.retry(
+        KRetryOptions(
+          initialInterval = 10.milliseconds,
+          maximumAttempts = 3
+        )
+      ) {
+        attempts++
+        if (attempts < 3) {
+          throw RuntimeException("Attempt $attempts failed")
+        }
+        "success after $attempts attempts"
+      }
+
+      return result
     }
   }
 
@@ -417,5 +447,21 @@ class WorkflowApiIntegrationTest {
     // Verify update info was available during update handler
     assertTrue(result.contains("update=myUpdate"))
     assertTrue(result.contains("input=testInput"))
+  }
+
+  @Test
+  fun `retry succeeds after transient failures`() {
+    setupKotlinWorkflows(RetryWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("RetryWorkflow", options)
+    stub.start()
+    val result = stub.getResult(String::class.java)
+
+    assertEquals("success after 3 attempts", result)
   }
 }

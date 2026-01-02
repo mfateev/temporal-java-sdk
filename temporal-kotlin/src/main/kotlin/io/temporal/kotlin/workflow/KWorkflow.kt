@@ -30,6 +30,7 @@ import io.temporal.common.SearchAttributes
 import io.temporal.common.converter.EncodedValues
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
+import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
@@ -40,6 +41,7 @@ import io.temporal.workflow.WorkflowInfo
 import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.delay
 import org.slf4j.Logger
 import java.time.Instant
 import java.util.Random
@@ -475,6 +477,106 @@ public object KWorkflow {
     noinline func: (R?) -> R
   ): R {
     return mutableSideEffect(id, R::class.java, func)
+  }
+
+  // ==================== Retry ====================
+
+  /**
+   * Executes a block with retry logic according to the specified options.
+   *
+   * This is useful for retrying operations that may fail transiently.
+   * The block is executed repeatedly until it succeeds, the maximum
+   * attempts are exhausted, or the expiration timeout is reached.
+   *
+   * Note: Activities already have built-in retry options via [KActivityOptions].
+   * This function is useful for:
+   * - Retrying a sequence of operations as a unit
+   * - Custom retry logic around non-activity operations
+   * - Retrying local computations that may fail transiently
+   *
+   * Example:
+   * ```kotlin
+   * val result = KWorkflow.retry(
+   *   KRetryOptions(
+   *     initialInterval = 1.seconds,
+   *     maximumInterval = 30.seconds,
+   *     backoffCoefficient = 2.0,
+   *     maximumAttempts = 5
+   *   ),
+   *   expiration = 5.minutes
+   * ) {
+   *   riskyOperation()
+   * }
+   * ```
+   *
+   * @param R the return type of the block
+   * @param options the retry options specifying retry policy
+   * @param expiration optional maximum time to retry (null means no limit)
+   * @param block the suspend block to execute
+   * @return the result of the block when it succeeds
+   * @throws Exception the last exception if all retries are exhausted
+   */
+  public suspend fun <R> retry(
+    options: KRetryOptions,
+    expiration: Duration? = null,
+    block: suspend () -> R
+  ): R {
+    val startTime = currentTimeMillis()
+    var attempt = 0
+    var lastException: Throwable
+    var nextDelayMs = options.initialInterval.inWholeMilliseconds
+    val maxIntervalMs = (options.maximumInterval ?: (options.initialInterval * 100)).inWholeMilliseconds
+
+    while (true) {
+      attempt++
+      try {
+        return block()
+      } catch (e: Throwable) {
+        // Check if this exception type should not be retried
+        if (shouldNotRetry(e, options.doNotRetry)) {
+          throw e
+        }
+
+        lastException = e
+
+        // Check if we've exceeded maximum attempts
+        if (options.maximumAttempts > 0 && attempt >= options.maximumAttempts) {
+          throw lastException
+        }
+
+        // Check if we've exceeded expiration time
+        if (expiration != null) {
+          val elapsed = currentTimeMillis() - startTime
+          if (elapsed >= expiration.inWholeMilliseconds) {
+            throw lastException
+          }
+        }
+
+        // Workflow-safe delay (intercepted by dispatcher to become Temporal timer)
+        delay(nextDelayMs)
+
+        // Calculate next delay with exponential backoff
+        nextDelayMs = (nextDelayMs * options.backoffCoefficient).toLong()
+          .coerceAtMost(maxIntervalMs)
+      }
+    }
+  }
+
+  /**
+   * Checks if the exception matches any of the "do not retry" exception types.
+   */
+  private fun shouldNotRetry(exception: Throwable, doNotRetry: List<String>): Boolean {
+    if (doNotRetry.isEmpty()) return false
+
+    var current: Throwable? = exception
+    while (current != null) {
+      val className = current::class.java.name
+      if (doNotRetry.any { className == it || className.endsWith(".$it") }) {
+        return true
+      }
+      current = current.cause
+    }
+    return false
   }
 
   // ==================== Update Info ====================
