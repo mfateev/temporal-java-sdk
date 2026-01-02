@@ -987,7 +987,7 @@ public object KWorkflow {
    */
   public suspend fun <T, R> executeChildWorkflow(
     workflow: KFunction1<T, R>,
-    options: KChildWorkflowOptions
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1008,6 +1008,14 @@ public object KWorkflow {
   }
 
   /**
+   * Executes a child workflow using a method reference with 1 argument and default options.
+   */
+  public suspend fun <T, A1, R> executeChildWorkflow(
+    workflow: KFunction2<T, A1, R>,
+    arg1: A1
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1)
+
+  /**
    * Executes a child workflow using a method reference with 2 arguments.
    */
   public suspend fun <T, A1, A2, R> executeChildWorkflow(
@@ -1020,6 +1028,15 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
   }
+
+  /**
+   * Executes a child workflow using a method reference with 2 arguments and default options.
+   */
+  public suspend fun <T, A1, A2, R> executeChildWorkflow(
+    workflow: KFunction3<T, A1, A2, R>,
+    arg1: A1,
+    arg2: A2
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2)
 
   /**
    * Executes a child workflow using a method reference with 3 arguments.
@@ -1035,6 +1052,16 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
   }
+
+  /**
+   * Executes a child workflow using a method reference with 3 arguments and default options.
+   */
+  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
+    workflow: KFunction4<T, A1, A2, A3, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3)
 
   /**
    * Executes a child workflow using a method reference with 4 arguments.
@@ -1053,6 +1080,17 @@ public object KWorkflow {
   }
 
   /**
+   * Executes a child workflow using a method reference with 4 arguments and default options.
+   */
+  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
+    workflow: KFunction5<T, A1, A2, A3, A4, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4)
+
+  /**
    * Executes a child workflow using a method reference with 5 arguments.
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
@@ -1068,6 +1106,18 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
   }
+
+  /**
+   * Executes a child workflow using a method reference with 5 arguments and default options.
+   */
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
+    workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4, arg5)
 
   // ==================== Typed Suspend Child Workflow Execution (Method Reference) ====================
   // These overloads support suspend child workflow methods (suspend fun in interfaces)
@@ -1086,7 +1136,7 @@ public object KWorkflow {
   @JvmName("executeSuspendChildWorkflow0")
   public suspend fun <T, R> executeChildWorkflow(
     workflow: KSuspendFunction1<T, R>,
-    options: KChildWorkflowOptions
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1108,6 +1158,15 @@ public object KWorkflow {
   }
 
   /**
+   * Executes a suspend child workflow using a method reference with 1 argument and default options.
+   */
+  @JvmName("executeSuspendChildWorkflow1NoOptions")
+  public suspend fun <T, A1, R> executeChildWorkflow(
+    workflow: KSuspendFunction2<T, A1, R>,
+    arg1: A1
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1)
+
+  /**
    * Executes a suspend child workflow using a method reference with 2 arguments.
    */
   @JvmName("executeSuspendChildWorkflow2")
@@ -1121,6 +1180,16 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
   }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 2 arguments and default options.
+   */
+  @JvmName("executeSuspendChildWorkflow2NoOptions")
+  public suspend fun <T, A1, A2, R> executeChildWorkflow(
+    workflow: KSuspendFunction3<T, A1, A2, R>,
+    arg1: A1,
+    arg2: A2
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2)
 
   /**
    * Executes a suspend child workflow using a method reference with 3 arguments.
@@ -1137,6 +1206,17 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
   }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 3 arguments and default options.
+   */
+  @JvmName("executeSuspendChildWorkflow3NoOptions")
+  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
+    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3)
 
   /**
    * Executes a suspend child workflow using a method reference with 4 arguments.
@@ -1156,6 +1236,18 @@ public object KWorkflow {
   }
 
   /**
+   * Executes a suspend child workflow using a method reference with 4 arguments and default options.
+   */
+  @JvmName("executeSuspendChildWorkflow4NoOptions")
+  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
+    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4)
+
+  /**
    * Executes a suspend child workflow using a method reference with 5 arguments.
    */
   @JvmName("executeSuspendChildWorkflow5")
@@ -1172,6 +1264,19 @@ public object KWorkflow {
     @Suppress("UNCHECKED_CAST")
     return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
   }
+
+  /**
+   * Executes a suspend child workflow using a method reference with 5 arguments and default options.
+   */
+  @JvmName("executeSuspendChildWorkflow5NoOptions")
+  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
+    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4, arg5)
 
   // ==================== Child Workflow Handle Methods ====================
 
