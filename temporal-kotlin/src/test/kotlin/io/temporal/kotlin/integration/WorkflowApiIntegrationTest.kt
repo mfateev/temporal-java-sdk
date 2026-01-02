@@ -30,6 +30,7 @@ import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
+import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import org.junit.Assert.assertEquals
@@ -104,6 +105,15 @@ class WorkflowApiIntegrationTest {
 
     @QueryMethod
     fun getHandlerStatus(): Boolean
+  }
+
+  @WorkflowInterface
+  interface UpdateInfoWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+
+    @UpdateMethod
+    suspend fun myUpdate(input: String): String
   }
 
   // ==================== Workflow Implementations ====================
@@ -227,6 +237,26 @@ class WorkflowApiIntegrationTest {
 
     override fun getHandlerStatus(): Boolean {
       return KWorkflow.isEveryHandlerFinished()
+    }
+  }
+
+  class UpdateInfoWorkflowImpl : UpdateInfoWorkflow {
+    private var updateResult: String? = null
+
+    override suspend fun execute(): String {
+      // Wait for update to complete
+      KWorkflow.awaitCondition { updateResult != null }
+      return updateResult!!
+    }
+
+    override suspend fun myUpdate(input: String): String {
+      // Get current update info
+      val updateInfo = KWorkflow.getCurrentUpdateInfo()
+      val name = updateInfo?.updateName ?: "unknown"
+      val id = updateInfo?.updateId ?: "unknown"
+
+      updateResult = "update=$name, id=$id, input=$input"
+      return updateResult!!
     }
   }
 
@@ -364,5 +394,28 @@ class WorkflowApiIntegrationTest {
 
     // After signal handler completes, isEveryHandlerFinished should be true
     assertTrue(result)
+  }
+
+  @Test
+  fun `getCurrentUpdateInfo returns update info during update handler`() {
+    setupKotlinWorkflows(UpdateInfoWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("UpdateInfoWorkflow", options)
+    stub.start()
+
+    // Send update
+    val updateResult = stub.update("myUpdate", String::class.java, "testInput")
+
+    // Get workflow result
+    val result = stub.getResult(String::class.java)
+
+    // Verify update info was available during update handler
+    assertTrue(result.contains("update=myUpdate"))
+    assertTrue(result.contains("input=testInput"))
   }
 }

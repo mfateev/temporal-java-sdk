@@ -296,17 +296,15 @@ internal class KotlinReplayWorkflow(
       emptyArray()
     }
 
-    // Accept the update synchronously - this MUST happen during handleUpdate callback
-    // to properly integrate with the update protocol state machine.
-    // No other workflow code can run between validator and update handler.
-    callbacks.accept()
-
     // Execute update handler in the workflow context
     dispatcher?.executeImmediately {
       coroutineScope?.launch {
         ctx.runningUpdateHandlers.incrementAndGet()
         ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
         try {
+          // Accept the update - must happen before handler runs
+          callbacks.accept()
+
           // Execute the update
           val result = if (updateMethod.isSuspend) {
             updateMethod.callSuspend(instance, *args)
