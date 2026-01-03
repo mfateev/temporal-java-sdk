@@ -1,0 +1,43 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+plugins {
+    id 'org.jlleitschuh.gradle.ktlint' version '11.3.1'
+}
+
+apply plugin: 'org.jetbrains.kotlin.jvm'
+
+description = '''Temporal Workflow Java SDK Kotlin Testing'''
+
+tasks.withType(KotlinCompile).all {
+    kotlinOptions {
+        freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
+        jvmTarget = project.hasProperty("edgeDepsTest") ? JavaVersion.VERSION_21 : JavaVersion.VERSION_1_8
+        languageVersion = "${project.hasProperty("edgeDepsTest") ? '1.8' : (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_16) ? '1.5' : '1.4')}"
+    }
+}
+
+java {
+    registerFeature('junit5') {
+        usingSourceSet(sourceSets.main)
+    }
+}
+
+dependencies {
+    api project(':temporal-kotlin')
+    api project(':temporal-testing')
+
+    implementation "org.jetbrains.kotlin:kotlin-reflect"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"
+
+    junit5Api platform('org.junit:junit-bom:5.9.2')
+    junit5Api 'org.junit.jupiter:junit-jupiter-api'
+
+    testImplementation project(':temporal-sdk')
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1"
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter'
+    testRuntimeOnly group: 'ch.qos.logback', name: 'logback-classic', version: "${logbackVersion}"
+}
+
+test {
+    useJUnitPlatform()
+}
