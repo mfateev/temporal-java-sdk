@@ -49,6 +49,9 @@ import kotlin.reflect.jvm.javaMethod
 /**
  * Kotlin workflow client providing suspend functions and type-safe workflow APIs.
  *
+ * This class wraps a [WorkflowClient] and provides Kotlin-idiomatic APIs including
+ * suspend functions and type-safe method references.
+ *
  * Example:
  * ```kotlin
  * val service = WorkflowServiceStubs.newLocalServiceStubs()
@@ -67,28 +70,38 @@ import kotlin.reflect.jvm.javaMethod
  * )
  * ```
  *
- * @param service The WorkflowServiceStubs to connect to
- * @param options DSL builder for WorkflowClientOptions
+ * @param workflowClient The underlying WorkflowClient to wrap
  */
 public class KWorkflowClient(
-  service: WorkflowServiceStubs,
-  options: WorkflowClientOptions.Builder.() -> Unit = {}
+  public val workflowClient: WorkflowClient
 ) {
 
-  /**
-   * The underlying WorkflowClient for advanced use cases.
-   */
-  public val workflowClient: WorkflowClient = WorkflowClient.newInstance(
-    service,
-    WorkflowClientOptions.newBuilder().apply(options).build()
-  )
-
-  /**
-   * Creates a KWorkflowClient wrapping an existing WorkflowClient.
-   */
-  public constructor(client: WorkflowClient) : this(client.workflowServiceStubs) {
-    // Note: This creates a new WorkflowClient with default options
-    // For exact wrapping, use the workflowClient property directly
+  public companion object {
+    /**
+     * Create a KWorkflowClient connected to the specified service.
+     *
+     * Example:
+     * ```kotlin
+     * val client = KWorkflowClient(service) {
+     *     setNamespace("my-namespace")
+     * }
+     * ```
+     *
+     * @param service The WorkflowServiceStubs to connect to
+     * @param options DSL builder for WorkflowClientOptions
+     * @return A new KWorkflowClient instance
+     */
+    @JvmStatic
+    public operator fun invoke(
+      service: WorkflowServiceStubs,
+      options: WorkflowClientOptions.Builder.() -> Unit = {}
+    ): KWorkflowClient {
+      val client = WorkflowClient.newInstance(
+        service,
+        WorkflowClientOptions.newBuilder().apply(options).build()
+      )
+      return KWorkflowClient(client)
+    }
   }
 
   // ========== Start Workflow (0-6 args) ==========

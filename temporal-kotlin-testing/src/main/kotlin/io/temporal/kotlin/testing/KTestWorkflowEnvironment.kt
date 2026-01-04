@@ -141,7 +141,8 @@ public class KTestWorkflowEnvironment private constructor(
     /**
      * The Kotlin workflow client for interacting with workflows.
      *
-     * This property is lazily initialized and wraps the underlying Java WorkflowClient.
+     * This property wraps the test environment's WorkflowClient which includes
+     * the TimeLockingInterceptor needed for time skipping.
      *
      * Example:
      * ```kotlin
