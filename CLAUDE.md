@@ -1,5 +1,9 @@
 # Claude Instructions
 
+## Required Reading
+
+Always read the `AGENTS.md` file in the same directory as this file before starting any task. It contains important context about the codebase and development practices.
+
 ## Interaction Style
 
 **Answer First, Then Wait**: When the user asks a question, provide an answer and then STOP. Wait for user input before taking any action. Do not immediately start implementing changes based on your interpretation of the question.

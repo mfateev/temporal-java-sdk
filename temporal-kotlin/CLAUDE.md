@@ -1,5 +1,9 @@
 # Kotlin SDK Instructions
 
+## Required Reading
+
+Always read the `AGENTS.md` file in the same directory as this file before starting any task. It contains important context about the Kotlin SDK codebase and development practices.
+
 ## API Design Principles
 
 ### Full Compatibility
