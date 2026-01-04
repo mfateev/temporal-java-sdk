@@ -40,6 +40,7 @@ import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
 
 /**
@@ -262,12 +263,6 @@ internal class KotlinReplayWorkflow(
     header: Header,
     callbacks: UpdateProtocolCallback
   ) {
-    val updateMethod = workflowDefinition.updateMethods[updateName]
-    if (updateMethod == null) {
-      callbacks.reject(createFailure("Unknown update: $updateName"))
-      return
-    }
-
     val instance = workflowInstance.get()
     if (instance == null) {
       callbacks.reject(createFailure("Workflow instance not initialized"))
@@ -280,6 +275,40 @@ internal class KotlinReplayWorkflow(
       return
     }
 
+    // First check for annotation-based update handler
+    val updateMethod = workflowDefinition.updateMethods[updateName]
+    if (updateMethod != null) {
+      handleAnnotationBasedUpdate(updateName, updateId, input, callbacks, instance, ctx, updateMethod)
+      return
+    }
+
+    // Check for dynamically registered named update handler
+    val namedHandler = ctx.updateHandlers[updateName]
+    if (namedHandler != null) {
+      handleDynamicNamedUpdate(updateName, updateId, input, callbacks, ctx, namedHandler)
+      return
+    }
+
+    // Check for catch-all dynamic update handler
+    val dynamicHandler = ctx.dynamicUpdateHandler
+    if (dynamicHandler != null) {
+      handleDynamicFallbackUpdate(updateName, updateId, input, callbacks, ctx, dynamicHandler)
+      return
+    }
+
+    // No handler found
+    callbacks.reject(createFailure("Unknown update: $updateName"))
+  }
+
+  private fun handleAnnotationBasedUpdate(
+    updateName: String,
+    updateId: String,
+    input: Optional<Payloads>,
+    callbacks: UpdateProtocolCallback,
+    instance: Any,
+    ctx: KotlinWorkflowContext,
+    updateMethod: KFunction<*>
+  ) {
     // Deserialize arguments synchronously (needed for validation)
     val parameters = updateMethod.parameters
     val args = if (input.isPresent && parameters.size > 1) {
@@ -321,6 +350,104 @@ internal class KotlinReplayWorkflow(
           callbacks.complete(resultPayloads, null)
         } catch (e: Throwable) {
           callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
+        } finally {
+          ctx.currentUpdateInfo.set(null)
+          ctx.runningUpdateHandlers.decrementAndGet()
+        }
+      }
+    }
+  }
+
+  private fun handleDynamicNamedUpdate(
+    updateName: String,
+    updateId: String,
+    input: Optional<Payloads>,
+    callbacks: UpdateProtocolCallback,
+    ctx: KotlinWorkflowContext,
+    handler: UpdateHandler
+  ) {
+    dispatcher?.executeImmediately {
+      coroutineScope?.launch {
+        ctx.runningUpdateHandlers.incrementAndGet()
+        ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
+        try {
+          // Run validator if registered
+          val validator = ctx.updateValidators[updateName]
+          if (validator != null) {
+            val encodedValues = ctx.createEncodedValues(input)
+            validator(encodedValues)
+          }
+
+          // Accept the update - must happen before handler runs
+          callbacks.accept()
+
+          // Execute the handler
+          val encodedValues = ctx.createEncodedValues(input)
+          val result = handler(encodedValues)
+
+          // Complete with result
+          val resultPayloads = if (result != null && result != Unit) {
+            dataConverter.toPayloads(result)
+          } else {
+            Optional.empty()
+          }
+          callbacks.complete(resultPayloads, null)
+        } catch (e: Throwable) {
+          // If validation failed, reject; otherwise complete with failure
+          if (ctx.updateValidators[updateName] != null) {
+            callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
+          } else {
+            callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
+          }
+        } finally {
+          ctx.currentUpdateInfo.set(null)
+          ctx.runningUpdateHandlers.decrementAndGet()
+        }
+      }
+    }
+  }
+
+  private fun handleDynamicFallbackUpdate(
+    updateName: String,
+    updateId: String,
+    input: Optional<Payloads>,
+    callbacks: UpdateProtocolCallback,
+    ctx: KotlinWorkflowContext,
+    handler: DynamicUpdateHandler
+  ) {
+    dispatcher?.executeImmediately {
+      coroutineScope?.launch {
+        ctx.runningUpdateHandlers.incrementAndGet()
+        ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
+        try {
+          // Run dynamic validator if registered
+          val validator = ctx.dynamicUpdateValidator
+          if (validator != null) {
+            val encodedValues = ctx.createEncodedValues(input)
+            validator(updateName, encodedValues)
+          }
+
+          // Accept the update - must happen before handler runs
+          callbacks.accept()
+
+          // Execute the handler
+          val encodedValues = ctx.createEncodedValues(input)
+          val result = handler(updateName, encodedValues)
+
+          // Complete with result
+          val resultPayloads = if (result != null && result != Unit) {
+            dataConverter.toPayloads(result)
+          } else {
+            Optional.empty()
+          }
+          callbacks.complete(resultPayloads, null)
+        } catch (e: Throwable) {
+          // If validation failed, reject; otherwise complete with failure
+          if (ctx.dynamicUpdateValidator != null) {
+            callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
+          } else {
+            callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
+          }
         } finally {
           ctx.currentUpdateInfo.set(null)
           ctx.runningUpdateHandlers.decrementAndGet()

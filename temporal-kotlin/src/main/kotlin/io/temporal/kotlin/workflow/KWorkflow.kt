@@ -2085,6 +2085,118 @@ public object KWorkflow {
     context.registerDynamicUpdateValidator(validator)
   }
 
+  /**
+   * Registers an update handler for a specific update name.
+   *
+   * Update handlers are invoked when the workflow receives an update with the
+   * matching name. The handler receives the update arguments as [EncodedValues]
+   * which can be decoded to the expected types, and returns a result.
+   *
+   * Update handlers should be suspend functions to allow calling activities,
+   * child workflows, and other workflow operations.
+   *
+   * Example:
+   * ```kotlin
+   * class MyWorkflowImpl : MyWorkflow {
+   *   private var config: Config = Config.default()
+   *
+   *   override suspend fun execute(): String {
+   *     // Register update handler
+   *     KWorkflow.registerUpdateHandler("updateConfig") { args ->
+   *       val newConfig = args.get(0, Config::class.java)
+   *       // Can call activities since this is a suspend function
+   *       KWorkflow.executeActivity(
+   *         ConfigActivities::validateConfig,
+   *         KActivityOptions(startToCloseTimeout = 30.seconds),
+   *         newConfig
+   *       )
+   *       config = newConfig
+   *       "Config updated successfully"
+   *     }
+   *
+   *     // ... workflow logic ...
+   *     return "done"
+   *   }
+   * }
+   * ```
+   *
+   * @param updateName the name of the update to handle
+   * @param handler the suspend function to invoke when the update is received
+   * @throws IllegalArgumentException if a handler is already registered for this update
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerUpdateHandler(
+    updateName: String,
+    handler: suspend (EncodedValues) -> Any?
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerUpdateHandler must be called from within workflow code")
+    context.registerUpdateHandler(updateName, handler)
+  }
+
+  /**
+   * Registers an update handler with no arguments for a specific update name.
+   *
+   * This is a convenience method for updates that don't require arguments.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerUpdateHandler("reset") {
+   *   state = initialState
+   *   "State reset"
+   * }
+   * ```
+   *
+   * @param updateName the name of the update to handle
+   * @param handler the suspend function to invoke when the update is received
+   */
+  public fun registerUpdateHandler(
+    updateName: String,
+    handler: suspend () -> Any?
+  ) {
+    registerUpdateHandler(updateName) { _ -> handler() }
+  }
+
+  /**
+   * Registers an update handler with a validator for a specific update name.
+   *
+   * The validator is invoked before the update handler to validate inputs.
+   * If the validator throws an exception, the update is rejected without
+   * executing the handler.
+   *
+   * Example:
+   * ```kotlin
+   * KWorkflow.registerUpdateHandler(
+   *   "updateConfig",
+   *   validator = { args ->
+   *     val config = args.get(0, Config::class.java)
+   *     require(config.isValid) { "Invalid config" }
+   *   },
+   *   handler = { args ->
+   *     val config = args.get(0, Config::class.java)
+   *     currentConfig = config
+   *     "Config updated"
+   *   }
+   * )
+   * ```
+   *
+   * @param updateName the name of the update to handle
+   * @param validator the function to validate update inputs (NOT suspend, must return quickly)
+   * @param handler the suspend function to invoke when the update is received
+   * @throws IllegalArgumentException if a handler is already registered for this update
+   * @throws IllegalStateException if called outside of workflow code
+   */
+  public fun registerUpdateHandler(
+    updateName: String,
+    validator: (EncodedValues) -> Unit,
+    handler: suspend (EncodedValues) -> Any?
+  ) {
+    val context = currentContext.get()
+      ?: throw IllegalStateException("KWorkflow.registerUpdateHandler must be called from within workflow code")
+    context.registerUpdateValidator(updateName, validator)
+    context.registerUpdateHandler(updateName, handler)
+  }
+
   // ==================== Continue-As-New ====================
 
   /**

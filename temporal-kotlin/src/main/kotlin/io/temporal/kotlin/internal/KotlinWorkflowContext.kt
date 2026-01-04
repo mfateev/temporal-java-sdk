@@ -99,6 +99,18 @@ typealias QueryHandler<R> = (args: EncodedValues) -> R
 typealias DynamicQueryHandler = (queryName: String, args: EncodedValues) -> Any?
 
 /**
+ * Type alias for update handlers.
+ * Update handlers receive the encoded arguments and return a result.
+ */
+typealias UpdateHandler = suspend (args: EncodedValues) -> Any?
+
+/**
+ * Type alias for update validators.
+ * Validators receive the encoded arguments and throw if validation fails.
+ */
+typealias UpdateValidator = (args: EncodedValues) -> Unit
+
+/**
  * Type alias for dynamic update handlers.
  * Dynamic handlers receive both the update name and encoded arguments.
  */
@@ -165,6 +177,16 @@ internal class KotlinWorkflowContext(
    */
   @Volatile
   internal var dynamicQueryHandler: DynamicQueryHandler? = null
+
+  /**
+   * Registered update handlers by update name.
+   */
+  internal val updateHandlers = ConcurrentHashMap<String, UpdateHandler>()
+
+  /**
+   * Registered update validators by update name.
+   */
+  internal val updateValidators = ConcurrentHashMap<String, UpdateValidator>()
 
   /**
    * Dynamic update handler for unhandled updates.
@@ -1032,6 +1054,32 @@ internal class KotlinWorkflowContext(
   }
 
   // ==================== Update Handler Registration ====================
+
+  /**
+   * Registers an update handler for a specific update name.
+   *
+   * @param updateName the name of the update to handle
+   * @param handler the handler function to invoke when the update is received
+   */
+  fun registerUpdateHandler(updateName: String, handler: UpdateHandler) {
+    if (updateHandlers.containsKey(updateName)) {
+      throw IllegalArgumentException("Update handler already registered for: $updateName")
+    }
+    updateHandlers[updateName] = handler
+  }
+
+  /**
+   * Registers an update validator for a specific update name.
+   *
+   * @param updateName the name of the update to validate
+   * @param validator the validator function to invoke before the handler
+   */
+  fun registerUpdateValidator(updateName: String, validator: UpdateValidator) {
+    if (updateValidators.containsKey(updateName)) {
+      throw IllegalArgumentException("Update validator already registered for: $updateName")
+    }
+    updateValidators[updateName] = validator
+  }
 
   /**
    * Registers a dynamic update handler for all unhandled updates.
