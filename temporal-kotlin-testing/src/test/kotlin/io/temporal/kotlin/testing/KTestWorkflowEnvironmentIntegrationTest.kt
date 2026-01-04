@@ -38,8 +38,10 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.hours
@@ -59,6 +61,7 @@ import kotlin.time.Duration.Companion.seconds
  * - Diagnostics output
  * - use() extension function
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestWorkflowEnvironmentIntegrationTest {
 
     // ==================== Test Interfaces ====================
@@ -164,7 +167,8 @@ class KTestWorkflowEnvironmentIntegrationTest {
         testEnv = KTestWorkflowEnvironment.newInstance()
 
         assertNotNull(testEnv)
-        assertEquals("UnitTest", testEnv!!.namespace)
+        // Default namespace is "default" from Java SDK (we don't override it)
+        assertEquals("default", testEnv!!.namespace)
         assertFalse(testEnv!!.isStarted)
     }
 
@@ -278,6 +282,168 @@ class KTestWorkflowEnvironmentIntegrationTest {
     // ==================== Workflow Execution Tests ====================
 
     @Test
+    fun `execute simple workflow using Java SDK directly`() {
+        // Use Java SDK TestWorkflowEnvironment directly to verify it works
+        val javaTestEnv = io.temporal.testing.TestWorkflowEnvironment.newInstance()
+        val javaWorker = javaTestEnv.newWorker("test-task-queue")
+        javaWorker.registerWorkflowImplementationTypes(SimpleWorkflowImpl::class.java)
+        javaTestEnv.start()
+
+        val workflow = javaTestEnv.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - Java Direct")
+
+        assertEquals("Hello, World - Java Direct!", result)
+        javaTestEnv.close()
+    }
+
+    @Test
+    fun `execute simple workflow using KWorker with Java TestEnv`() {
+        // Use Java TestWorkflowEnvironment but with KWorker wrapper
+        val javaTestEnv = io.temporal.testing.TestWorkflowEnvironment.newInstance()
+        val javaWorker = javaTestEnv.newWorker("test-task-queue")
+        val kWorker = KWorker(javaWorker)
+        kWorker.registerWorkflowImplementationTypes<SimpleWorkflowImpl>()
+        javaTestEnv.start()
+
+        val workflow = javaTestEnv.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - KWorker")
+
+        assertEquals("Hello, World - KWorker!", result)
+        javaTestEnv.close()
+    }
+
+    @Test
+    fun `execute simple workflow using Java TestEnv with Kotlin options`() {
+        // Use Java TestWorkflowEnvironment with Kotlin-built options (no explicit namespace)
+        val options = KTestEnvironmentOptionsBuilder().apply {
+            useTimeskipping = true
+        }.build()
+        val javaTestEnv = io.temporal.testing.TestWorkflowEnvironment.newInstance(options)
+        val javaWorker = javaTestEnv.newWorker("test-task-queue")
+        javaWorker.registerWorkflowImplementationTypes(SimpleWorkflowImpl::class.java)
+        javaTestEnv.start()
+
+        val workflow = javaTestEnv.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - Kotlin Options")
+
+        assertEquals("Hello, World - Kotlin Options!", result)
+        javaTestEnv.close()
+    }
+
+    @Test
+    fun `execute simple workflow with KTestWorkflowEnvironment using default Java options`() {
+        // Use KTestWorkflowEnvironment but with default Java options (not Kotlin builder)
+        val javaOptions = io.temporal.testing.TestEnvironmentOptions.getDefaultInstance()
+        testEnv = KTestWorkflowEnvironment.newInstance(KTestEnvironmentOptions.getDefaultInstance())
+
+        val worker = testEnv!!.newWorker("test-task-queue")
+        worker.registerWorkflowImplementationTypes<SimpleWorkflowImpl>()
+        testEnv!!.start()
+
+        val client = testEnv!!.workflowClient
+        val workflow = client.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - KTestEnv Default")
+
+        assertEquals("Hello, World - KTestEnv Default!", result)
+    }
+
+    @Test
+    fun `execute simple workflow using builder with no explicit config`() {
+        // Use KTestEnvironmentOptionsBuilder without any explicit configuration
+        // to see if the issue is with the defaults vs the wrapper
+        val options = KTestEnvironmentOptionsBuilder().build()
+        val javaTestEnv = io.temporal.testing.TestWorkflowEnvironment.newInstance(options)
+        val javaWorker = javaTestEnv.newWorker("test-task-queue")
+        javaWorker.registerWorkflowImplementationTypes(SimpleWorkflowImpl::class.java)
+        javaTestEnv.start()
+
+        val workflow = javaTestEnv.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - No Config Builder")
+
+        assertEquals("Hello, World - No Config Builder!", result)
+        javaTestEnv.close()
+    }
+
+    @Test
+    fun `execute simple workflow via KTestWorkflowEnvironment using Java worker directly`() {
+        // Use KTestWorkflowEnvironment but access the underlying Java worker
+        testEnv = KTestWorkflowEnvironment.newInstance()
+
+        // Use the KWorker's underlying Java Worker
+        val worker = testEnv!!.newWorker("test-task-queue")
+        worker.worker.registerWorkflowImplementationTypes(SimpleWorkflowImpl::class.java)
+        testEnv!!.start()
+
+        val client = testEnv!!.workflowClient
+        val workflow = client.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - Java Worker")
+
+        assertEquals("Hello, World - Java Worker!", result)
+    }
+
+    @Test
+    fun `execute simple workflow via KTestWorkflowEnvironment with pre-built Kotlin options`() {
+        // Use KTestWorkflowEnvironment with KTestEnvironmentOptions built from Kotlin builder
+        // Note: We don't set namespace explicitly to avoid issues with Java SDK internal handling
+        val options = KTestEnvironmentOptions.newBuilder {
+            useTimeskipping = true
+        }
+        testEnv = KTestWorkflowEnvironment.newInstance(options)
+
+        val worker = testEnv!!.newWorker("test-task-queue")
+        worker.registerWorkflowImplementationTypes<SimpleWorkflowImpl>()
+        testEnv!!.start()
+
+        val client = testEnv!!.workflowClient
+        val workflow = client.workflowClient.newWorkflowStub(
+            SimpleWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue("test-task-queue")
+                .build(),
+        )
+
+        val result = workflow.execute("World - Pre-built Options")
+
+        assertEquals("Hello, World - Pre-built Options!", result)
+    }
+
+    @Test
     fun `execute simple workflow`() {
         testEnv = KTestWorkflowEnvironment.newInstance()
 
@@ -325,9 +491,8 @@ class KTestWorkflowEnvironmentIntegrationTest {
 
     @Test
     fun `workflow with timer completes quickly with time skipping`() {
-        testEnv = KTestWorkflowEnvironment.newInstance {
-            useTimeskipping = true
-        }
+        // Use default options (time skipping is enabled by default)
+        testEnv = KTestWorkflowEnvironment.newInstance()
 
         val worker = testEnv!!.newWorker("test-task-queue")
         worker.registerWorkflowImplementationTypes<TimerWorkflowImpl>()

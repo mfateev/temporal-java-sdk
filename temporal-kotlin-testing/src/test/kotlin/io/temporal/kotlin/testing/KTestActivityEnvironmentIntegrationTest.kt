@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -49,6 +51,7 @@ import kotlin.time.Duration.Companion.seconds
  * - Heartbeat testing (setHeartbeatDetails, setActivityHeartbeatListener)
  * - Cancellation testing (requestCancelActivity)
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestActivityEnvironmentIntegrationTest {
 
     // ==================== Test Interfaces ====================

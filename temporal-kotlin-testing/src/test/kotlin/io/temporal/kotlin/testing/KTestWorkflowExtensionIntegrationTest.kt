@@ -34,9 +34,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -50,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * - Workflow and activity registration
  * - DSL configuration
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestWorkflowExtensionIntegrationTest {
 
     // ==================== Test Interfaces ====================
@@ -299,6 +302,7 @@ class KTestWorkflowExtensionIntegrationTest {
 /**
  * Tests for custom namespace configuration in [KTestWorkflowExtension].
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestWorkflowExtensionNamespaceTest {
 
     @WorkflowInterface
@@ -329,6 +333,7 @@ class KTestWorkflowExtensionNamespaceTest {
 /**
  * Tests for initial time configuration in [KTestWorkflowExtension].
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestWorkflowExtensionInitialTimeTest {
 
     @WorkflowInterface

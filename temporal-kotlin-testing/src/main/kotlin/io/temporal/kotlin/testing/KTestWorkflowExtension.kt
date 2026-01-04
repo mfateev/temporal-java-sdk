@@ -85,7 +85,7 @@ public class KTestWorkflowExtension private constructor(
     // ========== Commit 13: Configuration data class ==========
 
     private data class ExtensionConfig(
-        val namespace: String,
+        val namespace: String?,
         val workflowTypes: Map<Class<*>, WorkflowImplementationOptions>,
         val activityImplementations: Array<Any>,
         val suspendActivityImplementations: Array<Any>,
@@ -122,7 +122,7 @@ public class KTestWorkflowExtension private constructor(
         }
 
         override fun hashCode(): Int {
-            var result = namespace.hashCode()
+            var result = namespace?.hashCode() ?: 0
             result = 31 * result + workflowTypes.hashCode()
             result = 31 * result + activityImplementations.contentHashCode()
             result = 31 * result + suspendActivityImplementations.contentHashCode()
@@ -253,15 +253,20 @@ public class KTestWorkflowExtension private constructor(
                 setInitialTimeMillis(currentInitialTimeMillis)
             }
 
-            // Configure workflow client options with namespace
-            val clientOptions = (
-                config.workflowClientOptions?.let {
-                    WorkflowClientOptions.newBuilder(it)
-                } ?: WorkflowClientOptions.newBuilder()
-                )
-                .setNamespace(config.namespace)
-                .build()
-            setWorkflowClientOptions(clientOptions)
+            // Only set WorkflowClientOptions if namespace or custom options are configured
+            // When workflowClientOptions is null and namespace is null, the Java SDK handles
+            // namespace internally and time skipping works correctly.
+            // Setting explicit options can break time skipping.
+            if (config.namespace != null || config.workflowClientOptions != null) {
+                val clientOptions = (
+                    config.workflowClientOptions?.let {
+                        WorkflowClientOptions.newBuilder(it)
+                    } ?: WorkflowClientOptions.newBuilder()
+                    ).apply {
+                    config.namespace?.let { setNamespace(it) }
+                }.build()
+                setWorkflowClientOptions(clientOptions)
+            }
 
             // Configure worker factory options if provided
             config.workerFactoryOptions?.let { setWorkerFactoryOptions(it) }
@@ -426,7 +431,7 @@ public class KTestWorkflowExtension private constructor(
     @TemporalDsl
     public class Builder internal constructor() {
         // Commit 13: Basic properties
-        private var _namespace: String = "UnitTest"
+        private var _namespace: String? = null
 
         @PublishedApi
         internal val workflowTypes = mutableMapOf<Class<*>, WorkflowImplementationOptions>()
@@ -449,9 +454,12 @@ public class KTestWorkflowExtension private constructor(
 
         /**
          * The namespace to use for the test environment.
-         * Default: "UnitTest"
+         * Default: null (uses Java SDK default "default")
+         *
+         * Note: When using an in-memory test server, the namespace is automatically created.
+         * Set this only if you need a specific namespace name.
          */
-        public var namespace: String
+        public var namespace: String?
             get() = _namespace
             set(value) {
                 _namespace = value

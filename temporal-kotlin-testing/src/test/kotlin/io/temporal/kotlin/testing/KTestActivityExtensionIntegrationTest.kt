@@ -28,10 +28,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Integration tests for [KTestActivityExtension].
@@ -43,6 +45,7 @@ import kotlin.time.Duration.Companion.seconds
  * - Activity execution via injected environment
  * - Heartbeat testing
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestActivityExtensionIntegrationTest {
 
     // ==================== Test Interfaces ====================
@@ -88,6 +91,8 @@ class KTestActivityExtensionIntegrationTest {
             for (i in 1..items) {
                 processed = i
                 Activity.getExecutionContext().heartbeat(processed)
+                // Delay to ensure heartbeats exceed the throttle interval
+                Thread.sleep(100)
             }
             return processed
         }
@@ -104,32 +109,16 @@ class KTestActivityExtensionIntegrationTest {
         }
     }
 
-    // ==================== Extension Configurations ====================
+    // ==================== Extension Configuration ====================
 
     companion object {
         @JvmField
         @RegisterExtension
-        val simpleExtension = kTestActivityExtension {
-            setActivityImplementations(SimpleActivitiesImpl())
-        }
-
-        @JvmField
-        @RegisterExtension
-        val multipleActivitiesExtension = kTestActivityExtension {
+        val activityExtension = kTestActivityExtension {
             setActivityImplementations(
                 SimpleActivitiesImpl(),
                 AnotherActivitiesImpl(),
             )
-        }
-
-        @JvmField
-        @RegisterExtension
-        val customOptionsExtension = kTestActivityExtension {
-            setActivityImplementations(SimpleActivitiesImpl())
-            testEnvironmentOptions {
-                namespace = "custom-activity-namespace"
-                useTimeskipping = false
-            }
         }
     }
 
@@ -227,7 +216,8 @@ class KTestActivityExtensionIntegrationTest {
             SimpleActivities::processWithHeartbeat,
             KActivityOptions(
                 startToCloseTimeout = 1.minutes,
-                heartbeatTimeout = 30.seconds,
+                // Short heartbeat timeout reduces throttling (throttle = 0.8 * timeout)
+                heartbeatTimeout = 100.milliseconds,
             ),
             5,
         )

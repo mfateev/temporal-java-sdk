@@ -52,8 +52,13 @@ import java.time.Instant
 @TemporalDsl
 public class KTestEnvironmentOptionsBuilder internal constructor() {
 
-    /** Namespace to use for testing. Default: "UnitTest" */
-    public var namespace: String = "UnitTest"
+    /**
+     * Namespace to use for testing. Default: null (uses Java SDK default "default").
+     *
+     * Note: When using an in-memory test server, the namespace is automatically created.
+     * Set this only if you need a specific namespace name.
+     */
+    public var namespace: String? = null
 
     /** Initial time for the workflow virtual clock. Default: current time */
     public var initialTime: Instant? = null
@@ -153,12 +158,16 @@ public class KTestEnvironmentOptionsBuilder internal constructor() {
     internal fun build(): TestEnvironmentOptions {
         val builder = TestEnvironmentOptions.newBuilder()
 
-        // Apply namespace via WorkflowClientOptions
-        val clientOptions = WorkflowClientOptions.newBuilder().apply {
-            setNamespace(namespace)
-            workflowClientOptionsBuilder?.invoke(this)
-        }.build()
-        builder.setWorkflowClientOptions(clientOptions)
+        // Only set WorkflowClientOptions if namespace or custom options are configured
+        // When workflowClientOptions is null, the Java SDK handles namespace internally
+        // and everything works correctly. Setting explicit options can break this.
+        if (namespace != null || workflowClientOptionsBuilder != null) {
+            val clientOptions = WorkflowClientOptions.newBuilder().apply {
+                namespace?.let { setNamespace(it) }
+                workflowClientOptionsBuilder?.invoke(this)
+            }.build()
+            builder.setWorkflowClientOptions(clientOptions)
+        }
 
         // Apply WorkerFactoryOptions if configured
         workerFactoryOptionsBuilder?.let { block ->
