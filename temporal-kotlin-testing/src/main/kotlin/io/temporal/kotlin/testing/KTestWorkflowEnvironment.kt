@@ -68,6 +68,7 @@ import kotlin.time.Duration as KotlinDuration
  */
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
+    internal val mockRegistry: KActivityMockRegistry = KActivityMockRegistry(),
 ) : Closeable {
 
     // ========== Commit 7: Basic structure with worker creation ==========
@@ -360,6 +361,51 @@ public class KTestWorkflowEnvironment private constructor(
      */
     override fun close() {
         testEnvironment.close()
+    }
+
+    // ========== Phase 3.2: Activity Mocking Support ==========
+
+    /**
+     * Register activity implementations for this test.
+     *
+     * This method can be called at any time - before or after the test environment starts.
+     * The registered activities are handled by a dynamic activity handler that routes
+     * calls to the appropriate implementation.
+     *
+     * Works with both real implementations and mocks created with frameworks like
+     * mockito-kotlin or MockK.
+     *
+     * Example with mock:
+     * ```kotlin
+     * @Test
+     * fun `test with mocked activity`(testEnv: KTestWorkflowEnvironment, workflow: MyWorkflow) {
+     *     val mockActivity = mock<MyActivity> {
+     *         on { doSomething(any()) } doReturn "mocked result"
+     *     }
+     *     testEnv.registerActivitiesImplementations(mockActivity)
+     *
+     *     val result = workflow.execute("input")
+     *     assertEquals("mocked result", result)
+     * }
+     * ```
+     *
+     * Example with real implementation:
+     * ```kotlin
+     * @Test
+     * fun `test with real activity`(testEnv: KTestWorkflowEnvironment, workflow: MyWorkflow) {
+     *     testEnv.registerActivitiesImplementations(MyActivitiesImpl())
+     *
+     *     val result = workflow.execute("input")
+     *     assertEquals("expected", result)
+     * }
+     * ```
+     *
+     * @param activities Activity implementation instances (real or mocks)
+     */
+    public fun registerActivitiesImplementations(vararg activities: Any) {
+        activities.forEach { activity ->
+            mockRegistry.register(activity)
+        }
     }
 
     // ========== Commit 12: Advanced features ==========

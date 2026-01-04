@@ -280,8 +280,9 @@ public class KTestWorkflowExtension private constructor(
         // Create Java test environment
         val javaTestEnv = TestWorkflowEnvironment.newInstance(testEnvOptions)
 
-        // Create Kotlin wrapper for the test environment
-        val testEnvironment = createKTestWorkflowEnvironment(javaTestEnv)
+        // Create mock registry and Kotlin wrapper for the test environment
+        val mockRegistry = KActivityMockRegistry()
+        val testEnvironment = createKTestWorkflowEnvironment(javaTestEnv, mockRegistry)
 
         // Generate unique task queue per test
         val taskQueue = generateTaskQueue(context)
@@ -293,7 +294,7 @@ public class KTestWorkflowExtension private constructor(
             worker.registerWorkflowImplementationTypes(options, workflowType)
         }
 
-        // Register regular activities
+        // Register regular activities (via worker for pre-registered activities)
         if (config.activityImplementations.isNotEmpty()) {
             worker.registerActivitiesImplementations(*config.activityImplementations)
         }
@@ -307,6 +308,11 @@ public class KTestWorkflowExtension private constructor(
         if (config.nexusServiceImplementations.isNotEmpty()) {
             worker.registerNexusServiceImplementation(*config.nexusServiceImplementations)
         }
+
+        // Register dynamic activity handler for runtime mock support
+        // This allows testEnv.registerActivitiesImplementations() to work at any time
+        val dynamicHandler = KMockDynamicActivityHandler(mockRegistry)
+        worker.registerActivitiesImplementations(dynamicHandler)
 
         // Start unless doNotStart is set
         if (!config.doNotStart) {
@@ -389,13 +395,15 @@ public class KTestWorkflowExtension private constructor(
      */
     private fun createKTestWorkflowEnvironment(
         javaTestEnv: TestWorkflowEnvironment,
+        mockRegistry: KActivityMockRegistry,
     ): KTestWorkflowEnvironment {
         // Use reflection to access the private constructor
         val constructor = KTestWorkflowEnvironment::class.java.getDeclaredConstructor(
             TestWorkflowEnvironment::class.java,
+            KActivityMockRegistry::class.java,
         )
         constructor.isAccessible = true
-        return constructor.newInstance(javaTestEnv)
+        return constructor.newInstance(javaTestEnv, mockRegistry)
     }
 
     // ========== Commit 13: Companion object with factory ==========
