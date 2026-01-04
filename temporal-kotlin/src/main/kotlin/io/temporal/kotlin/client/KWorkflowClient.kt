@@ -20,15 +20,22 @@
 
 package io.temporal.kotlin.client
 
+import io.temporal.client.UpdateOptions
 import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
+import io.temporal.client.WorkflowUpdateStage
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KTypedWorkflowHandleImpl
+import io.temporal.kotlin.internal.KUpdateHandleImpl
 import io.temporal.kotlin.internal.KWorkflowHandleImpl
 import io.temporal.kotlin.internal.WorkflowHandleImpl
 import io.temporal.serviceclient.WorkflowServiceStubs
+import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
 import kotlin.reflect.KFunction2
@@ -664,6 +671,643 @@ public class KWorkflowClient(
     )
   }
 
+  // ========== With Start Workflow Operation (0-6 args) ==========
+
+  /**
+   * Create a workflow start operation for use with update-with-start.
+   * Captures the workflow method, arguments, and options for atomic execution.
+   *
+   * @param workflow the workflow method reference (no arguments)
+   * @param options workflow options including workflowIdConflictPolicy
+   * @return a start operation that can be used with [startUpdateWithStart] or [executeUpdateWithStart]
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, R> withStartWorkflowOperation(
+    workflow: KFunction1<T, R>,
+    options: KWorkflowOptions
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      emptyArray()
+    )
+  }
+
+  /**
+   * Create a workflow start operation with one argument.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, R> withStartWorkflowOperation(
+    workflow: KFunction2<T, A1, R>,
+    options: KWorkflowOptions,
+    arg1: A1
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1)
+    )
+  }
+
+  /**
+   * Create a workflow start operation with two arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, R> withStartWorkflowOperation(
+    workflow: KFunction3<T, A1, A2, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2)
+    )
+  }
+
+  /**
+   * Create a workflow start operation with three arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, R> withStartWorkflowOperation(
+    workflow: KFunction4<T, A1, A2, A3, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3)
+    )
+  }
+
+  /**
+   * Create a workflow start operation with four arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, R> withStartWorkflowOperation(
+    workflow: KFunction5<T, A1, A2, A3, A4, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4)
+    )
+  }
+
+  /**
+   * Create a workflow start operation with five arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, A5, R> withStartWorkflowOperation(
+    workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5)
+    )
+  }
+
+  /**
+   * Create a workflow start operation with six arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, A5, A6, R> withStartWorkflowOperation(
+    workflow: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5, arg6)
+    )
+  }
+
+  // ========== With Start Workflow Operation - Suspend Variants (0-6 args) ==========
+
+  /**
+   * Create a workflow start operation for a suspend workflow method.
+   */
+  @JvmName("withStartSuspendWorkflowOperation0")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction1<T, R>,
+    options: KWorkflowOptions
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      emptyArray()
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with one argument.
+   */
+  @JvmName("withStartSuspendWorkflowOperation1")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction2<T, A1, R>,
+    options: KWorkflowOptions,
+    arg1: A1
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1)
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with two arguments.
+   */
+  @JvmName("withStartSuspendWorkflowOperation2")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction3<T, A1, A2, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2)
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with three arguments.
+   */
+  @JvmName("withStartSuspendWorkflowOperation3")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3)
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with four arguments.
+   */
+  @JvmName("withStartSuspendWorkflowOperation4")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4)
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with five arguments.
+   */
+  @JvmName("withStartSuspendWorkflowOperation5")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, A5, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5)
+    )
+  }
+
+  /**
+   * Create a workflow start operation for a suspend workflow method with six arguments.
+   */
+  @JvmName("withStartSuspendWorkflowOperation6")
+  @OptIn(InternalTemporalApi::class)
+  public fun <T, A1, A2, A3, A4, A5, A6, R> withStartWorkflowOperation(
+    workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    options: KWorkflowOptions,
+    arg1: A1,
+    arg2: A2,
+    arg3: A3,
+    arg4: A4,
+    arg5: A5,
+    arg6: A6
+  ): KWithStartWorkflowOperation<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    @Suppress("UNCHECKED_CAST")
+    return KWithStartWorkflowOperation(
+      workflowType,
+      workflowClass as Class<T>,
+      resultClass as Class<R>,
+      options.toJavaOptions(),
+      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5, arg6)
+    )
+  }
+
+  // ========== Start Update With Start (0-6 update args) ==========
+
+  /**
+   * Atomically start a workflow and send an update, returning immediately after
+   * the update reaches the specified wait stage.
+   *
+   * If the workflow is not running, starts it and sends the update.
+   * Behavior for existing workflows depends on [KWorkflowOptions.workflowIdConflictPolicy]:
+   * - USE_EXISTING: sends update to existing workflow
+   * - FAIL: throws WorkflowExecutionAlreadyStarted
+   *
+   * @param update Update method reference (must be a suspend function)
+   * @param options Options containing the start operation and wait stage
+   * @return Handle to track the update result
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UR> startUpdateWithStart(
+    update: KSuspendFunction1<T, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      emptyArray()
+    )
+  }
+
+  /**
+   * Start update with start - one update argument.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UR> startUpdateWithStart(
+    update: KSuspendFunction2<T, UA1, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1)
+    )
+  }
+
+  /**
+   * Start update with start - two update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UR> startUpdateWithStart(
+    update: KSuspendFunction3<T, UA1, UA2, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2)
+    )
+  }
+
+  /**
+   * Start update with start - three update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UR> startUpdateWithStart(
+    update: KSuspendFunction4<T, UA1, UA2, UA3, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3)
+    )
+  }
+
+  /**
+   * Start update with start - four update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UR> startUpdateWithStart(
+    update: KSuspendFunction5<T, UA1, UA2, UA3, UA4, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4)
+    )
+  }
+
+  /**
+   * Start update with start - five update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UR> startUpdateWithStart(
+    update: KSuspendFunction6<T, UA1, UA2, UA3, UA4, UA5, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4,
+    updateArg5: UA5
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5)
+    )
+  }
+
+  /**
+   * Start update with start - six update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UA6, UR> startUpdateWithStart(
+    update: KSuspendFunction7<T, UA1, UA2, UA3, UA4, UA5, UA6, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4,
+    updateArg5: UA5,
+    updateArg6: UA6
+  ): KUpdateHandle<UR> {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return startUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5, updateArg6)
+    )
+  }
+
+  // ========== Execute Update With Start (0-6 update args) ==========
+
+  /**
+   * Atomically start a workflow and execute an update, waiting for completion.
+   * Convenience method equivalent to startUpdateWithStart with waitForStage=COMPLETED.
+   *
+   * @param update Update method reference (must be a suspend function)
+   * @param options Options containing the start operation
+   * @return The update result
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UR> executeUpdateWithStart(
+    update: KSuspendFunction1<T, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      emptyArray()
+    )
+  }
+
+  /**
+   * Execute update with start - one update argument.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UR> executeUpdateWithStart(
+    update: KSuspendFunction2<T, UA1, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1)
+    )
+  }
+
+  /**
+   * Execute update with start - two update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UR> executeUpdateWithStart(
+    update: KSuspendFunction3<T, UA1, UA2, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2)
+    )
+  }
+
+  /**
+   * Execute update with start - three update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UR> executeUpdateWithStart(
+    update: KSuspendFunction4<T, UA1, UA2, UA3, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3)
+    )
+  }
+
+  /**
+   * Execute update with start - four update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UR> executeUpdateWithStart(
+    update: KSuspendFunction5<T, UA1, UA2, UA3, UA4, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4)
+    )
+  }
+
+  /**
+   * Execute update with start - five update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UR> executeUpdateWithStart(
+    update: KSuspendFunction6<T, UA1, UA2, UA3, UA4, UA5, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4,
+    updateArg5: UA5
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5)
+    )
+  }
+
+  /**
+   * Execute update with start - six update arguments.
+   */
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UA6, UR> executeUpdateWithStart(
+    update: KSuspendFunction7<T, UA1, UA2, UA3, UA4, UA5, UA6, UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArg1: UA1,
+    updateArg2: UA2,
+    updateArg3: UA3,
+    updateArg4: UA4,
+    updateArg5: UA5,
+    updateArg6: UA6
+  ): UR {
+    val (updateName, updateResultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdateWithStartInternal(
+      updateName,
+      updateResultClass as Class<UR>,
+      options,
+      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5, updateArg6)
+    )
+  }
+
   // ========== Internal Helpers ==========
 
   @OptIn(InternalTemporalApi::class)
@@ -708,6 +1352,111 @@ public class KWorkflowClient(
       signalMethod.name
     } else {
       javaMethod.name
+    }
+  }
+
+  /**
+   * Extracts workflow type, declaring class, and result class from a workflow method reference.
+   */
+  private fun extractFullWorkflowMetadata(workflow: KFunction<*>): Triple<String, Class<*>, Class<*>> {
+    val javaMethod = workflow.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve workflow method reference")
+
+    // Get workflow type from annotation or method name
+    val workflowMethod = javaMethod.getAnnotation(WorkflowMethod::class.java)
+    val workflowType = if (workflowMethod != null && workflowMethod.name.isNotEmpty()) {
+      workflowMethod.name
+    } else {
+      // Default to interface name
+      javaMethod.declaringClass.simpleName
+    }
+
+    val workflowClass = javaMethod.declaringClass
+    val resultClass = javaMethod.returnType
+    return Triple(workflowType, workflowClass, resultClass)
+  }
+
+  /**
+   * Extracts update name and result class from an update method reference.
+   */
+  private fun extractUpdateMetadata(update: KFunction<*>): Pair<String, Class<*>> {
+    val javaMethod = update.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve update method reference")
+
+    val updateMethod = javaMethod.getAnnotation(UpdateMethod::class.java)
+    val updateName = if (updateMethod != null && updateMethod.name.isNotEmpty()) {
+      updateMethod.name
+    } else {
+      javaMethod.name
+    }
+
+    val resultClass = javaMethod.returnType
+    return Pair(updateName, resultClass)
+  }
+
+  /**
+   * Internal implementation for startUpdateWithStart.
+   */
+  @OptIn(InternalTemporalApi::class)
+  private suspend fun <T, R, UR> startUpdateWithStartInternal(
+    updateName: String,
+    updateResultClass: Class<UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArgs: Array<out Any?>
+  ): KUpdateHandle<UR> {
+    val startOp = options.startWorkflowOperation
+
+    if (!startOp.markInvoked()) {
+      throw IllegalStateException("WithStartWorkflowOperation was already executed")
+    }
+
+    require(options.waitForStage != WorkflowUpdateStage.ADMITTED) {
+      "waitForStage cannot be ADMITTED"
+    }
+
+    return withContext(Dispatchers.IO) {
+      val stub = startOp.createStub(workflowClient)
+
+      val updateOptions = UpdateOptions.newBuilder(updateResultClass)
+        .setUpdateName(updateName)
+        .setWaitForStage(options.waitForStage)
+        .apply { options.updateId?.let { setUpdateId(it) } }
+        .build()
+
+      val handle = stub.startUpdateWithStart(updateOptions, updateArgs, startOp.args)
+
+      KUpdateHandleImpl(handle.execution, handle.id, updateResultClass) {
+        handle.resultAsync.await()
+      }
+    }
+  }
+
+  /**
+   * Internal implementation for executeUpdateWithStart.
+   */
+  @OptIn(InternalTemporalApi::class)
+  private suspend fun <T, R, UR> executeUpdateWithStartInternal(
+    updateName: String,
+    updateResultClass: Class<UR>,
+    options: KUpdateWithStartOptions<T, R, UR>,
+    updateArgs: Array<out Any?>
+  ): UR {
+    val startOp = options.startWorkflowOperation
+
+    if (!startOp.markInvoked()) {
+      throw IllegalStateException("WithStartWorkflowOperation was already executed")
+    }
+
+    return withContext(Dispatchers.IO) {
+      val stub = startOp.createStub(workflowClient)
+
+      val updateOptions = UpdateOptions.newBuilder(updateResultClass)
+        .setUpdateName(updateName)
+        .setWaitForStage(WorkflowUpdateStage.COMPLETED)
+        .apply { options.updateId?.let { setUpdateId(it) } }
+        .build()
+
+      stub.executeUpdateWithStart(updateOptions, updateArgs, startOp.args)
     }
   }
 }
