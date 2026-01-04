@@ -26,6 +26,7 @@ import io.temporal.activity.ActivityOptions
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.client.KWorkflowOptions
+import io.temporal.kotlin.worker.KWorker
 import io.temporal.worker.Worker
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface

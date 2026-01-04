@@ -27,6 +27,7 @@ import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.client.KWorkflowOptions
+import io.temporal.kotlin.worker.KWorker
 import io.temporal.testing.TestWorkflowEnvironment
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactoryOptions

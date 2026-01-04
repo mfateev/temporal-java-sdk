@@ -101,15 +101,15 @@ public class KWorkerFactory(
   }
 
   /**
-   * Creates a new worker listening on the specified task queue.
+   * Creates a new Kotlin worker listening on the specified task queue.
    *
    * @param taskQueue The task queue name
    * @param options DSL builder for WorkerOptions
-   * @return A new Worker instance
+   * @return A new KWorker instance
    */
-  public fun newWorker(taskQueue: String, options: WorkerOptions.Builder.() -> Unit = {}): Worker {
+  public fun newWorker(taskQueue: String, options: WorkerOptions.Builder.() -> Unit = {}): KWorker {
     val workerOptions = WorkerOptions.newBuilder().apply(options).build()
-    return workerFactory.newWorker(taskQueue, workerOptions)
+    return KWorker(workerFactory.newWorker(taskQueue, workerOptions))
   }
 
   /**

@@ -26,6 +26,7 @@ import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.toJava
+import io.temporal.kotlin.worker.KWorker
 import io.temporal.serviceclient.OperatorServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.testing.TestWorkflowEnvironment
