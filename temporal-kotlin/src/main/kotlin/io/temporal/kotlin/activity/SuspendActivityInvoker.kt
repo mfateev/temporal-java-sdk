@@ -87,7 +87,12 @@ internal class SuspendActivityInvoker(
       // Create activity context for coroutine access
       val suspendContext = SuspendActivityContext(context, completionClient, job)
 
-      withContext(SuspendActivityContextElement(suspendContext)) {
+      // Create thread context element to propagate context to coroutine threads
+      // This enables KActivity.heartbeat() to work correctly in suspend activities
+      val suspendExecutionContext = SuspendActivityExecutionContext(context, completionClient)
+      val threadContextElement = SuspendActivityThreadContextElement(suspendExecutionContext)
+
+      withContext(SuspendActivityContextElement(suspendContext) + threadContextElement) {
         try {
           // Execute the suspend function
           val result = method.callSuspend(activityInstance, *args)

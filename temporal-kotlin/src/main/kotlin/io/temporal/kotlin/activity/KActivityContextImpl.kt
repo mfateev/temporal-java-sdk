@@ -23,7 +23,6 @@ package io.temporal.kotlin.activity
 import io.temporal.activity.ActivityExecutionContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import kotlin.coroutines.coroutineContext
 
 /**
  * Implementation of [KActivityContext] that wraps Java SDK's [ActivityExecutionContext].
@@ -41,15 +40,6 @@ internal class KActivityContextImpl(
 
   override fun heartbeat(details: Any?) {
     javaContext.heartbeat(details)
-  }
-
-  override suspend fun suspendHeartbeat(details: Any?) {
-    val suspendContext = coroutineContext[SuspendActivityContextElement]?.context
-      ?: throw IllegalStateException(
-        "suspendHeartbeat() must be called from within a suspend activity. " +
-          "For regular activities, use heartbeat() instead."
-      )
-    suspendContext.heartbeat(details)
   }
 
   override fun <T> getHeartbeatDetails(detailsClass: Class<T>): T? {

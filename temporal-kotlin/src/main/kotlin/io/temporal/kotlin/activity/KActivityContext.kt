@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.activity
 
-import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
 
 /**
@@ -55,10 +54,9 @@ import org.slf4j.Logger
  *     val context = KActivity.getContext()
  *     println("Fetching in activity ${context.info.activityId}")
  *
- *     // Non-blocking heartbeat in suspend activity
  *     for (i in 1..10) {
  *       val chunk = httpClient.get(url).body()
- *       context.suspendHeartbeat(i)  // Non-blocking
+ *       context.heartbeat(i)
  *     }
  *
  *     return data
@@ -74,36 +72,21 @@ public interface KActivityContext {
   public val info: KActivityInfo
 
   /**
-   * Records a heartbeat for the current activity (blocking version).
-   *
-   * Use this in regular (non-suspend) activities. For suspend activities,
-   * use [suspendHeartbeat] instead for non-blocking operation.
+   * Records a heartbeat for the current activity.
    *
    * Heartbeats are used to:
    * 1. Report progress to the Temporal service
    * 2. Detect if the activity should be cancelled
    * 3. Store details that can be retrieved if the activity is retried
    *
+   * This is a short, non-blocking operation that records progress locally.
+   * The actual network call happens asynchronously in the background.
+   * Use this method in both regular and suspend activities.
+   *
    * @param details progress details to record (optional)
    * @throws io.temporal.client.ActivityCompletionException if the activity has been cancelled
    */
   public fun heartbeat(details: Any? = null)
-
-  /**
-   * Records a heartbeat for the current suspend activity (non-blocking version).
-   *
-   * This suspend function performs the heartbeat on a background dispatcher
-   * to avoid blocking the coroutine. Use this in suspend activities instead
-   * of the regular [heartbeat] function.
-   *
-   * If the activity has been cancelled, this function throws [CancellationException]
-   * which will cancel the coroutine and properly report cancellation to Temporal.
-   *
-   * @param details progress details to record (optional)
-   * @throws CancellationException if the activity has been cancelled
-   * @throws IllegalStateException if called outside of a suspend activity
-   */
-  public suspend fun suspendHeartbeat(details: Any? = null)
 
   /**
    * Gets the heartbeat details from the previous activity attempt.

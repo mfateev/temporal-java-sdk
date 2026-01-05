@@ -149,7 +149,7 @@ class SuspendActivityIntegrationTest {
       for (i in 1..items) {
         delay(10) // Simulate work
         processed = i
-        KActivity.suspendHeartbeat(processed)
+        KActivity.heartbeat(processed)
         heartbeatCount.incrementAndGet()
       }
       return processed
