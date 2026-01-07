@@ -26,15 +26,10 @@ import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.client.WorkflowUpdateStage
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KTypedWorkflowHandleImpl
-import io.temporal.kotlin.internal.KUpdateHandleImpl
-import io.temporal.kotlin.internal.KWorkflowHandleImpl
-import io.temporal.kotlin.internal.WorkflowHandleImpl
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
@@ -52,6 +47,10 @@ import kotlin.reflect.KSuspendFunction5
 import kotlin.reflect.KSuspendFunction6
 import kotlin.reflect.KSuspendFunction7
 import kotlin.reflect.jvm.javaMethod
+
+// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
+//  using gRPC async client. This will eliminate thread pool overhead and provide true
+//  non-blocking suspension.
 
 /**
  * Kotlin workflow client providing suspend functions and type-safe workflow APIs.
@@ -584,38 +583,34 @@ public class KWorkflowClient(
   /**
    * Get a typed handle for an existing workflow by ID.
    */
-  @OptIn(InternalTemporalApi::class)
   public fun <T> getWorkflowHandle(workflowId: String, workflowClass: Class<T>): KWorkflowHandle<T> {
     val stub = workflowClient.newUntypedWorkflowStub(workflowId)
-    return KWorkflowHandleImpl(stub, workflowClass)
+    return KWorkflowHandle(stub, workflowClass)
   }
 
   /**
    * Get a typed handle for an existing workflow by ID and run ID.
    */
-  @OptIn(InternalTemporalApi::class)
   public fun <T> getWorkflowHandle(workflowId: String, runId: String, workflowClass: Class<T>): KWorkflowHandle<T> {
     val stub = workflowClient.newUntypedWorkflowStub(workflowId, java.util.Optional.of(runId), java.util.Optional.empty())
-    return KWorkflowHandleImpl(stub, workflowClass)
+    return KWorkflowHandle(stub, workflowClass)
   }
 
   /**
    * Get an untyped handle for an existing workflow by ID.
    * Use when you don't know the workflow type at compile time.
    */
-  @OptIn(InternalTemporalApi::class)
   public fun getUntypedWorkflowHandle(workflowId: String): WorkflowHandle {
     val stub = workflowClient.newUntypedWorkflowStub(workflowId)
-    return WorkflowHandleImpl(stub)
+    return WorkflowHandle(stub)
   }
 
   /**
    * Get an untyped handle for an existing workflow by ID and run ID.
    */
-  @OptIn(InternalTemporalApi::class)
   public fun getUntypedWorkflowHandle(workflowId: String, runId: String): WorkflowHandle {
     val stub = workflowClient.newUntypedWorkflowStub(workflowId, java.util.Optional.of(runId), java.util.Optional.empty())
-    return WorkflowHandleImpl(stub)
+    return WorkflowHandle(stub)
   }
 
   // ========== Signal With Start ==========
@@ -624,7 +619,6 @@ public class KWorkflowClient(
    * Atomically start a workflow and send a signal.
    * If the workflow already exists, only the signal is sent.
    */
-  @OptIn(InternalTemporalApi::class)
   public suspend fun <T, A1, R, SA1> signalWithStart(
     workflow: KFunction2<T, A1, R>,
     options: KWorkflowOptions,
@@ -632,7 +626,7 @@ public class KWorkflowClient(
     signal: KFunction2<T, SA1, *>,
     signalArg: SA1
   ): KTypedWorkflowHandle<T, R> {
-    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
     val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
@@ -641,8 +635,9 @@ public class KWorkflowClient(
     val execution = stub.signalWithStart(signalName, signalArgs, workflowArgs)
 
     @Suppress("UNCHECKED_CAST")
-    return KTypedWorkflowHandleImpl(
+    return KTypedWorkflowHandle(
       workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
       resultClass as Class<R>
     )
   }
@@ -650,14 +645,13 @@ public class KWorkflowClient(
   /**
    * Atomically start a workflow (no args) and send a signal.
    */
-  @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, SA1> signalWithStart(
     workflow: KFunction1<T, R>,
     options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
     signalArg: SA1
   ): KTypedWorkflowHandle<T, R> {
-    val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
     val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
@@ -665,8 +659,9 @@ public class KWorkflowClient(
     val execution = stub.signalWithStart(signalName, signalArgs, emptyArray())
 
     @Suppress("UNCHECKED_CAST")
-    return KTypedWorkflowHandleImpl(
+    return KTypedWorkflowHandle(
       workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
       resultClass as Class<R>
     )
   }
@@ -1310,7 +1305,6 @@ public class KWorkflowClient(
 
   // ========== Internal Helpers ==========
 
-  @OptIn(InternalTemporalApi::class)
   @Suppress("UNCHECKED_CAST")
   private fun <T, R> startWorkflowInternal(
     workflowType: String,
@@ -1320,8 +1314,13 @@ public class KWorkflowClient(
   ): KTypedWorkflowHandle<T, R> {
     val stub = workflowClient.newUntypedWorkflowStub(workflowType, options)
     val execution = stub.start(*args)
-    return KTypedWorkflowHandleImpl<T, R>(
+    // We don't have the workflow interface class here, so we use Any::class.java
+    // This is safe because the handle methods that need the interface class
+    // are defined on the typed handle which already has the correct type parameter
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
       workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      Any::class.java as Class<T>,
       resultClass
     )
   }
@@ -1425,9 +1424,7 @@ public class KWorkflowClient(
 
       val handle = stub.startUpdateWithStart(updateOptions, updateArgs, startOp.args)
 
-      KUpdateHandleImpl(handle.execution, handle.id, updateResultClass) {
-        handle.resultAsync.await()
-      }
+      KUpdateHandle(handle)
     }
   }
 

@@ -21,61 +21,240 @@
 package io.temporal.kotlin.client
 
 import io.temporal.api.common.v1.WorkflowExecution
-import io.temporal.client.WorkflowExecutionDescription
 import io.temporal.client.WorkflowStub
-import io.temporal.client.WorkflowUpdateException
+import io.temporal.client.WorkflowUpdateHandle
 import io.temporal.kotlin.TemporalDsl
+import io.temporal.workflow.QueryMethod
+import io.temporal.workflow.SignalMethod
+import io.temporal.workflow.UpdateMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.util.concurrent.TimeUnit
+import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
 import kotlin.reflect.KFunction2
+import kotlin.reflect.jvm.javaMethod
+
+// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
+//  using gRPC async client. This will eliminate thread pool overhead and provide true
+//  non-blocking suspension.
 
 /**
- * Handle for interacting with a workflow execution.
+ * Untyped handle for interacting with a workflow execution.
  *
- * Provides methods to signal, query, update, and cancel workflows.
+ * Use this when you don't know the workflow type at compile time.
+ * Operations use string names instead of method references.
  *
- * @param T the workflow interface type
+ * Example:
+ * ```kotlin
+ * val handle = client.getUntypedWorkflowHandle("order-123")
+ * handle.signal("updatePriority", Priority.HIGH)
+ * val status = handle.query<OrderStatus>("status")
+ * ```
  */
-public interface KWorkflowHandle<T> {
+public open class WorkflowHandle(
+  @PublishedApi internal val stub: WorkflowStub
+) {
 
   /**
    * The workflow ID.
    */
   public val workflowId: String
+    get() = stub.execution?.workflowId ?: throw IllegalStateException("Workflow not yet started")
 
   /**
    * The run ID of the current execution, if known.
    */
   public val runId: String?
+    get() = stub.execution?.runId?.takeIf { it.isNotEmpty() }
 
   /**
    * The workflow execution containing workflowId and runId.
    */
   public val execution: WorkflowExecution
+    get() = stub.execution ?: throw IllegalStateException("Workflow not yet started")
+
+  /**
+   * Sends a signal to the workflow by name.
+   *
+   * @param signalName the signal name
+   * @param args the signal arguments
+   */
+  public suspend fun signal(signalName: String, vararg args: Any?) {
+    withContext(Dispatchers.IO) {
+      stub.signal(signalName, *args)
+    }
+  }
+
+  /**
+   * Queries the workflow by name with reified type inference.
+   *
+   * @param queryName the query name
+   * @param args the query arguments
+   * @return the query result
+   */
+  public suspend inline fun <reified R> query(queryName: String, vararg args: Any?): R =
+    query(queryName, R::class.java, *args)
+
+  /**
+   * Queries the workflow by name.
+   *
+   * @param queryName the query name
+   * @param resultClass the expected result type
+   * @param args the query arguments
+   * @return the query result
+   */
+  public suspend fun <R> query(queryName: String, resultClass: Class<R>, vararg args: Any?): R {
+    return withContext(Dispatchers.IO) {
+      stub.query(queryName, resultClass, *args)
+    }
+  }
+
+  /**
+   * Executes an update by name with reified type inference and waits for the result.
+   *
+   * @param updateName the update name
+   * @param args the update arguments
+   * @return the update result
+   */
+  public suspend inline fun <reified R> executeUpdate(updateName: String, vararg args: Any?): R =
+    executeUpdate(updateName, R::class.java, *args)
+
+  /**
+   * Executes an update by name and waits for the result.
+   *
+   * @param updateName the update name
+   * @param resultClass the expected result type
+   * @param args the update arguments
+   * @return the update result
+   */
+  public suspend fun <R> executeUpdate(updateName: String, resultClass: Class<R>, vararg args: Any?): R {
+    return withContext(Dispatchers.IO) {
+      stub.update(updateName, resultClass, *args)
+    }
+  }
+
+  /**
+   * Requests cancellation of the workflow.
+   */
+  public suspend fun cancel() {
+    withContext(Dispatchers.IO) {
+      stub.cancel()
+    }
+  }
+
+  /**
+   * Terminates the workflow immediately.
+   *
+   * @param reason optional reason for termination
+   */
+  public suspend fun terminate(reason: String? = null) {
+    withContext(Dispatchers.IO) {
+      stub.terminate(reason)
+    }
+  }
+
+  /**
+   * Describes the workflow execution.
+   *
+   * @return detailed information about the workflow execution
+   */
+  public suspend fun describe(): KWorkflowExecutionDescription {
+    return withContext(Dispatchers.IO) {
+      KWorkflowExecutionDescription(stub.describe())
+    }
+  }
+
+  /**
+   * Waits for the workflow to complete and returns its result with reified type inference.
+   *
+   * Use this when the result type is known at compile time but you're using an untyped handle.
+   * For typed handles ([KTypedWorkflowHandle]), use [KTypedWorkflowHandle.result] instead.
+   *
+   * @return the workflow result
+   */
+  public suspend inline fun <reified R> getResult(): R = getResult(R::class.java)
+
+  /**
+   * Waits for the workflow to complete and returns its result.
+   *
+   * Use this when the result type is known at compile time but you're using an untyped handle.
+   * For typed handles ([KTypedWorkflowHandle]), use [KTypedWorkflowHandle.result] instead.
+   *
+   * @param R the expected result type
+   * @param resultClass the class of the expected result
+   * @return the workflow result
+   */
+  public suspend fun <R> getResult(resultClass: Class<R>): R {
+    return withContext(Dispatchers.IO) {
+      stub.getResult(resultClass)
+    }
+  }
+
+  /**
+   * Gets a handle for an existing update by ID with reified type inference.
+   *
+   * @param updateId the update ID
+   * @return handle for retrieving the update result
+   */
+  public inline fun <reified R> getUpdateHandle(updateId: String): KUpdateHandle<R> =
+    getUpdateHandle(updateId, R::class.java)
+
+  /**
+   * Gets a handle for an existing update by ID.
+   *
+   * @param updateId the update ID
+   * @param resultClass the expected result type
+   * @return handle for retrieving the update result
+   */
+  public fun <R> getUpdateHandle(updateId: String, resultClass: Class<R>): KUpdateHandle<R> {
+    val handle = stub.getUpdateHandle(updateId, resultClass)
+    return KUpdateHandle(handle)
+  }
+
+  /**
+   * Returns the underlying WorkflowStub for advanced operations.
+   */
+  public fun toStub(): WorkflowStub = stub
+}
+
+/**
+ * Handle for interacting with a workflow execution.
+ *
+ * Provides methods to signal, query, update, and cancel workflows
+ * using type-safe method references.
+ *
+ * @param T the workflow interface type
+ */
+public open class KWorkflowHandle<T>(
+  stub: WorkflowStub,
+  @PublishedApi internal val workflowInterface: Class<T>
+) : WorkflowHandle(stub) {
 
   /**
    * Sends a signal to the workflow using a method reference.
    *
    * Example:
    * ```kotlin
-   * handle.signal(MyWorkflow::updateStatus, "processing")
+   * handle.signal(MyWorkflow::updateStatus)
    * ```
    *
    * @param signal the signal method reference
    */
-  public suspend fun signal(signal: KFunction1<T, Unit>)
+  public suspend fun signal(signal: KFunction1<T, Unit>) {
+    val signalName = extractSignalName(signal)
+    signal(signalName)
+  }
 
   /**
    * Sends a signal with one argument to the workflow.
    */
-  public suspend fun <A> signal(signal: KFunction2<T, A, Unit>, arg: A)
-
-  /**
-   * Sends a signal by name.
-   *
-   * @param signalName the signal name
-   * @param args the signal arguments
-   */
-  public suspend fun signal(signalName: String, vararg args: Any?)
+  public suspend fun <A> signal(signal: KFunction2<T, A, Unit>, arg: A) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, arg)
+  }
 
   /**
    * Queries the workflow using a method reference.
@@ -88,117 +267,81 @@ public interface KWorkflowHandle<T> {
    * @param query the query method reference
    * @return the query result
    */
-  public suspend fun <R> query(query: KFunction1<T, R>): R
+  public suspend fun <R> query(query: KFunction1<T, R>): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>)
+  }
 
   /**
    * Queries the workflow with one argument.
    */
-  public suspend fun <A, R> query(query: KFunction2<T, A, R>, arg: A): R
-
-  /**
-   * Queries the workflow by name.
-   *
-   * @param queryName the query name
-   * @param resultClass the expected result type
-   * @param args the query arguments
-   * @return the query result
-   */
-  public suspend fun <R> query(queryName: String, resultClass: Class<R>, vararg args: Any?): R
+  public suspend fun <A, R> query(query: KFunction2<T, A, R>, arg: A): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, arg)
+  }
 
   /**
    * Executes an update on the workflow and waits for the result.
    *
    * @param update the update method reference
    * @return the update result
-   * @throws WorkflowUpdateException if the update fails
    */
-  public suspend fun <R> executeUpdate(update: KFunction1<T, R>): R
+  public suspend fun <R> executeUpdate(update: KFunction1<T, R>): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>)
+  }
 
   /**
    * Executes an update with one argument and waits for the result.
    */
-  public suspend fun <A, R> executeUpdate(update: KFunction2<T, A, R>, arg: A): R
+  public suspend fun <A, R> executeUpdate(update: KFunction2<T, A, R>, arg: A): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, arg)
+  }
 
-  /**
-   * Executes an update by name and waits for the result.
-   *
-   * @param updateName the update name
-   * @param resultClass the expected result type
-   * @param args the update arguments
-   * @return the update result
-   */
-  public suspend fun <R> executeUpdate(updateName: String, resultClass: Class<R>, vararg args: Any?): R
+  private fun extractSignalName(signal: KFunction<*>): String {
+    val javaMethod = signal.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve signal method reference")
 
-  /**
-   * Starts an update on the workflow and returns a handle for async result retrieval.
-   *
-   * @param update the update method reference
-   * @return handle for retrieving the update result
-   */
-  public suspend fun <R> startUpdate(update: KFunction1<T, R>): KUpdateHandle<R>
+    val signalMethod = javaMethod.getAnnotation(SignalMethod::class.java)
+    return if (signalMethod != null && signalMethod.name.isNotEmpty()) {
+      signalMethod.name
+    } else {
+      javaMethod.name
+    }
+  }
 
-  /**
-   * Starts an update with one argument and returns a handle.
-   */
-  public suspend fun <A, R> startUpdate(update: KFunction2<T, A, R>, arg: A): KUpdateHandle<R>
+  private fun extractQueryMetadata(query: KFunction<*>): Pair<String, Class<*>> {
+    val javaMethod = query.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve query method reference")
 
-  /**
-   * Starts an update by name and returns a handle.
-   *
-   * @param updateName the update name
-   * @param resultClass the expected result type
-   * @param args the update arguments
-   * @return handle for retrieving the update result
-   */
-  public suspend fun <R> startUpdate(updateName: String, resultClass: Class<R>, vararg args: Any?): KUpdateHandle<R>
+    val queryMethod = javaMethod.getAnnotation(QueryMethod::class.java)
+    val queryName = if (queryMethod != null && queryMethod.name.isNotEmpty()) {
+      queryMethod.name
+    } else {
+      javaMethod.name
+    }
 
-  /**
-   * Gets a handle for an existing update by ID.
-   *
-   * @param updateId the update ID
-   * @param resultClass the expected result type
-   * @return handle for retrieving the update result
-   */
-  public fun <R> getUpdateHandle(updateId: String, resultClass: Class<R>): KUpdateHandle<R>
+    return Pair(queryName, javaMethod.returnType)
+  }
 
-  /**
-   * Requests cancellation of the workflow.
-   *
-   * This is a request; the workflow may choose to ignore it or perform cleanup.
-   */
-  public suspend fun cancel()
+  private fun extractUpdateMetadata(update: KFunction<*>): Pair<String, Class<*>> {
+    val javaMethod = update.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve update method reference")
 
-  /**
-   * Terminates the workflow immediately.
-   *
-   * Unlike cancellation, termination is forceful and immediate.
-   *
-   * @param reason optional reason for termination
-   */
-  public suspend fun terminate(reason: String? = null)
+    val updateMethod = javaMethod.getAnnotation(UpdateMethod::class.java)
+    val updateName = if (updateMethod != null && updateMethod.name.isNotEmpty()) {
+      updateMethod.name
+    } else {
+      javaMethod.name
+    }
 
-  /**
-   * Describes the workflow execution.
-   *
-   * @return detailed information about the workflow execution
-   */
-  public suspend fun describe(): WorkflowExecutionDescription
-
-  /**
-   * Waits for the workflow to complete and returns its result.
-   *
-   * Use this when the result type is not known at compile time.
-   *
-   * @param R the expected result type
-   * @param resultClass the class of the expected result
-   * @return the workflow result
-   */
-  public suspend fun <R> result(resultClass: Class<R>): R
-
-  /**
-   * Returns the underlying WorkflowStub for advanced operations.
-   */
-  public fun toStub(): WorkflowStub
+    return Pair(updateName, javaMethod.returnType)
+  }
 }
 
 /**
@@ -209,25 +352,34 @@ public interface KWorkflowHandle<T> {
  * @param T the workflow interface type
  * @param R the result type
  */
-public interface KTypedWorkflowHandle<T, R> : KWorkflowHandle<T> {
+public class KTypedWorkflowHandle<T, R>(
+  stub: WorkflowStub,
+  workflowInterface: Class<T>,
+  @PublishedApi internal val resultClass: Class<R>
+) : KWorkflowHandle<T>(stub, workflowInterface) {
 
   /**
    * Waits for the workflow to complete and returns its result.
    *
    * @return the workflow result
-   * @throws WorkflowException if the workflow fails
    */
-  public suspend fun result(): R
+  public suspend fun result(): R {
+    return withContext(Dispatchers.IO) {
+      stub.getResult(resultClass)
+    }
+  }
 
   /**
    * Waits for the workflow to complete with a timeout.
    *
    * @param timeout maximum time to wait
    * @return the workflow result
-   * @throws WorkflowException if the workflow fails
-   * @throws TimeoutException if the wait times out
    */
-  public suspend fun result(timeout: java.time.Duration): R
+  public suspend fun result(timeout: Duration): R {
+    return withContext(Dispatchers.IO) {
+      stub.getResult(timeout.toMillis(), TimeUnit.MILLISECONDS, resultClass)
+    }
+  }
 }
 
 /**
@@ -235,25 +387,28 @@ public interface KTypedWorkflowHandle<T, R> : KWorkflowHandle<T> {
  *
  * @param R the result type of the update
  */
-public interface KUpdateHandle<R> {
+public class KUpdateHandle<R>(
+  @PublishedApi internal val delegate: WorkflowUpdateHandle<R>
+) {
 
   /**
    * The update ID.
    */
-  public val updateId: String
+  public val updateId: String get() = delegate.id
 
   /**
    * The workflow execution this update was sent to.
    */
-  public val execution: WorkflowExecution
+  public val execution: WorkflowExecution get() = delegate.execution
 
   /**
    * Waits for the update to complete and returns its result.
    *
    * @return the update result
-   * @throws WorkflowUpdateException if the update fails
    */
-  public suspend fun result(): R
+  public suspend fun result(): R {
+    return delegate.resultAsync.await()
+  }
 
   /**
    * Waits for the update to complete with a timeout.
@@ -261,7 +416,11 @@ public interface KUpdateHandle<R> {
    * @param timeout maximum time to wait
    * @return the update result
    */
-  public suspend fun result(timeout: java.time.Duration): R
+  public suspend fun result(timeout: Duration): R {
+    return kotlinx.coroutines.withTimeout(timeout.toMillis()) {
+      delegate.resultAsync.await()
+    }
+  }
 }
 
 /**
@@ -302,117 +461,3 @@ public class WorkflowStartOptions private constructor(
       Builder().apply(block).build()
   }
 }
-
-/**
- * Untyped handle for interacting with a workflow execution.
- *
- * Use this when you don't know the workflow type at compile time.
- * Operations use string names instead of method references.
- *
- * Example:
- * ```kotlin
- * val handle = client.getUntypedWorkflowHandle("order-123")
- * handle.signal("updatePriority", Priority.HIGH)
- * val status = handle.query<OrderStatus>("status")
- * ```
- */
-public interface WorkflowHandle {
-
-  /**
-   * The workflow ID.
-   */
-  public val workflowId: String
-
-  /**
-   * The run ID of the current execution, if known.
-   */
-  public val runId: String?
-
-  /**
-   * The workflow execution containing workflowId and runId.
-   */
-  public val execution: WorkflowExecution
-
-  /**
-   * Waits for the workflow to complete and returns its result.
-   *
-   * @param R the expected result type
-   * @param resultClass the class of the expected result
-   * @return the workflow result
-   */
-  public suspend fun <R> result(resultClass: Class<R>): R
-
-  /**
-   * Sends a signal to the workflow by name.
-   *
-   * @param signalName the signal name
-   * @param args the signal arguments
-   */
-  public suspend fun signal(signalName: String, vararg args: Any?)
-
-  /**
-   * Queries the workflow by name.
-   *
-   * @param queryName the query name
-   * @param resultClass the expected result type
-   * @param args the query arguments
-   * @return the query result
-   */
-  public suspend fun <R> query(queryName: String, resultClass: Class<R>, vararg args: Any?): R
-
-  /**
-   * Executes an update by name and waits for the result.
-   *
-   * @param updateName the update name
-   * @param resultClass the expected result type
-   * @param args the update arguments
-   * @return the update result
-   */
-  public suspend fun <R> executeUpdate(updateName: String, resultClass: Class<R>, vararg args: Any?): R
-
-  /**
-   * Requests cancellation of the workflow.
-   */
-  public suspend fun cancel()
-
-  /**
-   * Terminates the workflow immediately.
-   *
-   * @param reason optional reason for termination
-   */
-  public suspend fun terminate(reason: String? = null)
-
-  /**
-   * Describes the workflow execution.
-   *
-   * @return detailed information about the workflow execution
-   */
-  public suspend fun describe(): WorkflowExecutionDescription
-
-  /**
-   * Returns the underlying WorkflowStub for advanced operations.
-   */
-  public fun toStub(): WorkflowStub
-}
-
-/**
- * Reified extension for getting the workflow result with type inference.
- */
-public suspend inline fun <reified R> WorkflowHandle.result(): R = result(R::class.java)
-
-/**
- * Reified extension for querying the workflow with type inference.
- */
-public suspend inline fun <reified R> WorkflowHandle.query(queryName: String, vararg args: Any?): R =
-  query(queryName, R::class.java, *args)
-
-/**
- * Reified extension for getting the workflow result with type inference.
- */
-public suspend inline fun <reified R> KWorkflowHandle<*>.result(): R = result(R::class.java)
-
-/**
- * Reified extension for querying the workflow with type inference.
- */
-public suspend inline fun <reified R, T> KWorkflowHandle<T>.query(queryName: String, vararg args: Any?): R =
-  query(queryName, R::class.java, *args)

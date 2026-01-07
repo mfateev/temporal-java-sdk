@@ -20,8 +20,21 @@
 
 package io.temporal.kotlin.workflow
 
+import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes
+import io.temporal.api.common.v1.Payloads
+import io.temporal.api.common.v1.WorkflowExecution
+import io.temporal.common.converter.DataConverter
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.workflow.SignalMethod
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.Optional
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
 import kotlin.reflect.KFunction2
+import kotlin.reflect.jvm.javaMethod
 
 /**
  * Handle to a child workflow execution for sending signals and awaiting results.
@@ -47,18 +60,23 @@ import kotlin.reflect.KFunction2
  * @param T the child workflow interface type
  * @param R the result type of the child workflow
  */
-public interface KChildWorkflowHandle<T, R> {
-
+public class KChildWorkflowHandle<T, R> @InternalTemporalApi internal constructor(
   /**
    * The workflow ID of the child workflow.
    */
-  public val workflowId: String
+  public val workflowId: String,
 
   /**
    * The run ID of the first execution of this child workflow.
    * This remains constant across continue-as-new.
    */
-  public val firstExecutionRunId: String
+  public val firstExecutionRunId: String,
+
+  @PublishedApi internal val resultClass: Class<R>,
+  @PublishedApi internal val context: KotlinWorkflowContext,
+  @PublishedApi internal val dataConverter: DataConverter,
+  @PublishedApi internal val resultProvider: suspend () -> Optional<Payloads>
+) {
 
   /**
    * Waits for the child workflow to complete and returns the result.
@@ -66,19 +84,25 @@ public interface KChildWorkflowHandle<T, R> {
    * @return the result of the child workflow
    * @throws ChildWorkflowException if the child workflow fails
    */
-  public suspend fun result(): R
+  public suspend fun result(): R {
+    val payloads = resultProvider()
+    return deserializeResult(payloads)
+  }
 
   /**
    * Sends a signal to the child workflow using a method reference.
    *
    * Example:
    * ```kotlin
-   * handle.signal(ChildWorkflow::updateStatus, "processing")
+   * handle.signal(ChildWorkflow::updateStatus)
    * ```
    *
    * @param signal the signal method reference
    */
-  public suspend fun signal(signal: KFunction1<T, Unit>)
+  public suspend fun signal(signal: KFunction1<T, Unit>) {
+    val signalName = extractSignalName(signal)
+    signal(signalName)
+  }
 
   /**
    * Sends a signal with one argument to the child workflow.
@@ -86,7 +110,10 @@ public interface KChildWorkflowHandle<T, R> {
    * @param signal the signal method reference
    * @param arg the signal argument
    */
-  public suspend fun <A> signal(signal: KFunction2<T, A, Unit>, arg: A)
+  public suspend fun <A> signal(signal: KFunction2<T, A, Unit>, arg: A) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, arg)
+  }
 
   /**
    * Sends a signal by name to the child workflow.
@@ -94,7 +121,36 @@ public interface KChildWorkflowHandle<T, R> {
    * @param signalName the name of the signal
    * @param args the signal arguments
    */
-  public suspend fun signal(signalName: String, vararg args: Any?)
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun signal(signalName: String, vararg args: Any?) {
+    val input = if (args.isEmpty()) {
+      Optional.empty()
+    } else {
+      dataConverter.toPayloads(*args)
+    }
+
+    val execution = WorkflowExecution.newBuilder()
+      .setWorkflowId(workflowId)
+      .setRunId(firstExecutionRunId)
+      .build()
+
+    val attributes = SignalExternalWorkflowExecutionCommandAttributes.newBuilder()
+      .setSignalName(signalName)
+      .setExecution(execution)
+    input.ifPresent { attributes.setInput(it) }
+
+    suspendCancellableCoroutine<Unit> { cont ->
+      context.replayContext.signalExternalWorkflowExecution(
+        attributes
+      ) { _, failure ->
+        if (failure != null) {
+          cont.resumeWithException(RuntimeException(failure.message))
+        } else {
+          cont.resume(Unit)
+        }
+      }
+    }
+  }
 
   /**
    * Requests cancellation of the child workflow.
@@ -102,5 +158,45 @@ public interface KChildWorkflowHandle<T, R> {
    * This is a request; the child workflow may choose to ignore it
    * or perform cleanup before terminating.
    */
-  public suspend fun cancel()
+  @OptIn(InternalTemporalApi::class)
+  public suspend fun cancel() {
+    val execution = WorkflowExecution.newBuilder()
+      .setWorkflowId(workflowId)
+      .setRunId(firstExecutionRunId)
+      .build()
+
+    suspendCancellableCoroutine<Unit> { cont ->
+      context.replayContext.requestCancelExternalWorkflowExecution(
+        execution,
+        null // reason
+      ) { _, exception ->
+        if (exception != null) {
+          cont.resumeWithException(exception)
+        } else {
+          cont.resume(Unit)
+        }
+      }
+    }
+  }
+
+  private fun extractSignalName(signal: KFunction<*>): String {
+    val javaMethod = signal.javaMethod
+      ?: throw IllegalArgumentException("Cannot resolve signal method reference")
+
+    val signalMethod = javaMethod.getAnnotation(SignalMethod::class.java)
+    return if (signalMethod != null && signalMethod.name.isNotEmpty()) {
+      signalMethod.name
+    } else {
+      javaMethod.name
+    }
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  private fun deserializeResult(payloads: Optional<Payloads>): R {
+    return if (payloads.isPresent && resultClass != Unit::class.java && resultClass != Void.TYPE) {
+      dataConverter.fromPayload(payloads.get().getPayloads(0), resultClass, resultClass) as R
+    } else {
+      null as R
+    }
+  }
 }
