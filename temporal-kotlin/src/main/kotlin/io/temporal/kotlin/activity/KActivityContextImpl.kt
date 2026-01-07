@@ -42,7 +42,7 @@ internal class KActivityContextImpl(
     javaContext.heartbeat(details)
   }
 
-  override fun <T> getHeartbeatDetails(detailsClass: Class<T>): T? {
+  override fun <T> heartbeatDetails(detailsClass: Class<T>): T? {
     return javaContext.getHeartbeatDetails(detailsClass).orElse(null)
   }
 

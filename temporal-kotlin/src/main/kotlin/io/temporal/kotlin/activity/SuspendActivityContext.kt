@@ -31,6 +31,10 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
+// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
+//  using gRPC async client. This will eliminate thread pool overhead and provide true
+//  non-blocking suspension.
+
 /**
  * Coroutine context element that holds the suspend activity context.
  *
@@ -102,7 +106,7 @@ internal class SuspendActivityContext(
    * @param detailsClass the class of the expected details type
    * @return the heartbeat details, or null if none
    */
-  fun <T> getHeartbeatDetails(detailsClass: Class<T>): T? {
+  fun <T> heartbeatDetails(detailsClass: Class<T>): T? {
     return javaContext.getHeartbeatDetails(detailsClass).orElse(null)
   }
 
@@ -112,7 +116,7 @@ internal class SuspendActivityContext(
    * @param T the expected type of the heartbeat details
    * @return the heartbeat details, or null if none
    */
-  inline fun <reified T> getHeartbeatDetails(): T? {
-    return getHeartbeatDetails(T::class.java)
+  inline fun <reified T> heartbeatDetails(): T? {
+    return heartbeatDetails(T::class.java)
   }
 }

@@ -98,7 +98,7 @@ public interface KActivityContext {
    * @param detailsClass the class of the expected details type
    * @return the heartbeat details, or null if none
    */
-  public fun <T> getHeartbeatDetails(detailsClass: Class<T>): T?
+  public fun <T> heartbeatDetails(detailsClass: Class<T>): T?
 
   /**
    * Gets a correlation token that can be used to complete the Activity Execution
@@ -145,17 +145,17 @@ public interface KActivityContext {
 }
 
 /**
- * Reified version of [KActivityContext.getHeartbeatDetails] for easier Kotlin usage.
+ * Reified version of [KActivityContext.heartbeatDetails] for easier Kotlin usage.
  *
  * Example:
  * ```kotlin
- * val progress = context.getHeartbeatDetails<Int>()
+ * val progress = context.heartbeatDetails<Int>()
  * val startIndex = progress ?: 0
  * ```
  *
  * @param T the expected type of the heartbeat details
  * @return the heartbeat details, or null if none
  */
-public inline fun <reified T> KActivityContext.getHeartbeatDetails(): T? {
-  return getHeartbeatDetails(T::class.java)
+public inline fun <reified T> KActivityContext.heartbeatDetails(): T? {
+  return heartbeatDetails(T::class.java)
 }
