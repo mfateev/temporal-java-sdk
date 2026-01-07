@@ -25,14 +25,14 @@ import org.slf4j.Logger
 /**
  * Context object passed to an Activity implementation.
  *
- * Use [KActivity.getContext] from an activity implementation to access.
+ * Use [KActivity.context] from an activity implementation to access.
  * This matches Java SDK's [io.temporal.activity.ActivityExecutionContext] pattern.
  *
  * Example (regular activity):
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val context = KActivity.getContext()
+ *     val context = KActivity.context
  *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
@@ -51,7 +51,7 @@ import org.slf4j.Logger
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val context = KActivity.getContext()
+ *     val context = KActivity.context
  *     println("Fetching in activity ${context.info.activityId}")
  *
  *     for (i in 1..10) {

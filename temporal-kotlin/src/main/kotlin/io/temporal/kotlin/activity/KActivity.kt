@@ -29,8 +29,8 @@ import org.slf4j.LoggerFactory
 /**
  * Provides access to Temporal activity APIs from within Kotlin activity code.
  *
- * Use [getContext] to obtain a [KActivityContext] for accessing activity APIs.
- * This matches Java SDK's [Activity.getExecutionContext] pattern.
+ * Use the [context] property to obtain a [KActivityContext] for accessing activity APIs.
+ * This matches Java SDK's [Activity.getExecutionContext] pattern with Kotlin idiomatic syntax.
  *
  * Supports both regular and suspend activities:
  * - **Regular activities**: Use thread-local context from Java SDK
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val context = KActivity.getContext()
+ *     val context = KActivity.context
  *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val context = KActivity.getContext()
+ *     val context = KActivity.context
  *     println("Fetching in activity ${context.info.activityId}")
  *
  *     for (i in 1..10) {
@@ -75,17 +75,15 @@ import org.slf4j.LoggerFactory
 public object KActivity {
 
   /**
-   * Returns the activity execution context for the current activity.
+   * The activity execution context for the current activity.
    *
    * This is the primary entry point for accessing activity APIs, matching
-   * Java SDK's [Activity.getExecutionContext] pattern.
+   * Java SDK's [Activity.getExecutionContext] pattern with Kotlin idiomatic syntax.
    *
-   * @return the activity context with Kotlin-friendly APIs
    * @throws IllegalStateException if called outside of activity code
    */
-  public fun getContext(): KActivityContext {
-    return KActivityContextImpl(Activity.getExecutionContext())
-  }
+  public val context: KActivityContext
+    get() = KActivityContextImpl(Activity.getExecutionContext())
 
   /**
    * Returns information about the current activity execution.
