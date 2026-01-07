@@ -31,6 +31,10 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 
+// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
+//  using gRPC async client. This will eliminate thread pool overhead and provide true
+//  non-blocking suspension.
+
 /**
  * Kotlin worker factory that automatically enables coroutine support.
  *

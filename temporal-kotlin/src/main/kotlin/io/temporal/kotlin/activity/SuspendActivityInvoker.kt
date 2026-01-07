@@ -32,6 +32,10 @@ import kotlinx.coroutines.withContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
 
+// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
+//  using gRPC async client. This will eliminate thread pool overhead and provide true
+//  non-blocking suspension.
+
 /**
  * Invokes suspend activity methods using Kotlin coroutines.
  *
