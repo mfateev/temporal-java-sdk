@@ -27,8 +27,8 @@ import io.temporal.activity.ActivityMethod
 import io.temporal.common.SearchAttributeKey
 import io.temporal.common.SearchAttributeUpdate
 import io.temporal.common.SearchAttributes
-import io.temporal.common.converter.EncodedValues
 import io.temporal.kotlin.activity.KActivityOptions
+import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
@@ -1819,7 +1819,7 @@ public object KWorkflow {
    * Registers a signal handler for a specific signal name.
    *
    * Signal handlers are invoked when the workflow receives a signal with the
-   * matching name. The handler receives the signal arguments as [EncodedValues]
+   * matching name. The handler receives the signal arguments as [KEncodedValues]
    * which can be decoded to the expected types.
    *
    * Example:
@@ -1830,7 +1830,7 @@ public object KWorkflow {
    *   override suspend fun execute(): String {
    *     // Register signal handler
    *     KWorkflow.registerSignalHandler("approve") { args ->
-   *       approved = args.get(0, Boolean::class.java)
+   *       approved = args.get<Boolean>(0)
    *     }
    *
    *     // Wait for approval
@@ -1847,7 +1847,7 @@ public object KWorkflow {
    */
   public fun registerSignalHandler(
     signalName: String,
-    handler: suspend (EncodedValues) -> Unit
+    handler: suspend (KEncodedValues) -> Unit
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerSignalHandler must be called from within workflow code")
@@ -1894,7 +1894,7 @@ public object KWorkflow {
    * @throws IllegalStateException if called outside of workflow code
    */
   public fun registerDynamicSignalHandler(
-    handler: suspend (signalName: String, args: EncodedValues) -> Unit
+    handler: suspend (signalName: String, args: KEncodedValues) -> Unit
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicSignalHandler must be called from within workflow code")
@@ -1935,7 +1935,7 @@ public object KWorkflow {
    */
   public fun <R> registerQueryHandler(
     queryName: String,
-    handler: (EncodedValues) -> R
+    handler: (KEncodedValues) -> R
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerQueryHandler must be called from within workflow code")
@@ -1987,7 +1987,7 @@ public object KWorkflow {
    * @throws IllegalStateException if called outside of workflow code
    */
   public fun registerDynamicQueryHandler(
-    handler: (queryName: String, args: EncodedValues) -> Any?
+    handler: (queryName: String, args: KEncodedValues) -> Any?
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicQueryHandler must be called from within workflow code")
@@ -2042,7 +2042,7 @@ public object KWorkflow {
    * KWorkflow.registerDynamicUpdateHandler { updateName, args ->
    *   when (updateName) {
    *     "setConfig" -> {
-   *       val newConfig = args.get(0, Config::class.java)
+   *       val newConfig = args.get<Config>(0)
    *       // Can call activities since this is a suspend function
    *       KWorkflow.executeActivity(
    *         ConfigActivities::validateAndApply,
@@ -2062,7 +2062,7 @@ public object KWorkflow {
    * @throws IllegalStateException if called outside of workflow code
    */
   public fun registerDynamicUpdateHandler(
-    handler: suspend (updateName: String, args: EncodedValues) -> Any?
+    handler: suspend (updateName: String, args: KEncodedValues) -> Any?
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicUpdateHandler must be called from within workflow code")
@@ -2078,7 +2078,7 @@ public object KWorkflow {
    * @param validator the function to validate update inputs
    */
   public fun registerDynamicUpdateValidator(
-    validator: (updateName: String, args: EncodedValues) -> Unit
+    validator: (updateName: String, args: KEncodedValues) -> Unit
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerDynamicUpdateValidator must be called from within workflow code")
@@ -2089,7 +2089,7 @@ public object KWorkflow {
    * Registers an update handler for a specific update name.
    *
    * Update handlers are invoked when the workflow receives an update with the
-   * matching name. The handler receives the update arguments as [EncodedValues]
+   * matching name. The handler receives the update arguments as [KEncodedValues]
    * which can be decoded to the expected types, and returns a result.
    *
    * Update handlers should be suspend functions to allow calling activities,
@@ -2103,7 +2103,7 @@ public object KWorkflow {
    *   override suspend fun execute(): String {
    *     // Register update handler
    *     KWorkflow.registerUpdateHandler("updateConfig") { args ->
-   *       val newConfig = args.get(0, Config::class.java)
+   *       val newConfig = args.get<Config>(0)
    *       // Can call activities since this is a suspend function
    *       KWorkflow.executeActivity(
    *         ConfigActivities::validateConfig,
@@ -2127,7 +2127,7 @@ public object KWorkflow {
    */
   public fun registerUpdateHandler(
     updateName: String,
-    handler: suspend (EncodedValues) -> Any?
+    handler: suspend (KEncodedValues) -> Any?
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerUpdateHandler must be called from within workflow code")
@@ -2169,11 +2169,11 @@ public object KWorkflow {
    * KWorkflow.registerUpdateHandler(
    *   "updateConfig",
    *   validator = { args ->
-   *     val config = args.get(0, Config::class.java)
+   *     val config = args.get<Config>(0)
    *     require(config.isValid) { "Invalid config" }
    *   },
    *   handler = { args ->
-   *     val config = args.get(0, Config::class.java)
+   *     val config = args.get<Config>(0)
    *     currentConfig = config
    *     "Config updated"
    *   }
@@ -2188,8 +2188,8 @@ public object KWorkflow {
    */
   public fun registerUpdateHandler(
     updateName: String,
-    validator: (EncodedValues) -> Unit,
-    handler: suspend (EncodedValues) -> Any?
+    validator: (KEncodedValues) -> Unit,
+    handler: suspend (KEncodedValues) -> Any?
   ) {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.registerUpdateHandler must be called from within workflow code")

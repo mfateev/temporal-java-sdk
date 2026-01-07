@@ -41,6 +41,7 @@ import io.temporal.common.SearchAttributes
 import io.temporal.common.converter.DataConverter
 import io.temporal.common.converter.EncodedValues
 import io.temporal.internal.common.ProtobufTimeUtils
+import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.internal.common.SearchAttributesUtil
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.statemachines.ExecuteActivityParameters
@@ -77,50 +78,50 @@ import kotlin.coroutines.resumeWithException
  * Type alias for signal handlers.
  * Signal handlers receive the signal name and encoded arguments.
  */
-typealias SignalHandler = suspend (args: EncodedValues) -> Unit
+typealias SignalHandler = suspend (args: KEncodedValues) -> Unit
 
 /**
  * Type alias for dynamic signal handlers that handle any signal.
  * Dynamic handlers receive both the signal name and encoded arguments.
  */
-typealias DynamicSignalHandler = suspend (signalName: String, args: EncodedValues) -> Unit
+typealias DynamicSignalHandler = suspend (signalName: String, args: KEncodedValues) -> Unit
 
 /**
  * Type alias for query handlers.
  * Query handlers receive the encoded arguments and return a result.
  * Note: Query handlers are NOT suspend functions as queries must return immediately.
  */
-typealias QueryHandler<R> = (args: EncodedValues) -> R
+typealias QueryHandler<R> = (args: KEncodedValues) -> R
 
 /**
  * Type alias for dynamic query handlers that handle any query.
  * Dynamic handlers receive both the query name and encoded arguments.
  */
-typealias DynamicQueryHandler = (queryName: String, args: EncodedValues) -> Any?
+typealias DynamicQueryHandler = (queryName: String, args: KEncodedValues) -> Any?
 
 /**
  * Type alias for update handlers.
  * Update handlers receive the encoded arguments and return a result.
  */
-typealias UpdateHandler = suspend (args: EncodedValues) -> Any?
+typealias UpdateHandler = suspend (args: KEncodedValues) -> Any?
 
 /**
  * Type alias for update validators.
  * Validators receive the encoded arguments and throw if validation fails.
  */
-typealias UpdateValidator = (args: EncodedValues) -> Unit
+typealias UpdateValidator = (args: KEncodedValues) -> Unit
 
 /**
  * Type alias for dynamic update handlers.
  * Dynamic handlers receive both the update name and encoded arguments.
  */
-typealias DynamicUpdateHandler = suspend (updateName: String, args: EncodedValues) -> Any?
+typealias DynamicUpdateHandler = suspend (updateName: String, args: KEncodedValues) -> Any?
 
 /**
  * Type alias for dynamic update validators.
  * Validators receive both the update name and encoded arguments.
  */
-typealias DynamicUpdateValidator = (updateName: String, args: EncodedValues) -> Unit
+typealias DynamicUpdateValidator = (updateName: String, args: KEncodedValues) -> Unit
 
 /**
  * Simple implementation of [UpdateInfo] for tracking current update context.
@@ -1047,10 +1048,10 @@ internal class KotlinWorkflowContext(
   }
 
   /**
-   * Creates EncodedValues from an Optional<Payloads>.
+   * Creates KEncodedValues from an Optional<Payloads>.
    */
-  fun createEncodedValues(payloads: Optional<Payloads>): EncodedValues {
-    return EncodedValues(payloads, dataConverter)
+  fun createEncodedValues(payloads: Optional<Payloads>): KEncodedValues {
+    return KEncodedValues(EncodedValues(payloads, dataConverter))
   }
 
   // ==================== Update Handler Registration ====================
@@ -1180,7 +1181,8 @@ internal class KotlinWorkflowContext(
       }
     }
 
-    return KChildWorkflowHandleImpl(
+    @OptIn(InternalTemporalApi::class)
+    return io.temporal.kotlin.workflow.KChildWorkflowHandle(
       workflowId = execution.workflowId,
       firstExecutionRunId = execution.runId,
       resultClass = resultClass,
@@ -1197,13 +1199,14 @@ internal class KotlinWorkflowContext(
    * @param resultClass the expected result class
    * @return a handle for interacting with the child workflow
    */
+  @OptIn(InternalTemporalApi::class)
   fun <T, R> getChildWorkflowHandle(
     workflowId: String,
     resultClass: Class<R>
   ): io.temporal.kotlin.workflow.KChildWorkflowHandle<T, R> {
     // For existing child workflows, we don't have the result provider
     // This is a simplified implementation that throws on result()
-    return KChildWorkflowHandleImpl(
+    return io.temporal.kotlin.workflow.KChildWorkflowHandle(
       workflowId = workflowId,
       firstExecutionRunId = "", // Unknown for existing workflows
       resultClass = resultClass,

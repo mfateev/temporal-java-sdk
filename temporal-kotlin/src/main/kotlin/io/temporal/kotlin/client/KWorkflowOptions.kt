@@ -26,7 +26,6 @@ import io.temporal.api.common.v1.Callback
 import io.temporal.api.common.v1.Link
 import io.temporal.api.enums.v1.WorkflowIdConflictPolicy
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy
-import io.temporal.client.OnConflictOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.Priority
 import io.temporal.common.SearchAttributes
@@ -95,7 +94,7 @@ public data class KWorkflowOptions(
   val requestId: String? = null,
   val completionCallbacks: List<Callback>? = null,
   val links: List<Link>? = null,
-  val onConflictOptions: OnConflictOptions? = null,
+  val onConflictOptions: KOnConflictOptions? = null,
   val priority: Priority? = null,
   val versioningOverride: VersioningOverride? = null
 ) {
@@ -126,7 +125,7 @@ public data class KWorkflowOptions(
       requestId?.let { setRequestId(it) }
       completionCallbacks?.let { setCompletionCallbacks(it) }
       links?.let { setLinks(it) }
-      onConflictOptions?.let { setOnConflictOptions(it) }
+      onConflictOptions?.let { setOnConflictOptions(it.toJavaOptions()) }
       priority?.let { setPriority(it) }
       versioningOverride?.let { setVersioningOverride(it) }
     }.build()
