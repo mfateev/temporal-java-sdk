@@ -340,20 +340,20 @@ internal class KotlinReplayWorkflow(
       header = headerMap
     )
 
-    // Run validation synchronously (must happen before accept)
-    try {
-      interceptor.validateUpdate(updateInput)
-    } catch (e: Throwable) {
-      callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
-      return
-    }
-
-    // Accept the update - validation passed
-    callbacks.accept()
-
-    // Execute update handler in the workflow context
+    // Execute validation and update handler in the workflow context
     dispatcher?.executeImmediately {
       coroutineScope?.launch {
+        // Run validation first (must happen before accept)
+        try {
+          interceptor.validateUpdate(updateInput)
+        } catch (e: Throwable) {
+          callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
+          return@launch
+        }
+
+        // Accept the update - validation passed
+        callbacks.accept()
+
         ctx.runningUpdateHandlers.incrementAndGet()
         ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
         try {
