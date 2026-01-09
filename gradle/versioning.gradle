@@ -55,7 +55,12 @@ group = 'io.temporal'
 version = getVersionName()
 
 subprojects {
-    apply plugin: "com.palantir.git-version"
+    // Only apply git-version plugin when .git is a proper directory
+    // (not a worktree gitlink file, which happens in composite builds)
+    def gitDir = rootProject.file('.git')
+    if (gitDir.isDirectory()) {
+        apply plugin: "com.palantir.git-version"
+    }
 
     group = 'io.temporal'
     version = getVersionName()
