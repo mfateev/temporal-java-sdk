@@ -165,5 +165,6 @@ internal fun getActivityTypeName(method: KFunction<*>, interfaceClass: KClass<*>
   if (annotation != null && annotation.name.isNotEmpty()) {
     return annotation.name
   }
-  return method.name
+  // Default to method name with first letter capitalized (Temporal convention)
+  return method.name.replaceFirstChar { it.uppercase() }
 }
