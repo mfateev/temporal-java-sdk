@@ -25,6 +25,7 @@ import io.temporal.api.common.v1.WorkflowType
 import io.temporal.common.converter.DataConverter
 import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.worker.WorkflowImplementationFactory
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -45,7 +46,8 @@ import java.util.concurrent.ConcurrentHashMap
 @InternalTemporalApi
 class KotlinWorkflowImplementationFactory(
   private val dataConverter: DataConverter,
-  private val deadlockDetectionTimeoutMs: Long = DEFAULT_DEADLOCK_DETECTION_TIMEOUT_MS
+  private val deadlockDetectionTimeoutMs: Long = DEFAULT_DEADLOCK_DETECTION_TIMEOUT_MS,
+  private val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 ) : WorkflowImplementationFactory {
 
   companion object {
@@ -100,7 +102,8 @@ class KotlinWorkflowImplementationFactory(
     return KotlinReplayWorkflow(
       workflowDefinition = definition,
       dataConverter = dataConverter,
-      deadlockDetectionTimeoutMs = deadlockDetectionTimeoutMs
+      deadlockDetectionTimeoutMs = deadlockDetectionTimeoutMs,
+      workerInterceptors = workerInterceptors
     )
   }
 

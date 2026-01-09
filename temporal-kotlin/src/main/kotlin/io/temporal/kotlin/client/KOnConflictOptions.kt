@@ -1,6 +1,5 @@
 package io.temporal.kotlin.client
 
-
 import io.temporal.client.OnConflictOptions
 
 public data class KOnConflictOptions(

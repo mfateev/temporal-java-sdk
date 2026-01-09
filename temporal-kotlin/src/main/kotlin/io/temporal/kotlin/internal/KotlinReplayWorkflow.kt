@@ -18,6 +18,8 @@
  * limitations under the License.
  */
 
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package io.temporal.kotlin.internal
 
 import io.temporal.api.common.v1.Header
@@ -29,8 +31,14 @@ import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.replay.WorkflowContext
 import io.temporal.internal.statemachines.UpdateProtocolCallback
+import io.temporal.kotlin.interceptor.KActivityInvocationInput
+import io.temporal.kotlin.interceptor.KCancelWorkflowInput
+import io.temporal.kotlin.interceptor.KChildWorkflowInvocationInput
+import io.temporal.kotlin.interceptor.KContinueAsNewInput
+import io.temporal.kotlin.interceptor.KLocalActivityInvocationInput
 import io.temporal.kotlin.interceptor.KQueryInput
 import io.temporal.kotlin.interceptor.KQueryOutput
+import io.temporal.kotlin.interceptor.KSignalExternalInput
 import io.temporal.kotlin.interceptor.KSignalInput
 import io.temporal.kotlin.interceptor.KUpdateInput
 import io.temporal.kotlin.interceptor.KUpdateOutput
@@ -121,18 +129,57 @@ internal class KotlinReplayWorkflow(
       Optional.empty()
     }
 
+    // Extract header from the start event
+    val startHeader = startedAttributes.header
+    val headerMap = io.temporal.common.interceptors.Header(startHeader.fieldsMap)
+
+    // Convert input payloads to arguments array
+    val inputArgs = if (input.isPresent) {
+      val payloads = input.get()
+      val method = workflowDefinition.workflowMethod
+      val parameters = method.parameters
+      if (parameters.size > 1) {
+        val paramTypes = parameters.drop(1).map { param ->
+          val classifier = param.type.classifier
+          when (classifier) {
+            is KClass<*> -> classifier.java
+            is Class<*> -> classifier
+            else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
+          }
+        }
+        deserializeArguments(payloads, paramTypes)
+      } else {
+        emptyArray()
+      }
+    } else {
+      emptyArray()
+    }
+
+    // Create the workflow input for interceptors
+    val workflowInput = KWorkflowInput(
+      header = headerMap,
+      arguments = inputArgs
+    )
+
     // Launch the workflow coroutine
     workflowJob = coroutineScope!!.launch {
       try {
-        // TODO: Integrate interceptor chain for workflow execution
-        // Currently the interceptor chain is built but not used for execution.
-        // When implemented, workflow execution will go through:
-        //   inboundInterceptor?.init(outboundInterceptor)
-        //   inboundInterceptor?.execute(workflowInput)
-        // For now, execute directly without interceptors.
+        // Execute through the interceptor chain
+        val interceptor = inboundInterceptor!!
 
-        val result = executeWorkflowMethod(instance, input)
-        workflowOutput.set(result)
+        // Initialize the interceptor chain (outbound interceptor can be added later)
+        interceptor.init(NoOpWorkflowOutboundCallsInterceptor())
+
+        // Execute the workflow through interceptors
+        val output = interceptor.execute(workflowInput)
+
+        // Serialize the result
+        val resultPayloads = if (output.result != null && output.result != Unit) {
+          Optional.of(dataConverter.toPayloads(output.result).orElse(Payloads.getDefaultInstance()))
+        } else {
+          Optional.empty()
+        }
+        workflowOutput.set(resultPayloads)
         workflowCompleted.set(true)
       } catch (e: CancellationException) {
         // Workflow was cancelled
@@ -688,5 +735,90 @@ internal class KotlinReplayWorkflow(
       // TODO: Implement update execution through interceptor
       throw UnsupportedOperationException("Update handling through interceptor not yet implemented")
     }
+  }
+}
+
+/**
+ * No-op implementation of KWorkflowOutboundCallsInterceptor for initialization.
+ * TODO: Implement proper outbound interceptor chain when outbound operations are supported.
+ */
+private class NoOpWorkflowOutboundCallsInterceptor : KWorkflowOutboundCallsInterceptor {
+  override suspend fun <R> executeActivity(input: KActivityInvocationInput<R>): R {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun <R> executeLocalActivity(input: KLocalActivityInvocationInput<R>): R {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun <T, R> startChildWorkflow(
+    input: KChildWorkflowInvocationInput<R>
+  ): io.temporal.kotlin.workflow.KChildWorkflowHandle<T, R> {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun delay(duration: kotlin.time.Duration) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun awaitCondition(
+    timeout: kotlin.time.Duration,
+    reason: String,
+    condition: () -> Boolean
+  ): Boolean {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun awaitCondition(reason: String, condition: () -> Boolean) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun <R> sideEffect(resultClass: Class<R>, func: () -> R): R {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun <R> mutableSideEffect(
+    id: String,
+    resultClass: Class<R>,
+    updated: (R?, R?) -> Boolean,
+    func: () -> R
+  ): R {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun getVersion(changeId: String, minSupported: Int, maxSupported: Int): Int {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun continueAsNew(input: KContinueAsNewInput): Nothing {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun signalExternalWorkflow(input: KSignalExternalInput) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override suspend fun cancelWorkflow(input: KCancelWorkflowInput) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun upsertTypedSearchAttributes(vararg updates: io.temporal.common.SearchAttributeUpdate<*>) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun upsertMemo(memo: Map<String, Any>) {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun newRandom(): java.util.Random {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun randomUUID(): java.util.UUID {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
+  }
+
+  override fun currentTimeMillis(): Long {
+    throw UnsupportedOperationException("Outbound interceptor not yet wired")
   }
 }

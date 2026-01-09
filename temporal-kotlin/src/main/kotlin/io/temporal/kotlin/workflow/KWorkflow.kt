@@ -28,8 +28,8 @@ import io.temporal.common.SearchAttributeKey
 import io.temporal.common.SearchAttributeUpdate
 import io.temporal.common.SearchAttributes
 import io.temporal.kotlin.activity.KActivityOptions
-import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.activity.KLocalActivityOptions
+import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
