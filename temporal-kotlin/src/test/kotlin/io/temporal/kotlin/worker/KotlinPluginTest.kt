@@ -20,7 +20,11 @@
 
 package io.temporal.kotlin.worker
 
+import io.temporal.kotlin.interceptor.KActivityInboundCallsInterceptor
+import io.temporal.kotlin.interceptor.KWorkerInterceptorBase
+import io.temporal.kotlin.interceptor.KWorkflowInboundCallsInterceptor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KotlinPluginTest {
@@ -66,5 +70,86 @@ class KotlinPluginTest {
     val options = KotlinPluginOptions()
 
     assertEquals(1000L, options.deadlockDetectionTimeout)
+  }
+
+  // ========== Interceptor Tests ==========
+
+  /**
+   * Simple test interceptor for verifying wiring.
+   */
+  class TestInterceptor : KWorkerInterceptorBase() {
+    var workflowInterceptCalled = false
+    var activityInterceptCalled = false
+
+    override fun interceptWorkflow(
+      next: KWorkflowInboundCallsInterceptor
+    ): KWorkflowInboundCallsInterceptor {
+      workflowInterceptCalled = true
+      return next
+    }
+
+    override fun interceptActivity(
+      next: KActivityInboundCallsInterceptor
+    ): KActivityInboundCallsInterceptor {
+      activityInterceptCalled = true
+      return next
+    }
+  }
+
+  @Test
+  fun `KotlinPluginOptions accepts worker interceptors`() {
+    val interceptor1 = TestInterceptor()
+    val interceptor2 = TestInterceptor()
+    val interceptors = listOf(interceptor1, interceptor2)
+
+    val options = KotlinPluginOptions(workerInterceptors = interceptors)
+
+    assertEquals(2, options.workerInterceptors.size)
+    assertTrue(options.workerInterceptors.contains(interceptor1))
+    assertTrue(options.workerInterceptors.contains(interceptor2))
+  }
+
+  @Test
+  fun `KotlinPluginOptions default has empty interceptors list`() {
+    val options = KotlinPluginOptions()
+
+    assertTrue(options.workerInterceptors.isEmpty())
+  }
+
+  @Test
+  fun `KotlinPluginOptions builder accepts interceptors`() {
+    val interceptor = TestInterceptor()
+
+    val options = KotlinPluginOptions.Builder().apply {
+      workerInterceptors = listOf(interceptor)
+    }.build()
+
+    assertEquals(1, options.workerInterceptors.size)
+    assertTrue(options.workerInterceptors.contains(interceptor))
+  }
+
+  @Test
+  fun `create KotlinPlugin with interceptors using DSL`() {
+    val interceptor = TestInterceptor()
+
+    val plugin = KotlinPlugin {
+      workerInterceptors = listOf(interceptor)
+    }
+
+    // Plugin created successfully with interceptors
+    assertEquals(1000L, plugin.deadlockDetectionTimeout)
+  }
+
+  @Test
+  fun `create KotlinPlugin with interceptors using options`() {
+    val interceptor = TestInterceptor()
+    val options = KotlinPluginOptions(
+      deadlockDetectionTimeout = 2000L,
+      workerInterceptors = listOf(interceptor)
+    )
+
+    val plugin = KotlinPlugin.create(options)
+
+    assertEquals(2000L, plugin.deadlockDetectionTimeout)
   }
 }

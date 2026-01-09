@@ -29,6 +29,19 @@ import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.replay.WorkflowContext
 import io.temporal.internal.statemachines.UpdateProtocolCallback
+import io.temporal.kotlin.interceptor.KQueryInput
+import io.temporal.kotlin.interceptor.KQueryOutput
+import io.temporal.kotlin.interceptor.KSignalInput
+import io.temporal.kotlin.interceptor.KUpdateInput
+import io.temporal.kotlin.interceptor.KUpdateOutput
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.interceptor.KWorkflowInboundCallsInterceptor
+import io.temporal.kotlin.interceptor.KWorkflowInput
+import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
+import io.temporal.kotlin.interceptor.KWorkflowOutput
+import io.temporal.kotlin.internal.interceptor.InterceptorChain
+import io.temporal.kotlin.internal.interceptor.RootWorkflowInboundCallsInterceptor
+import io.temporal.kotlin.internal.interceptor.WorkflowExecutor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +67,8 @@ import kotlin.reflect.full.callSuspend
 internal class KotlinReplayWorkflow(
   private val workflowDefinition: KotlinWorkflowDefinition,
   private val dataConverter: DataConverter,
-  private val deadlockDetectionTimeoutMs: Long
+  private val deadlockDetectionTimeoutMs: Long,
+  private val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 ) : ReplayWorkflow {
 
   private var workflowContext: KotlinWorkflowContext? = null
@@ -62,6 +76,7 @@ internal class KotlinReplayWorkflow(
   private var dispatcher: KotlinCoroutineDispatcher? = null
   private var coroutineScope: CoroutineScope? = null
   private var workflowJob: Job? = null
+  private var inboundInterceptor: KWorkflowInboundCallsInterceptor? = null
 
   private val workflowInstance = AtomicReference<Any?>(null)
   private val workflowOutput = AtomicReference<Optional<Payloads>>(Optional.empty())
@@ -93,6 +108,11 @@ internal class KotlinReplayWorkflow(
     val instance = workflowDefinition.createInstance()
     workflowInstance.set(instance)
 
+    // Build interceptor chain
+    val executor = DefaultWorkflowExecutor()
+    val rootInterceptor = RootWorkflowInboundCallsInterceptor(executor)
+    inboundInterceptor = InterceptorChain.buildWorkflowInboundChain(workerInterceptors, rootInterceptor)
+
     // Extract input from the start event
     val startedAttributes = event.workflowExecutionStartedEventAttributes
     val input = if (startedAttributes.hasInput()) {
@@ -104,6 +124,13 @@ internal class KotlinReplayWorkflow(
     // Launch the workflow coroutine
     workflowJob = coroutineScope!!.launch {
       try {
+        // TODO: Integrate interceptor chain for workflow execution
+        // Currently the interceptor chain is built but not used for execution.
+        // When implemented, workflow execution will go through:
+        //   inboundInterceptor?.init(outboundInterceptor)
+        //   inboundInterceptor?.execute(workflowInput)
+        // For now, execute directly without interceptors.
+
         val result = executeWorkflowMethod(instance, input)
         workflowOutput.set(result)
         workflowCompleted.set(true)
@@ -604,6 +631,62 @@ internal class KotlinReplayWorkflow(
       override fun getVersioningBehavior(): io.temporal.common.VersioningBehavior {
         return io.temporal.common.VersioningBehavior.UNSPECIFIED
       }
+    }
+  }
+
+  /**
+   * Inner class that implements WorkflowExecutor to provide actual workflow execution.
+   * This is used as the root of the interceptor chain.
+   */
+  private inner class DefaultWorkflowExecutor : WorkflowExecutor {
+    private var outboundInterceptor: KWorkflowOutboundCallsInterceptor? = null
+
+    override fun setOutboundInterceptor(outboundCalls: KWorkflowOutboundCallsInterceptor) {
+      this.outboundInterceptor = outboundCalls
+    }
+
+    override suspend fun executeWorkflow(input: KWorkflowInput): KWorkflowOutput {
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
+
+      val payloadsInput = if (input.arguments.isNotEmpty()) {
+        Optional.of(
+          Payloads.newBuilder()
+            .addAllPayloads(input.arguments.map { dataConverter.toPayloads(it).orElse(Payloads.getDefaultInstance()).getPayloads(0) })
+            .build()
+        )
+      } else {
+        Optional.empty()
+      }
+
+      val result = executeWorkflowMethod(instance, payloadsInput)
+      return KWorkflowOutput(
+        result = if (result.isPresent) {
+          dataConverter.fromPayloads(0, Optional.of(result.get()), Any::class.java, Any::class.java)
+        } else {
+          null
+        }
+      )
+    }
+
+    override suspend fun handleSignal(input: KSignalInput) {
+      // TODO: Implement signal handling through interceptor
+      // For now, signals are handled directly in handleSignal override
+    }
+
+    override fun handleQuery(input: KQueryInput): KQueryOutput {
+      // TODO: Implement query handling through interceptor
+      // For now, queries are handled directly in query override
+      throw UnsupportedOperationException("Query handling through interceptor not yet implemented")
+    }
+
+    override fun validateUpdate(input: KUpdateInput) {
+      // TODO: Implement update validation through interceptor
+    }
+
+    override suspend fun executeUpdate(input: KUpdateInput): KUpdateOutput {
+      // TODO: Implement update execution through interceptor
+      throw UnsupportedOperationException("Update handling through interceptor not yet implemented")
     }
   }
 }

@@ -25,6 +25,7 @@ package io.temporal.kotlin.worker
 import io.temporal.common.converter.DataConverter
 import io.temporal.internal.worker.WorkflowImplementationFactory
 import io.temporal.kotlin.TemporalDsl
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowDefinition
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
@@ -103,7 +104,8 @@ public class KotlinPlugin private constructor(
     if (factory == null) {
       factory = KotlinWorkflowImplementationFactory(
         dataConverter = dataConverter,
-        deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout
+        deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout,
+        workerInterceptors = options.workerInterceptors
       )
     }
 
@@ -156,7 +158,15 @@ public class KotlinPluginOptions(
    * Set to false if you want to manage the timeout separately via WorkerOptions.
    * Default is true.
    */
-  public val configureDeadlockDetection: Boolean = true
+  public val configureDeadlockDetection: Boolean = true,
+
+  /**
+   * List of Kotlin worker interceptors to register.
+   *
+   * Interceptors are called in order for inbound operations and
+   * in reverse order for outbound operations.
+   */
+  public val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 ) {
   public companion object {
     public const val DEFAULT_DEADLOCK_DETECTION_TIMEOUT: Long = 1000L
@@ -177,9 +187,15 @@ public class KotlinPluginOptions(
      */
     public var configureDeadlockDetection: Boolean = true
 
+    /**
+     * List of Kotlin worker interceptors to register.
+     */
+    public var workerInterceptors: List<KWorkerInterceptor> = emptyList()
+
     public fun build(): KotlinPluginOptions = KotlinPluginOptions(
       deadlockDetectionTimeout = deadlockDetectionTimeout,
-      configureDeadlockDetection = configureDeadlockDetection
+      configureDeadlockDetection = configureDeadlockDetection,
+      workerInterceptors = workerInterceptors
     )
   }
 }

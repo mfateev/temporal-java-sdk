@@ -23,6 +23,7 @@ package io.temporal.kotlin.activity
 import io.temporal.activity.Activity
 import io.temporal.activity.DynamicActivity
 import io.temporal.common.converter.EncodedValues
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -45,7 +46,8 @@ import kotlin.reflect.jvm.javaMethod
 internal class SuspendActivityWrapper(
   private val activityImplementation: Any,
   private val activityInterfaces: List<KClass<*>>,
-  private val dispatcher: CoroutineDispatcher
+  private val dispatcher: CoroutineDispatcher,
+  private val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 ) {
   // Map of activity type name to method info
   private val methodMap: Map<String, MethodInfo> = buildMethodMap()
@@ -117,6 +119,14 @@ internal class SuspendActivityWrapper(
    * Creates a DynamicActivity that routes calls to the appropriate executor.
    */
   fun createDynamicActivity(): DynamicActivity {
+    // TODO: Integrate interceptor chain for activity execution
+    // Currently the interceptor chain infrastructure is set up but not used for execution.
+    // When implemented, activity execution will go through:
+    //   val inboundInterceptor = InterceptorChain.buildActivityInboundChain(workerInterceptors, rootInterceptor)
+    //   inboundInterceptor.init(context)
+    //   inboundInterceptor.execute(activityInput)
+    // For now, execute directly without interceptors.
+
     return DynamicActivity { encodedValues ->
       val context = Activity.getExecutionContext()
       val activityType = context.info.activityType

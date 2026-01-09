@@ -405,7 +405,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
       }
 
       KWorkflow.registerSignalHandler("addMessage") { args ->
-        val message = args.get(0, String::class.java)
+        val message: String = args.get(0)
         messages.add(message)
       }
 
@@ -448,7 +448,7 @@ class KotlinCoroutineFeaturesIntegrationTest {
       KWorkflow.registerDynamicQueryHandler { queryName, args ->
         when (queryName) {
           "getCount" -> {
-            val signalName = args.get(0, String::class.java)
+            val signalName: String = args.get(0)
             signalCounts.getOrDefault(signalName, 0)
           }
           "getAllCounts" -> signalCounts.toMap()

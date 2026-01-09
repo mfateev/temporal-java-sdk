@@ -20,7 +20,9 @@
 
 package io.temporal.kotlin.worker
 
+import io.temporal.kotlin.activity.SuspendActivityOptions
 import io.temporal.kotlin.activity.registerSuspendActivities
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkflowImplementationOptions
 import kotlin.reflect.KClass
@@ -57,7 +59,9 @@ import kotlin.reflect.KClass
  */
 public class KWorker(
   /** The underlying Java Worker for interop scenarios */
-  public val worker: Worker
+  public val worker: Worker,
+  /** Kotlin worker interceptors for activity interception */
+  internal val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 ) {
 
   // ========== Workflow Registration ==========
@@ -182,7 +186,8 @@ public class KWorker(
    * @param activities Activity implementation objects containing suspend functions
    */
   public fun registerSuspendActivities(vararg activities: Any) {
-    worker.registerSuspendActivities(*activities)
+    val options = SuspendActivityOptions(workerInterceptors = workerInterceptors)
+    worker.registerSuspendActivities(*activities, options = options)
   }
 
   // ========== Nexus Registration ==========

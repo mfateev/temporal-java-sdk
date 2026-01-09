@@ -21,6 +21,7 @@
 package io.temporal.kotlin.worker
 
 import io.temporal.kotlin.client.KWorkflowClient
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
 import io.temporal.worker.WorkerFactoryOptions
@@ -48,6 +49,7 @@ import kotlin.reflect.KClass
  *
  * // KWorkerFactory automatically enables Kotlin coroutine support
  * val factory = KWorkerFactory(client) {
+ *     workerInterceptors = listOf(LoggingInterceptor())
  *     maxWorkflowThreadCount = 800
  * }
  *
@@ -72,11 +74,11 @@ import kotlin.reflect.KClass
  * ```
  *
  * @param client The KWorkflowClient to use for workflow interactions
- * @param options DSL builder for WorkerFactoryOptions
+ * @param options DSL builder for KWorkerFactoryOptionsBuilder
  */
 public class KWorkerFactory(
   client: KWorkflowClient,
-  options: WorkerFactoryOptions.Builder.() -> Unit = {}
+  options: KWorkerFactoryOptionsBuilder.() -> Unit = {}
 ) {
 
   /**
@@ -84,21 +86,25 @@ public class KWorkerFactory(
    */
   public val workerFactory: WorkerFactory
 
-  init {
-    val factoryOptions = WorkerFactoryOptions.newBuilder()
-      .apply(options)
-      // Ensure KotlinPlugin is added
-      .also { builder ->
-        // Add KotlinPlugin to support Kotlin coroutine workflows
-        val existingOptions = builder.build()
-        val plugins = existingOptions.workerInterceptors.toMutableList()
-        // Note: KotlinPlugin is added via WorkflowImplementationFactory, not interceptors
-      }
-      .build()
+  /**
+   * The registered Kotlin worker interceptors.
+   */
+  internal val workerInterceptors: List<KWorkerInterceptor>
 
-    // Create WorkerFactory with KotlinPlugin added
+  init {
+    val optionsBuilder = KWorkerFactoryOptionsBuilder().apply(options)
+    workerInterceptors = optionsBuilder.workerInterceptors
+
+    val factoryOptions = optionsBuilder.build()
+
+    // Create WorkerFactory with KotlinPlugin added (including interceptors)
+    val kotlinPlugin = KotlinPlugin.create(
+      KotlinPluginOptions(
+        workerInterceptors = workerInterceptors
+      )
+    )
     val factoryOptionsWithPlugin = WorkerFactoryOptions.newBuilder(factoryOptions)
-      .addPlugin(KotlinPlugin())
+      .addPlugin(kotlinPlugin)
       .build()
 
     workerFactory = WorkerFactory.newInstance(client.workflowClient, factoryOptionsWithPlugin)
@@ -113,7 +119,7 @@ public class KWorkerFactory(
    */
   public fun newWorker(taskQueue: String, options: WorkerOptions.Builder.() -> Unit = {}): KWorker {
     val workerOptions = WorkerOptions.newBuilder().apply(options).build()
-    return KWorker(workerFactory.newWorker(taskQueue, workerOptions))
+    return KWorker(workerFactory.newWorker(taskQueue, workerOptions), workerInterceptors)
   }
 
   /**

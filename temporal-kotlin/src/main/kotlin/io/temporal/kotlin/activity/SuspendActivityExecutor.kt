@@ -22,6 +22,7 @@ package io.temporal.kotlin.activity
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
+import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -36,9 +37,11 @@ import kotlin.reflect.jvm.javaMethod
  *
  * @property dispatcher The coroutine dispatcher for executing suspend activities.
  *   Defaults to [Dispatchers.Default].
+ * @property workerInterceptors List of Kotlin worker interceptors for activity interception.
  */
 public data class SuspendActivityOptions(
-  val dispatcher: CoroutineDispatcher = Dispatchers.Default
+  val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  val workerInterceptors: List<KWorkerInterceptor> = emptyList()
 )
 
 /**
@@ -108,7 +111,8 @@ private fun Worker.registerSuspendActivityImplementation(
   val wrapper = SuspendActivityWrapper(
     activityImplementation = activityImplementation,
     activityInterfaces = activityInterfaces,
-    dispatcher = options.dispatcher
+    dispatcher = options.dispatcher,
+    workerInterceptors = options.workerInterceptors
   )
 
   // Register the wrapper as a dynamic activity
