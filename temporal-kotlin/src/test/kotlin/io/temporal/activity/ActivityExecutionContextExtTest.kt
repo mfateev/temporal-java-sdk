@@ -1,7 +1,6 @@
 
 package io.temporal.activity
 
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.newWorkflowStub
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -21,13 +20,11 @@ class ActivityExecutionContextExtTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(TestWorkflowImpl::class)
-    setActivityImplementations(TestActivityForHeartbeatDetails())
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    workflowTypes(TestWorkflowImpl::class)
+    activityImplementations(TestActivityForHeartbeatDetails())
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test

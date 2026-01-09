@@ -24,7 +24,6 @@ package io.temporal.kotlin.activity
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DataConverter
 import io.temporal.common.converter.DefaultDataConverter
@@ -330,12 +329,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var greetTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -365,12 +362,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var addTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -399,12 +394,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var delayTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -433,12 +426,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var noReturnTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -467,12 +458,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var errorTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -501,12 +490,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var mixedTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -540,12 +527,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var heartbeatTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -574,12 +559,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var dispatcherTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test
@@ -615,12 +598,10 @@ class SuspendActivityIntegrationTest {
   @Rule
   @JvmField
   var explicitNameTestRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    doNotStart = true
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test

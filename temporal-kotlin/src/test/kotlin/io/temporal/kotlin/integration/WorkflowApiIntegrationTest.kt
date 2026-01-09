@@ -295,7 +295,7 @@ class WorkflowApiIntegrationTest {
   @Rule
   @JvmField
   val testWorkflowRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
+    doNotStart = true
   }
 
   private fun setupKotlinWorkflows(vararg workflowClasses: Class<*>) {

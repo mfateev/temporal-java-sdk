@@ -1,7 +1,6 @@
 
 package io.temporal.workflow
 
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -15,16 +14,14 @@ class KotlinChildWorkflowStubExtTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(
+    workflowTypes(
       ParentWorkflowImpl::class,
       AsyncParentWorkflowImpl::class,
       ChildWorkflowImpl::class
     )
-    setWorkflowClientOptions(
-      WorkflowClientOptions.newBuilder()
-        .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-        .build()
-    )
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @WorkflowInterface

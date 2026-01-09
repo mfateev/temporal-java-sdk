@@ -1,7 +1,6 @@
 
 package io.temporal.workflow
 
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -24,12 +23,10 @@ class KotlinAsyncLambdaTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(LambdaWorkflowImpl::class)
-    setWorkflowClientOptions(
-      WorkflowClientOptions.newBuilder()
-        .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-        .build()
-    )
+    workflowTypes(LambdaWorkflowImpl::class)
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @WorkflowInterface

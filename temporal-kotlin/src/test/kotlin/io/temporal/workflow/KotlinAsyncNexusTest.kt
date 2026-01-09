@@ -9,7 +9,6 @@ import io.nexusrpc.handler.OperationImpl
 import io.nexusrpc.handler.OperationStartDetails
 import io.nexusrpc.handler.ServiceImpl
 import io.nexusrpc.handler.SynchronousOperationFunction
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -27,13 +26,11 @@ class KotlinAsyncNexusTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(WorkflowImpl::class)
-    setNexusServiceImplementation(TestNexusServiceImpl())
-    setWorkflowClientOptions(
-      WorkflowClientOptions.newBuilder()
-        .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-        .build()
-    )
+    workflowTypes(WorkflowImpl::class)
+    nexusServiceImplementations(TestNexusServiceImpl())
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Service

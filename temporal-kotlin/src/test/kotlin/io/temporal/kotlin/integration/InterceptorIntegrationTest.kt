@@ -36,7 +36,6 @@ import io.temporal.kotlin.interceptor.KWorkflowOutput
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.worker.KotlinPlugin
 import io.temporal.kotlin.worker.KotlinPluginOptions
-import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import org.junit.Assert.assertEquals
@@ -135,12 +134,10 @@ class InterceptorIntegrationTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkerFactoryOptions(
-      WorkerFactoryOptions.newBuilder()
-        .addPlugin(kotlinPlugin)
-        .build()
-    )
-    setWorkflowTypes(SimpleWorkflowImpl::class)
+    workerFactoryOptions {
+      addPlugin(kotlinPlugin)
+    }
+    workflowTypes(SimpleWorkflowImpl::class)
   }
 
   // ==================== Tests ====================

@@ -19,12 +19,10 @@ class WorkflowClientExtTest {
   @Rule
   @JvmField
   val testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(TestWorkflowImpl::class)
-    setWorkflowClientOptions(
-      WorkflowClientOptions {
-        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-      }
-    )
+    workflowTypes(TestWorkflowImpl::class)
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @Test

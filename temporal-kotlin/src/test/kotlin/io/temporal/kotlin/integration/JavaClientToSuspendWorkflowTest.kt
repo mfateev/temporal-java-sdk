@@ -49,7 +49,7 @@ class JavaClientToSuspendWorkflowTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
+    doNotStart = true
   }
 
   private fun setupWorkflow() {

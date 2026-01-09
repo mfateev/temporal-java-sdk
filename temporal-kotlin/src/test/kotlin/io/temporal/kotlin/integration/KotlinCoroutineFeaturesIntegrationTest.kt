@@ -252,8 +252,8 @@ class KotlinCoroutineFeaturesIntegrationTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
-    setActivityImplementations(TestActivitiesImpl())
+    doNotStart = true
+    activityImplementations(TestActivitiesImpl())
   }
 
   private fun setupKotlinWorkflows(vararg workflowClasses: Class<*>) {

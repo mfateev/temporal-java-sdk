@@ -1,7 +1,6 @@
 
 package io.temporal.workflow
 
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -18,12 +17,10 @@ class KotlinAsyncChildWorkflowTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(ParentWorkflowImpl::class, ChildWorkflowImpl::class)
-    setWorkflowClientOptions(
-      WorkflowClientOptions.newBuilder()
-        .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-        .build()
-    )
+    workflowTypes(ParentWorkflowImpl::class, ChildWorkflowImpl::class)
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @WorkflowInterface

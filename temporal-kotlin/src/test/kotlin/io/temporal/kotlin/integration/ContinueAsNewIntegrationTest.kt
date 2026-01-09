@@ -109,7 +109,7 @@ class ContinueAsNewIntegrationTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setDoNotStart(true)
+    doNotStart = true
   }
 
   private fun setupKotlinWorkflows(vararg workflowClasses: Class<*>) {

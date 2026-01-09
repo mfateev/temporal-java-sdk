@@ -4,7 +4,6 @@ package io.temporal.workflow
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.setRetryOptions
-import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
@@ -19,16 +18,14 @@ class KotlinActivityStubExtTest {
   @Rule
   @JvmField
   var testWorkflowRule = KSDKTestWorkflowRule {
-    setWorkflowTypes(
+    workflowTypes(
       SyncWorkflowImpl::class,
       AsyncWorkflowImpl::class
     )
-    setActivityImplementations(ActivityImpl())
-    setWorkflowClientOptions(
-      WorkflowClientOptions.newBuilder()
-        .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
-        .build()
-    )
+    activityImplementations(ActivityImpl())
+    workflowClientOptions {
+      setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+    }
   }
 
   @WorkflowInterface
