@@ -48,6 +48,7 @@ import io.temporal.internal.statemachines.ExecuteLocalActivityParameters
 import io.temporal.internal.statemachines.LocalActivityCallback
 import io.temporal.internal.statemachines.StartChildWorkflowExecutionParameters
 import io.temporal.kotlin.common.KEncodedValues
+import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.workflow.ChildWorkflowCancellationType
 import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.UpdateInfo
@@ -200,6 +201,15 @@ internal class KotlinWorkflowContext(
    */
   @Volatile
   internal var dynamicUpdateValidator: DynamicUpdateValidator? = null
+
+  // ==================== Interceptor ====================
+
+  /**
+   * Outbound interceptor for workflow calls.
+   * Set by the interceptor chain during initialization.
+   */
+  @Volatile
+  internal var outboundInterceptor: KWorkflowOutboundCallsInterceptor? = null
 
   // ==================== Handler Tracking ====================
 

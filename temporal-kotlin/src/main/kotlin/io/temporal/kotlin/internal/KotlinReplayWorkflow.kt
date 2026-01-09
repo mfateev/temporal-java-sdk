@@ -31,14 +31,8 @@ import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.internal.replay.WorkflowContext
 import io.temporal.internal.statemachines.UpdateProtocolCallback
-import io.temporal.kotlin.interceptor.KActivityInvocationInput
-import io.temporal.kotlin.interceptor.KCancelWorkflowInput
-import io.temporal.kotlin.interceptor.KChildWorkflowInvocationInput
-import io.temporal.kotlin.interceptor.KContinueAsNewInput
-import io.temporal.kotlin.interceptor.KLocalActivityInvocationInput
 import io.temporal.kotlin.interceptor.KQueryInput
 import io.temporal.kotlin.interceptor.KQueryOutput
-import io.temporal.kotlin.interceptor.KSignalExternalInput
 import io.temporal.kotlin.interceptor.KSignalInput
 import io.temporal.kotlin.interceptor.KUpdateInput
 import io.temporal.kotlin.interceptor.KUpdateOutput
@@ -49,6 +43,7 @@ import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkflowOutput
 import io.temporal.kotlin.internal.interceptor.InterceptorChain
 import io.temporal.kotlin.internal.interceptor.RootWorkflowInboundCallsInterceptor
+import io.temporal.kotlin.internal.interceptor.RootWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.internal.interceptor.WorkflowExecutor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -61,7 +56,6 @@ import java.util.Optional
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
 
 /**
@@ -105,8 +99,12 @@ internal class KotlinReplayWorkflow(
       workflowCompleted.set(true)
     }
 
+    // WorkflowContextElement ensures the workflow context ThreadLocal is properly
+    // set when coroutines run, including nested async blocks
+    val contextElement = WorkflowContextElement(workflowContext!!)
+
     this.coroutineScope = CoroutineScope(
-      dispatcher!! + SupervisorJob() + exceptionHandler
+      dispatcher!! + SupervisorJob() + exceptionHandler + contextElement
     )
 
     // Set coroutine scope reference for async operations
@@ -167,8 +165,9 @@ internal class KotlinReplayWorkflow(
         // Execute through the interceptor chain
         val interceptor = inboundInterceptor!!
 
-        // Initialize the interceptor chain (outbound interceptor can be added later)
-        interceptor.init(NoOpWorkflowOutboundCallsInterceptor())
+        // Initialize the interceptor chain with the real outbound interceptor
+        val rootOutbound = RootWorkflowOutboundCallsInterceptor(workflowContext!!, dataConverter)
+        interceptor.init(rootOutbound)
 
         // Execute the workflow through interceptors
         val output = interceptor.execute(workflowInput)
@@ -247,86 +246,63 @@ internal class KotlinReplayWorkflow(
     eventId: Long,
     header: Header
   ) {
-    val instance = workflowInstance.get() ?: return
     val ctx = workflowContext ?: return
+    val interceptor = inboundInterceptor ?: return
 
-    // First check for annotation-based signal handler
+    // Deserialize signal arguments
+    val args = deserializeSignalArgs(signalName, input)
+
+    // Create encoded values for dynamic handlers
+    val encodedValues = ctx.createEncodedValues(input)
+
+    // Create signal input for interceptor
+    val headerMap = io.temporal.common.interceptors.Header(header.fieldsMap)
+    val signalInput = KSignalInput(
+      signalName = signalName,
+      arguments = args,
+      encodedValues = encodedValues,
+      eventId = eventId,
+      header = headerMap
+    )
+
+    // Execute through interceptor chain
+    dispatcher?.executeImmediately {
+      coroutineScope?.launch {
+        ctx.runningSignalHandlers.incrementAndGet()
+        try {
+          interceptor.handleSignal(signalInput)
+        } catch (e: Throwable) {
+          workflowContext?.failWorkflowTask(e)
+        } finally {
+          ctx.runningSignalHandlers.decrementAndGet()
+        }
+      }
+    }
+  }
+
+  private fun deserializeSignalArgs(signalName: String, input: Optional<Payloads>): Array<Any?> {
+    if (!input.isPresent) return emptyArray()
+
+    // Check for annotation-based signal handler to get parameter types
     val signalMethod = workflowDefinition.signalMethods[signalName]
     if (signalMethod != null) {
-      // Execute annotation-based signal handler
-      dispatcher?.executeImmediately {
-        coroutineScope?.launch {
-          ctx.runningSignalHandlers.incrementAndGet()
-          try {
-            val parameters = signalMethod.parameters
-            val args = if (input.isPresent && parameters.size > 1) {
-              val paramTypes = parameters.drop(1).map { param ->
-                val classifier = param.type.classifier
-                when (classifier) {
-                  is KClass<*> -> classifier.java
-                  is Class<*> -> classifier
-                  else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
-                }
-              }
-              deserializeArguments(input.get(), paramTypes)
-            } else {
-              emptyArray()
-            }
-
-            if (signalMethod.isSuspend) {
-              signalMethod.callSuspend(instance, *args)
-            } else {
-              signalMethod.call(instance, *args)
-            }
-          } catch (e: Throwable) {
-            workflowContext?.failWorkflowTask(e)
-          } finally {
-            ctx.runningSignalHandlers.decrementAndGet()
+      val parameters = signalMethod.parameters
+      if (parameters.size > 1) {
+        val paramTypes = parameters.drop(1).map { param ->
+          val classifier = param.type.classifier
+          when (classifier) {
+            is KClass<*> -> classifier.java
+            is Class<*> -> classifier
+            else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
           }
         }
+        return deserializeArguments(input.get(), paramTypes)
       }
-      return
     }
 
-    // Check for dynamically registered signal handler
-    val dynamicHandler = ctx.signalHandlers[signalName]
-    if (dynamicHandler != null) {
-      dispatcher?.executeImmediately {
-        coroutineScope?.launch {
-          ctx.runningSignalHandlers.incrementAndGet()
-          try {
-            val encodedValues = ctx.createEncodedValues(input)
-            dynamicHandler(encodedValues)
-          } catch (e: Throwable) {
-            workflowContext?.failWorkflowTask(e)
-          } finally {
-            ctx.runningSignalHandlers.decrementAndGet()
-          }
-        }
-      }
-      return
-    }
-
-    // Check for catch-all dynamic signal handler
-    val catchAllHandler = ctx.dynamicSignalHandler
-    if (catchAllHandler != null) {
-      dispatcher?.executeImmediately {
-        coroutineScope?.launch {
-          ctx.runningSignalHandlers.incrementAndGet()
-          try {
-            val encodedValues = ctx.createEncodedValues(input)
-            catchAllHandler(signalName, encodedValues)
-          } catch (e: Throwable) {
-            workflowContext?.failWorkflowTask(e)
-          } finally {
-            ctx.runningSignalHandlers.decrementAndGet()
-          }
-        }
-      }
-      return
-    }
-
-    // Unknown signal with no handler - ignore (could log warning)
+    // For dynamic handlers, we can't deserialize without knowing the types
+    // Return empty and let the handler use encoded values
+    return emptyArray()
   }
 
   override fun handleUpdate(
@@ -337,67 +313,43 @@ internal class KotlinReplayWorkflow(
     header: Header,
     callbacks: UpdateProtocolCallback
   ) {
-    val instance = workflowInstance.get()
-    if (instance == null) {
-      callbacks.reject(createFailure("Workflow instance not initialized"))
-      return
-    }
-
     val ctx = workflowContext
     if (ctx == null) {
       callbacks.reject(createFailure("Workflow context not initialized"))
       return
     }
 
-    // First check for annotation-based update handler
-    val updateMethod = workflowDefinition.updateMethods[updateName]
-    if (updateMethod != null) {
-      handleAnnotationBasedUpdate(updateName, updateId, input, callbacks, instance, ctx, updateMethod)
+    val interceptor = inboundInterceptor
+    if (interceptor == null) {
+      callbacks.reject(createFailure("Inbound interceptor not initialized"))
       return
     }
 
-    // Check for dynamically registered named update handler
-    val namedHandler = ctx.updateHandlers[updateName]
-    if (namedHandler != null) {
-      handleDynamicNamedUpdate(updateName, updateId, input, callbacks, ctx, namedHandler)
+    // Deserialize arguments
+    val args = deserializeUpdateArgs(updateName, input)
+
+    // Create encoded values for dynamic handlers
+    val encodedValues = ctx.createEncodedValues(input)
+
+    // Create update input for interceptor
+    val headerMap = io.temporal.common.interceptors.Header(header.fieldsMap)
+    val updateInput = KUpdateInput(
+      updateName = updateName,
+      arguments = args,
+      encodedValues = encodedValues,
+      header = headerMap
+    )
+
+    // Run validation synchronously (must happen before accept)
+    try {
+      interceptor.validateUpdate(updateInput)
+    } catch (e: Throwable) {
+      callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
       return
     }
 
-    // Check for catch-all dynamic update handler
-    val dynamicHandler = ctx.dynamicUpdateHandler
-    if (dynamicHandler != null) {
-      handleDynamicFallbackUpdate(updateName, updateId, input, callbacks, ctx, dynamicHandler)
-      return
-    }
-
-    // No handler found
-    callbacks.reject(createFailure("Unknown update: $updateName"))
-  }
-
-  private fun handleAnnotationBasedUpdate(
-    updateName: String,
-    updateId: String,
-    input: Optional<Payloads>,
-    callbacks: UpdateProtocolCallback,
-    instance: Any,
-    ctx: KotlinWorkflowContext,
-    updateMethod: KFunction<*>
-  ) {
-    // Deserialize arguments synchronously (needed for validation)
-    val parameters = updateMethod.parameters
-    val args = if (input.isPresent && parameters.size > 1) {
-      val paramTypes = parameters.drop(1).map { param ->
-        val classifier = param.type.classifier
-        when (classifier) {
-          is KClass<*> -> classifier.java
-          is Class<*> -> classifier
-          else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
-        }
-      }
-      deserializeArguments(input.get(), paramTypes)
-    } else {
-      emptyArray()
-    }
+    // Accept the update - validation passed
+    callbacks.accept()
 
     // Execute update handler in the workflow context
     dispatcher?.executeImmediately {
@@ -405,19 +357,12 @@ internal class KotlinReplayWorkflow(
         ctx.runningUpdateHandlers.incrementAndGet()
         ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
         try {
-          // Accept the update - must happen before handler runs
-          callbacks.accept()
-
-          // Execute the update
-          val result = if (updateMethod.isSuspend) {
-            updateMethod.callSuspend(instance, *args)
-          } else {
-            updateMethod.call(instance, *args)
-          }
+          // Execute through interceptor chain
+          val output = interceptor.executeUpdate(updateInput)
 
           // Complete with result
-          val resultPayloads = if (result != null && result != Unit) {
-            dataConverter.toPayloads(result)
+          val resultPayloads = if (output.result != null && output.result != Unit) {
+            dataConverter.toPayloads(output.result)
           } else {
             Optional.empty()
           }
@@ -432,102 +377,28 @@ internal class KotlinReplayWorkflow(
     }
   }
 
-  private fun handleDynamicNamedUpdate(
-    updateName: String,
-    updateId: String,
-    input: Optional<Payloads>,
-    callbacks: UpdateProtocolCallback,
-    ctx: KotlinWorkflowContext,
-    handler: UpdateHandler
-  ) {
-    dispatcher?.executeImmediately {
-      coroutineScope?.launch {
-        ctx.runningUpdateHandlers.incrementAndGet()
-        ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
-        try {
-          // Run validator if registered
-          val validator = ctx.updateValidators[updateName]
-          if (validator != null) {
-            val encodedValues = ctx.createEncodedValues(input)
-            validator(encodedValues)
-          }
+  private fun deserializeUpdateArgs(updateName: String, input: Optional<Payloads>): Array<Any?> {
+    if (!input.isPresent) return emptyArray()
 
-          // Accept the update - must happen before handler runs
-          callbacks.accept()
-
-          // Execute the handler
-          val encodedValues = ctx.createEncodedValues(input)
-          val result = handler(encodedValues)
-
-          // Complete with result
-          val resultPayloads = if (result != null && result != Unit) {
-            dataConverter.toPayloads(result)
-          } else {
-            Optional.empty()
+    // Check for annotation-based update handler to get parameter types
+    val updateMethod = workflowDefinition.updateMethods[updateName]
+    if (updateMethod != null) {
+      val parameters = updateMethod.parameters
+      if (parameters.size > 1) {
+        val paramTypes = parameters.drop(1).map { param ->
+          val classifier = param.type.classifier
+          when (classifier) {
+            is KClass<*> -> classifier.java
+            is Class<*> -> classifier
+            else -> throw IllegalArgumentException("Unsupported parameter type: $classifier")
           }
-          callbacks.complete(resultPayloads, null)
-        } catch (e: Throwable) {
-          // If validation failed, reject; otherwise complete with failure
-          if (ctx.updateValidators[updateName] != null) {
-            callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
-          } else {
-            callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
-          }
-        } finally {
-          ctx.currentUpdateInfo.set(null)
-          ctx.runningUpdateHandlers.decrementAndGet()
         }
+        return deserializeArguments(input.get(), paramTypes)
       }
     }
-  }
 
-  private fun handleDynamicFallbackUpdate(
-    updateName: String,
-    updateId: String,
-    input: Optional<Payloads>,
-    callbacks: UpdateProtocolCallback,
-    ctx: KotlinWorkflowContext,
-    handler: DynamicUpdateHandler
-  ) {
-    dispatcher?.executeImmediately {
-      coroutineScope?.launch {
-        ctx.runningUpdateHandlers.incrementAndGet()
-        ctx.currentUpdateInfo.set(KUpdateInfo(updateName, updateId))
-        try {
-          // Run dynamic validator if registered
-          val validator = ctx.dynamicUpdateValidator
-          if (validator != null) {
-            val encodedValues = ctx.createEncodedValues(input)
-            validator(updateName, encodedValues)
-          }
-
-          // Accept the update - must happen before handler runs
-          callbacks.accept()
-
-          // Execute the handler
-          val encodedValues = ctx.createEncodedValues(input)
-          val result = handler(updateName, encodedValues)
-
-          // Complete with result
-          val resultPayloads = if (result != null && result != Unit) {
-            dataConverter.toPayloads(result)
-          } else {
-            Optional.empty()
-          }
-          callbacks.complete(resultPayloads, null)
-        } catch (e: Throwable) {
-          // If validation failed, reject; otherwise complete with failure
-          if (ctx.dynamicUpdateValidator != null) {
-            callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
-          } else {
-            callbacks.complete(Optional.empty(), createFailure(e.message ?: "Update failed", e))
-          }
-        } finally {
-          ctx.currentUpdateInfo.set(null)
-          ctx.runningUpdateHandlers.decrementAndGet()
-        }
-      }
-    }
+    // For dynamic handlers, return empty (they use encoded values)
+    return emptyArray()
   }
 
   private fun createFailure(message: String, cause: Throwable? = null): io.temporal.api.failure.v1.Failure {
@@ -580,8 +451,8 @@ internal class KotlinReplayWorkflow(
 
   override fun query(query: WorkflowQuery): Optional<Payloads> {
     val queryName = query.queryType
-    val ctx = workflowContext
-      ?: throw IllegalStateException("Workflow context not initialized")
+    val interceptor = inboundInterceptor
+      ?: throw IllegalStateException("Inbound interceptor not initialized")
 
     val input = if (query.hasQueryArgs()) {
       Optional.of(query.queryArgs)
@@ -589,56 +460,48 @@ internal class KotlinReplayWorkflow(
       Optional.empty()
     }
 
-    // First check for annotation-based query handler
+    // Deserialize query arguments
+    val args = deserializeQueryArgs(queryName, input)
+
+    // Create encoded values for dynamic handlers
+    val ctx = workflowContext
+      ?: throw IllegalStateException("Workflow context not initialized")
+    val encodedValues = ctx.createEncodedValues(input)
+
+    // Create query input for interceptor
+    val headerMap = io.temporal.common.interceptors.Header.empty()
+    val queryInput = KQueryInput(
+      queryName = queryName,
+      arguments = args,
+      encodedValues = encodedValues,
+      header = headerMap
+    )
+
+    // Execute through interceptor chain
+    val output = interceptor.handleQuery(queryInput)
+
+    // Serialize the result
+    return if (output.result != null && output.result != Unit) {
+      Optional.of(dataConverter.toPayloads(output.result).orElse(Payloads.getDefaultInstance()))
+    } else {
+      Optional.empty()
+    }
+  }
+
+  private fun deserializeQueryArgs(queryName: String, input: Optional<Payloads>): Array<Any?> {
+    if (!input.isPresent) return emptyArray()
+
+    // Check for annotation-based query handler to get parameter types
     val queryMethod = workflowDefinition.queryMethods[queryName]
     if (queryMethod != null) {
-      val instance = workflowInstance.get()
-        ?: throw IllegalStateException("Workflow instance not initialized")
-
       val parameters = queryMethod.parameters
-      val args = if (input.isPresent && parameters.size > 1) {
-        deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
-      } else {
-        emptyArray()
-      }
-
-      // Query methods should not be suspend functions
-      val result = queryMethod.call(instance, *args)
-
-      return if (result != null && result != Unit) {
-        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
-      } else {
-        Optional.empty()
+      if (parameters.size > 1) {
+        return deserializeArguments(input.get(), parameters.drop(1).map { it.type.classifier as Class<*> })
       }
     }
 
-    // Check for dynamically registered query handler
-    val dynamicHandler = ctx.queryHandlers[queryName]
-    if (dynamicHandler != null) {
-      val encodedValues = ctx.createEncodedValues(input)
-      val result = dynamicHandler(encodedValues)
-
-      return if (result != null && result != Unit) {
-        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
-      } else {
-        Optional.empty()
-      }
-    }
-
-    // Check for catch-all dynamic query handler
-    val catchAllHandler = ctx.dynamicQueryHandler
-    if (catchAllHandler != null) {
-      val encodedValues = ctx.createEncodedValues(input)
-      val result = catchAllHandler(queryName, encodedValues)
-
-      return if (result != null && result != Unit) {
-        Optional.of(dataConverter.toPayloads(result).orElse(Payloads.getDefaultInstance()))
-      } else {
-        Optional.empty()
-      }
-    }
-
-    throw IllegalArgumentException("Unknown query: $queryName")
+    // For dynamic handlers, return empty (they use encoded values)
+    return emptyArray()
   }
 
   override fun getWorkflowContext(): WorkflowContext {
@@ -690,6 +553,8 @@ internal class KotlinReplayWorkflow(
 
     override fun setOutboundInterceptor(outboundCalls: KWorkflowOutboundCallsInterceptor) {
       this.outboundInterceptor = outboundCalls
+      // Also set on context so KWorkflow static methods can route through the interceptor chain
+      workflowContext?.outboundInterceptor = outboundCalls
     }
 
     override suspend fun executeWorkflow(input: KWorkflowInput): KWorkflowOutput {
@@ -717,108 +582,133 @@ internal class KotlinReplayWorkflow(
     }
 
     override suspend fun handleSignal(input: KSignalInput) {
-      // TODO: Implement signal handling through interceptor
-      // For now, signals are handled directly in handleSignal override
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
+      val ctx = workflowContext
+        ?: throw IllegalStateException("Workflow context not initialized")
+
+      // First check for annotation-based signal handler
+      val signalMethod = workflowDefinition.signalMethods[input.signalName]
+      if (signalMethod != null) {
+        if (signalMethod.isSuspend) {
+          signalMethod.callSuspend(instance, *input.arguments)
+        } else {
+          signalMethod.call(instance, *input.arguments)
+        }
+        return
+      }
+
+      // Check for dynamically registered signal handler
+      val dynamicHandler = ctx.signalHandlers[input.signalName]
+      if (dynamicHandler != null) {
+        // For dynamic handlers, create encoded values from the arguments
+        // Note: arguments may be empty if types couldn't be determined at deserialization
+        val encodedValues = input.encodedValues
+        dynamicHandler(encodedValues)
+        return
+      }
+
+      // Check for catch-all dynamic signal handler
+      val catchAllHandler = ctx.dynamicSignalHandler
+      if (catchAllHandler != null) {
+        val encodedValues = input.encodedValues
+        catchAllHandler(input.signalName, encodedValues)
+        return
+      }
+
+      // Unknown signal with no handler - ignore
     }
 
     override fun handleQuery(input: KQueryInput): KQueryOutput {
-      // TODO: Implement query handling through interceptor
-      // For now, queries are handled directly in query override
-      throw UnsupportedOperationException("Query handling through interceptor not yet implemented")
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
+      val ctx = workflowContext
+        ?: throw IllegalStateException("Workflow context not initialized")
+
+      // First check for annotation-based query handler
+      val queryMethod = workflowDefinition.queryMethods[input.queryName]
+      if (queryMethod != null) {
+        // Query methods should not be suspend functions
+        val result = queryMethod.call(instance, *input.arguments)
+        return KQueryOutput(result = result)
+      }
+
+      // Check for dynamically registered query handler
+      val dynamicHandler = ctx.queryHandlers[input.queryName]
+      if (dynamicHandler != null) {
+        val encodedValues = input.encodedValues
+        val result = dynamicHandler(encodedValues)
+        return KQueryOutput(result = result)
+      }
+
+      // Check for catch-all dynamic query handler
+      val catchAllHandler = ctx.dynamicQueryHandler
+      if (catchAllHandler != null) {
+        val encodedValues = input.encodedValues
+        val result = catchAllHandler(input.queryName, encodedValues)
+        return KQueryOutput(result = result)
+      }
+
+      throw IllegalArgumentException("Unknown query: ${input.queryName}")
     }
 
     override fun validateUpdate(input: KUpdateInput) {
-      // TODO: Implement update validation through interceptor
+      val ctx = workflowContext
+        ?: throw IllegalStateException("Workflow context not initialized")
+
+      // Check for dynamically registered validator (by update name)
+      val dynamicValidator = ctx.updateValidators[input.updateName]
+      if (dynamicValidator != null) {
+        val encodedValues = input.encodedValues
+        dynamicValidator(encodedValues)
+        return
+      }
+
+      // Check for catch-all dynamic validator
+      val catchAllValidator = ctx.dynamicUpdateValidator
+      if (catchAllValidator != null) {
+        val encodedValues = input.encodedValues
+        catchAllValidator(input.updateName, encodedValues)
+        return
+      }
+
+      // No validator = validation passes
     }
 
     override suspend fun executeUpdate(input: KUpdateInput): KUpdateOutput {
-      // TODO: Implement update execution through interceptor
-      throw UnsupportedOperationException("Update handling through interceptor not yet implemented")
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
+      val ctx = workflowContext
+        ?: throw IllegalStateException("Workflow context not initialized")
+
+      // First check for annotation-based update handler
+      val updateMethod = workflowDefinition.updateMethods[input.updateName]
+      if (updateMethod != null) {
+        val result = if (updateMethod.isSuspend) {
+          updateMethod.callSuspend(instance, *input.arguments)
+        } else {
+          updateMethod.call(instance, *input.arguments)
+        }
+        return KUpdateOutput(result = result)
+      }
+
+      // Check for dynamically registered update handler
+      val dynamicHandler = ctx.updateHandlers[input.updateName]
+      if (dynamicHandler != null) {
+        val encodedValues = input.encodedValues
+        val result = dynamicHandler(encodedValues)
+        return KUpdateOutput(result = result)
+      }
+
+      // Check for catch-all dynamic update handler
+      val catchAllHandler = ctx.dynamicUpdateHandler
+      if (catchAllHandler != null) {
+        val encodedValues = input.encodedValues
+        val result = catchAllHandler(input.updateName, encodedValues)
+        return KUpdateOutput(result = result)
+      }
+
+      throw IllegalArgumentException("Unknown update: ${input.updateName}")
     }
-  }
-}
-
-/**
- * No-op implementation of KWorkflowOutboundCallsInterceptor for initialization.
- * TODO: Implement proper outbound interceptor chain when outbound operations are supported.
- */
-private class NoOpWorkflowOutboundCallsInterceptor : KWorkflowOutboundCallsInterceptor {
-  override suspend fun <R> executeActivity(input: KActivityInvocationInput<R>): R {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun <R> executeLocalActivity(input: KLocalActivityInvocationInput<R>): R {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun <T, R> startChildWorkflow(
-    input: KChildWorkflowInvocationInput<R>
-  ): io.temporal.kotlin.workflow.KChildWorkflowHandle<T, R> {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun delay(duration: kotlin.time.Duration) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun awaitCondition(
-    timeout: kotlin.time.Duration,
-    reason: String,
-    condition: () -> Boolean
-  ): Boolean {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun awaitCondition(reason: String, condition: () -> Boolean) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun <R> sideEffect(resultClass: Class<R>, func: () -> R): R {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun <R> mutableSideEffect(
-    id: String,
-    resultClass: Class<R>,
-    updated: (R?, R?) -> Boolean,
-    func: () -> R
-  ): R {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun getVersion(changeId: String, minSupported: Int, maxSupported: Int): Int {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun continueAsNew(input: KContinueAsNewInput): Nothing {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun signalExternalWorkflow(input: KSignalExternalInput) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override suspend fun cancelWorkflow(input: KCancelWorkflowInput) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun upsertTypedSearchAttributes(vararg updates: io.temporal.common.SearchAttributeUpdate<*>) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun upsertMemo(memo: Map<String, Any>) {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun newRandom(): java.util.Random {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun randomUUID(): java.util.UUID {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
-  }
-
-  override fun currentTimeMillis(): Long {
-    throw UnsupportedOperationException("Outbound interceptor not yet wired")
   }
 }

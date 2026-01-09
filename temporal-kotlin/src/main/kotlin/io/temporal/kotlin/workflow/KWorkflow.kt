@@ -166,7 +166,9 @@ public object KWorkflow {
   public fun currentTimeMillis(): Long {
     val context = currentContext.get()
       ?: throw IllegalStateException("Called outside of workflow context")
-    return context.currentTimeMillis
+    val interceptor = context.outboundInterceptor
+      ?: return context.currentTimeMillis // Fallback if interceptor not yet initialized
+    return interceptor.currentTimeMillis()
   }
 
   /**
@@ -180,7 +182,9 @@ public object KWorkflow {
   public fun randomUUID(): UUID {
     val context = currentContext.get()
       ?: throw IllegalStateException("Called outside of workflow context")
-    return context.randomUUID()
+    val interceptor = context.outboundInterceptor
+      ?: return context.randomUUID() // Fallback if interceptor not yet initialized
+    return interceptor.randomUUID()
   }
 
   /**
@@ -194,7 +198,9 @@ public object KWorkflow {
   public fun newRandom(): Random {
     val context = currentContext.get()
       ?: throw IllegalStateException("Called outside of workflow context")
-    return context.newRandom()
+    val interceptor = context.outboundInterceptor
+      ?: return context.newRandom() // Fallback if interceptor not yet initialized
+    return interceptor.newRandom()
   }
 
   /**

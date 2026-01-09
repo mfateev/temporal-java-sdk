@@ -21,6 +21,7 @@
 package io.temporal.kotlin.interceptor
 
 import io.temporal.common.interceptors.Header
+import io.temporal.kotlin.common.KEncodedValues
 
 /**
  * Input for workflow execution.
@@ -59,13 +60,15 @@ public data class KWorkflowOutput(val result: Any?)
  * Input for signal handling.
  *
  * @property signalName the name of the signal
- * @property arguments the arguments passed with the signal
+ * @property arguments the arguments passed with the signal (for annotation-based handlers)
+ * @property encodedValues the raw encoded values for dynamic handlers to decode
  * @property eventId the event ID of the signal in the workflow history
  * @property header the signal header containing metadata
  */
 public data class KSignalInput(
   val signalName: String,
   val arguments: Array<Any?>,
+  val encodedValues: KEncodedValues,
   val eventId: Long,
   val header: Header
 ) {
@@ -93,12 +96,14 @@ public data class KSignalInput(
  * Input for query handling.
  *
  * @property queryName the name of the query
- * @property arguments the arguments passed with the query
+ * @property arguments the arguments passed with the query (for annotation-based handlers)
+ * @property encodedValues the raw encoded values for dynamic handlers to decode
  * @property header the query header containing metadata
  */
 public data class KQueryInput(
   val queryName: String,
   val arguments: Array<Any?>,
+  val encodedValues: KEncodedValues,
   val header: Header
 ) {
   override fun equals(other: Any?): Boolean {
@@ -130,12 +135,14 @@ public data class KQueryOutput(val result: Any?)
  * Input for update handling.
  *
  * @property updateName the name of the update
- * @property arguments the arguments passed with the update
+ * @property arguments the arguments passed with the update (for annotation-based handlers)
+ * @property encodedValues the raw encoded values for dynamic handlers to decode
  * @property header the update header containing metadata
  */
 public data class KUpdateInput(
   val updateName: String,
   val arguments: Array<Any?>,
+  val encodedValues: KEncodedValues,
   val header: Header
 ) {
   override fun equals(other: Any?): Boolean {
