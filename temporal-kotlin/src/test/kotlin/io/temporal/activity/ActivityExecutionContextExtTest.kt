@@ -6,7 +6,7 @@ import io.temporal.client.newWorkflowStub
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
@@ -20,15 +20,15 @@ class ActivityExecutionContextExtTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestWorkflowImpl::class.java)
-    .setActivityImplementations(TestActivityForHeartbeatDetails())
-    .setWorkflowClientOptions(
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(TestWorkflowImpl::class)
+    setActivityImplementations(TestActivityForHeartbeatDetails())
+    setWorkflowClientOptions(
       WorkflowClientOptions {
         setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
       }
     )
-    .build()
+  }
 
   @Test
   fun `getHeartbeatDetailsOrNull should correctly deserialize generic activity heartbeat details`() {

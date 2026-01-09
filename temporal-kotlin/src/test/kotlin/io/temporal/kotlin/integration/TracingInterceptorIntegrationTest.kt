@@ -44,11 +44,11 @@ import io.temporal.kotlin.interceptor.KWorkflowInput
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptorBase
 import io.temporal.kotlin.interceptor.KWorkflowOutput
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.worker.KotlinPlugin
 import io.temporal.kotlin.worker.KotlinPluginOptions
 import io.temporal.kotlin.workflow.KChildWorkflowHandle
 import io.temporal.kotlin.workflow.KWorkflow
-import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
@@ -306,17 +306,17 @@ class TracingInterceptorIntegrationTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkerFactoryOptions(
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkerFactoryOptions(
       WorkerFactoryOptions.newBuilder()
         .addPlugin(kotlinPlugin)
         .build()
     )
-    .setWorkflowTypes(
-      SimpleTracingWorkflowImpl::class.java,
-      WorkflowWithSignalAndQueryImpl::class.java
+    setWorkflowTypes(
+      SimpleTracingWorkflowImpl::class,
+      WorkflowWithSignalAndQueryImpl::class
     )
-    .build()
+  }
 
   // ==================== Tests ====================
 

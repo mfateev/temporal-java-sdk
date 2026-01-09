@@ -16,7 +16,7 @@ import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
 import io.temporal.internal.async.FunctionWrappingUtil
 import io.temporal.internal.sync.AsyncInternal
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,15 +26,15 @@ class KotlinAsyncNexusTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(WorkflowImpl::class.java)
-    .setNexusServiceImplementation(TestNexusServiceImpl())
-    .setWorkflowClientOptions(
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(WorkflowImpl::class)
+    setNexusServiceImplementation(TestNexusServiceImpl())
+    setWorkflowClientOptions(
       WorkflowClientOptions.newBuilder()
         .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
         .build()
     )
-    .build()
+  }
 
   @Service
   interface TestNexusService {

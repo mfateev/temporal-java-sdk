@@ -29,9 +29,9 @@ import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KChildWorkflowOptions
 import io.temporal.kotlin.workflow.KWorkflow
-import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.WorkflowInterface
@@ -251,10 +251,10 @@ class KotlinCoroutineFeaturesIntegrationTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setDoNotStart(true)
-    .setActivityImplementations(TestActivitiesImpl())
-    .build()
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setActivityImplementations(TestActivitiesImpl())
+  }
 
   private fun setupKotlinWorkflows(vararg workflowClasses: Class<*>) {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())

@@ -18,14 +18,22 @@
  * limitations under the License.
  */
 
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 package io.temporal.kotlin.activity
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
-import io.temporal.activity.ActivityOptions
+import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
-import io.temporal.testing.internal.SDKTestWorkflowRule
-import io.temporal.workflow.Workflow
+import io.temporal.common.converter.DataConverter
+import io.temporal.common.converter.DefaultDataConverter
+import io.temporal.common.converter.JacksonJsonPayloadConverter
+import io.temporal.common.converter.KotlinObjectMapperFactory
+import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
+import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +42,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Integration tests for suspend activity support.
@@ -48,44 +57,42 @@ import java.util.concurrent.atomic.AtomicInteger
  * - Handle errors properly
  * - Can coexist with regular activities
  *
- * Design Note:
- * - Activity interfaces use suspend functions (they define the implementation contract)
- * - Workflows use untyped stubs since Java SDK proxies can't invoke Kotlin suspend functions
- * - The SuspendActivityWrapper registers the implementation as a DynamicActivity
+ * Tests use KWorkflow.executeActivity with method references to test the full
+ * activity invocation path including activity type name derivation.
  */
 class SuspendActivityIntegrationTest {
 
   // ==================== Test Interfaces ====================
-  // Interfaces use suspend - this is the implementation contract
+  // No explicit @ActivityMethod names - testing default name generation
 
   @ActivityInterface
   interface SuspendActivities {
-    @ActivityMethod(name = "Greet")
     suspend fun greet(name: String): String
 
-    @ActivityMethod(name = "Add")
     suspend fun add(a: Int, b: Int): Int
 
-    @ActivityMethod(name = "ProcessWithDelay")
     suspend fun processWithDelay(input: String, delayMs: Long): String
 
-    @ActivityMethod(name = "NoReturnValue")
     suspend fun noReturnValue(message: String)
 
-    @ActivityMethod(name = "ThrowError")
     suspend fun throwError(message: String): String
   }
 
   @ActivityInterface
   interface RegularActivities {
-    @ActivityMethod(name = "RegularGreet")
     fun regularGreet(name: String): String
   }
 
   @ActivityInterface
   interface HeartbeatActivities {
-    @ActivityMethod(name = "ProcessWithHeartbeat")
     suspend fun processWithHeartbeat(items: Int): Int
+  }
+
+  // Interface with explicit @ActivityMethod names for testing annotation support
+  @ActivityInterface
+  interface ExplicitNameActivities {
+    @ActivityMethod(name = "CustomGreet")
+    suspend fun greet(name: String): String
   }
 
   // ==================== Test Implementations ====================
@@ -156,110 +163,111 @@ class SuspendActivityIntegrationTest {
     }
   }
 
+  class ExplicitNameActivitiesImpl : ExplicitNameActivities {
+    companion object {
+      val executionCount = AtomicInteger(0)
+    }
+
+    override suspend fun greet(name: String): String {
+      executionCount.incrementAndGet()
+      return "Custom Hello, $name!"
+    }
+  }
+
   // ==================== Test Workflows ====================
-  // Workflows use untyped stubs since Java proxies can't call suspend functions
+  // Workflows use KWorkflow.executeActivity with method references
 
   @WorkflowInterface
   interface TestGreetWorkflow {
     @WorkflowMethod
-    fun runGreet(name: String): String
+    suspend fun runGreet(name: String): String
   }
 
   @WorkflowInterface
   interface TestAddWorkflow {
     @WorkflowMethod
-    fun runAdd(a: Int, b: Int): Int
+    suspend fun runAdd(a: Int, b: Int): Int
   }
 
   @WorkflowInterface
   interface TestDelayWorkflow {
     @WorkflowMethod
-    fun runDelay(input: String, delayMs: Long): String
+    suspend fun runDelay(input: String, delayMs: Long): String
   }
 
   @WorkflowInterface
   interface TestNoReturnWorkflow {
     @WorkflowMethod
-    fun runNoReturn(message: String): String
+    suspend fun runNoReturn(message: String): String
   }
 
   @WorkflowInterface
   interface TestErrorWorkflow {
     @WorkflowMethod
-    fun runError(message: String): String
+    suspend fun runError(message: String): String
   }
 
   @WorkflowInterface
   interface TestMixedWorkflow {
     @WorkflowMethod
-    fun runMixed(name: String): String
+    suspend fun runMixed(name: String): String
   }
 
   @WorkflowInterface
   interface TestHeartbeatWorkflow {
     @WorkflowMethod
-    fun runHeartbeat(items: Int): Int
+    suspend fun runHeartbeat(items: Int): Int
+  }
+
+  @WorkflowInterface
+  interface TestExplicitNameWorkflow {
+    @WorkflowMethod
+    suspend fun runExplicitName(name: String): String
   }
 
   class TestGreetWorkflowImpl : TestGreetWorkflow {
-    override fun runGreet(name: String): String {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
-      return stub.execute("Greet", String::class.java, name)
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
+
+    override suspend fun runGreet(name: String): String {
+      // Use method reference - tests activity type name derivation
+      return KWorkflow.executeActivity(SuspendActivities::greet, options, name)
     }
   }
 
   class TestAddWorkflowImpl : TestAddWorkflow {
-    override fun runAdd(a: Int, b: Int): Int {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
-      return stub.execute("Add", Int::class.javaObjectType, a, b)
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
+
+    override suspend fun runAdd(a: Int, b: Int): Int {
+      return KWorkflow.executeActivity(SuspendActivities::add, options, a, b)
     }
   }
 
   class TestDelayWorkflowImpl : TestDelayWorkflow {
-    override fun runDelay(input: String, delayMs: Long): String {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
-      return stub.execute("ProcessWithDelay", String::class.java, input, delayMs)
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
+
+    override suspend fun runDelay(input: String, delayMs: Long): String {
+      return KWorkflow.executeActivity(SuspendActivities::processWithDelay, options, input, delayMs)
     }
   }
 
   class TestNoReturnWorkflowImpl : TestNoReturnWorkflow {
-    override fun runNoReturn(message: String): String {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
-      stub.execute("NoReturnValue", Void::class.java, message)
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
+
+    override suspend fun runNoReturn(message: String): String {
+      KWorkflow.executeActivity(SuspendActivities::noReturnValue, options, message)
       return "completed"
     }
   }
 
   class TestErrorWorkflowImpl : TestErrorWorkflow {
-    override fun runError(message: String): String {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .setRetryOptions(
-            io.temporal.common.RetryOptions.newBuilder()
-              .setMaximumAttempts(1)
-              .build()
-          )
-          .build()
-      )
+    private val options = KActivityOptions(
+      startToCloseTimeout = 1.minutes,
+      retryOptions = KRetryOptions(maximumAttempts = 1)
+    )
+
+    override suspend fun runError(message: String): String {
       return try {
-        stub.execute("ThrowError", String::class.java, message)
+        KWorkflow.executeActivity(SuspendActivities::throwError, options, message)
       } catch (e: Exception) {
         // Exception chain: ActivityFailure -> ApplicationFailure -> original message
         // Traverse the chain to find the original message
@@ -275,36 +283,35 @@ class SuspendActivityIntegrationTest {
   }
 
   class TestMixedWorkflowImpl : TestMixedWorkflow {
-    override fun runMixed(name: String): String {
-      // Use untyped stub for suspend activity
-      val suspendStub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
-      // Use typed stub for regular activity
-      val regularActivities = Workflow.newActivityStub(
-        RegularActivities::class.java,
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .build()
-      )
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
 
-      val suspendResult = suspendStub.execute("Greet", String::class.java, name)
-      val regularResult = regularActivities.regularGreet(name)
+    override suspend fun runMixed(name: String): String {
+      // Call suspend activity via method reference
+      val suspendResult = KWorkflow.executeActivity(SuspendActivities::greet, options, name)
+
+      // Call regular (non-suspend) activity via method reference
+      val regularResult = KWorkflow.executeActivity(RegularActivities::regularGreet, options, name)
       return "$suspendResult | $regularResult"
     }
   }
 
   class TestHeartbeatWorkflowImpl : TestHeartbeatWorkflow {
-    override fun runHeartbeat(items: Int): Int {
-      val stub = Workflow.newUntypedActivityStub(
-        ActivityOptions.newBuilder()
-          .setStartToCloseTimeout(Duration.ofMinutes(1))
-          .setHeartbeatTimeout(Duration.ofSeconds(10))
-          .build()
-      )
-      return stub.execute("ProcessWithHeartbeat", Int::class.javaObjectType, items)
+    private val options = KActivityOptions(
+      startToCloseTimeout = 1.minutes,
+      heartbeatTimeout = 10.seconds
+    )
+
+    override suspend fun runHeartbeat(items: Int): Int {
+      return KWorkflow.executeActivity(HeartbeatActivities::processWithHeartbeat, options, items)
+    }
+  }
+
+  class TestExplicitNameWorkflowImpl : TestExplicitNameWorkflow {
+    private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
+
+    override suspend fun runExplicitName(name: String): String {
+      // Tests that @ActivityMethod(name = "CustomGreet") is respected
+      return KWorkflow.executeActivity(ExplicitNameActivities::greet, options, name)
     }
   }
 
@@ -315,30 +322,41 @@ class SuspendActivityIntegrationTest {
     SuspendActivitiesImpl.executionThreads.clear()
     RegularActivitiesImpl.executionCount.set(0)
     HeartbeatActivitiesImpl.heartbeatCount.set(0)
+    ExplicitNameActivitiesImpl.executionCount.set(0)
   }
 
   // ==================== Tests ====================
 
   @Rule
   @JvmField
-  var greetTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestGreetWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var greetTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity returns correct result`() {
+  fun testSuspendActivityReturnsCorrectResult() {
     resetCounters()
-    greetTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    // Register Kotlin suspend workflow using KotlinWorkflowImplementationFactory
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestGreetWorkflowImpl::class.java)
+    greetTestRule.worker.registerWorkflowImplementationFactory(factory)
+    greetTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     greetTestRule.testEnvironment.start()
 
-    val workflow = greetTestRule.workflowClient.newWorkflowStub(
-      TestGreetWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = greetTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestGreetWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(greetTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runGreet("World")
+    stub.start("World")
+    val result = stub.getResult(String::class.java)
 
     assertEquals("Hello, World!", result)
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -346,24 +364,33 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var addTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestAddWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var addTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity with multiple parameters`() {
+  fun testSuspendActivityWithMultipleParameters() {
     resetCounters()
-    addTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestAddWorkflowImpl::class.java)
+    addTestRule.worker.registerWorkflowImplementationFactory(factory)
+    addTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     addTestRule.testEnvironment.start()
 
-    val workflow = addTestRule.workflowClient.newWorkflowStub(
-      TestAddWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = addTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestAddWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(addTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runAdd(10, 20)
+    stub.start(10, 20)
+    val result = stub.getResult(Int::class.java)
 
     assertEquals(30, result)
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -371,24 +398,33 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var delayTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestDelayWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var delayTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity with delay uses coroutines`() {
+  fun testSuspendActivityWithDelayUsesCoroutines() {
     resetCounters()
-    delayTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestDelayWorkflowImpl::class.java)
+    delayTestRule.worker.registerWorkflowImplementationFactory(factory)
+    delayTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     delayTestRule.testEnvironment.start()
 
-    val workflow = delayTestRule.workflowClient.newWorkflowStub(
-      TestDelayWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = delayTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestDelayWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(delayTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runDelay("test-data", 50L)
+    stub.start("test-data", 50L)
+    val result = stub.getResult(String::class.java)
 
     assertEquals("Processed: test-data", result)
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -396,24 +432,33 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var noReturnTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestNoReturnWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var noReturnTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity with Unit return type`() {
+  fun testSuspendActivityWithUnitReturnType() {
     resetCounters()
-    noReturnTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestNoReturnWorkflowImpl::class.java)
+    noReturnTestRule.worker.registerWorkflowImplementationFactory(factory)
+    noReturnTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     noReturnTestRule.testEnvironment.start()
 
-    val workflow = noReturnTestRule.workflowClient.newWorkflowStub(
-      TestNoReturnWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = noReturnTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestNoReturnWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(noReturnTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runNoReturn("test message")
+    stub.start("test message")
+    val result = stub.getResult(String::class.java)
 
     assertEquals("completed", result)
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -421,24 +466,33 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var errorTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestErrorWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var errorTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity error is propagated`() {
+  fun testSuspendActivityErrorIsPropagated() {
     resetCounters()
-    errorTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestErrorWorkflowImpl::class.java)
+    errorTestRule.worker.registerWorkflowImplementationFactory(factory)
+    errorTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     errorTestRule.testEnvironment.start()
 
-    val workflow = errorTestRule.workflowClient.newWorkflowStub(
-      TestErrorWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = errorTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestErrorWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(errorTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runError("test error")
+    stub.start("test error")
+    val result = stub.getResult(String::class.java)
 
     assertTrue("Should contain error message", result.contains("test error"))
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -446,28 +500,37 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var mixedTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestMixedWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var mixedTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend and regular activities can coexist`() {
+  fun testSuspendAndRegularActivitiesCanCoexist() {
     resetCounters()
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestMixedWorkflowImpl::class.java)
+    mixedTestRule.worker.registerWorkflowImplementationFactory(factory)
     // Register suspend activities
-    mixedTestRule.worker.registerSuspendActivities(SuspendActivitiesImpl())
+    mixedTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
     // Register regular activities separately
-    mixedTestRule.worker.registerActivitiesImplementations(RegularActivitiesImpl())
+    mixedTestRule.kWorker.registerActivitiesImplementations(RegularActivitiesImpl())
 
     mixedTestRule.testEnvironment.start()
 
-    val workflow = mixedTestRule.workflowClient.newWorkflowStub(
-      TestMixedWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = mixedTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestMixedWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(mixedTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runMixed("Test")
+    stub.start("Test")
+    val result = stub.getResult(String::class.java)
 
     assertEquals("Hello, Test! | Regular Hello, Test!", result)
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
@@ -476,24 +539,33 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var heartbeatTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestHeartbeatWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var heartbeatTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity with heartbeating`() {
+  fun testSuspendActivityWithHeartbeating() {
     resetCounters()
-    heartbeatTestRule.worker.registerSuspendActivities(HeartbeatActivitiesImpl())
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestHeartbeatWorkflowImpl::class.java)
+    heartbeatTestRule.worker.registerWorkflowImplementationFactory(factory)
+    heartbeatTestRule.kWorker.registerSuspendActivities(HeartbeatActivitiesImpl())
     heartbeatTestRule.testEnvironment.start()
 
-    val workflow = heartbeatTestRule.workflowClient.newWorkflowStub(
-      TestHeartbeatWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = heartbeatTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestHeartbeatWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(heartbeatTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runHeartbeat(5)
+    stub.start(5)
+    val result = stub.getResult(Int::class.java)
 
     assertEquals(5, result)
     assertEquals(5, HeartbeatActivitiesImpl.heartbeatCount.get())
@@ -501,33 +573,76 @@ class SuspendActivityIntegrationTest {
 
   @Rule
   @JvmField
-  var dispatcherTestRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestGreetWorkflowImpl::class.java)
-    .setDoNotStart(true)
-    .build()
+  var dispatcherTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
 
   @Test
-  fun `suspend activity runs on configured dispatcher`() {
+  fun testSuspendActivityRunsOnConfiguredDispatcher() {
     resetCounters()
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestGreetWorkflowImpl::class.java)
+    dispatcherTestRule.worker.registerWorkflowImplementationFactory(factory)
     // Use IO dispatcher to verify we can configure the dispatcher
-    dispatcherTestRule.worker.registerSuspendActivities(
+    dispatcherTestRule.kWorker.worker.registerSuspendActivities(
       SuspendActivitiesImpl(),
       options = SuspendActivityOptions(dispatcher = Dispatchers.IO)
     )
     dispatcherTestRule.testEnvironment.start()
 
-    val workflow = dispatcherTestRule.workflowClient.newWorkflowStub(
-      TestGreetWorkflow::class.java,
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = dispatcherTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestGreetWorkflow",
       WorkflowOptions.newBuilder()
         .setTaskQueue(dispatcherTestRule.taskQueue)
         .build()
     )
-    val result = workflow.runGreet("World")
+    stub.start("World")
+    val result = stub.getResult(String::class.java)
 
     assertEquals("Hello, World!", result)
     // Verify the activity actually executed
     assertEquals(1, SuspendActivitiesImpl.executionCount.get())
     // Note: We can't easily verify the exact dispatcher used, but the test
     // passing means it worked with the configured dispatcher
+  }
+
+  @Rule
+  @JvmField
+  var explicitNameTestRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+    setWorkflowClientOptions(
+      WorkflowClientOptions {
+        setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
+      }
+    )
+  }
+
+  @Test
+  fun testSuspendActivityWithExplicitActivityMethodName() {
+    resetCounters()
+    val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
+    factory.registerWorkflowImplementationType(TestExplicitNameWorkflowImpl::class.java)
+    explicitNameTestRule.worker.registerWorkflowImplementationFactory(factory)
+    explicitNameTestRule.kWorker.registerSuspendActivities(ExplicitNameActivitiesImpl())
+    explicitNameTestRule.testEnvironment.start()
+
+    // Use untyped stub since Java proxy doesn't support suspend functions on client side
+    val stub = explicitNameTestRule.workflowClient.newUntypedWorkflowStub(
+      "TestExplicitNameWorkflow",
+      WorkflowOptions.newBuilder()
+        .setTaskQueue(explicitNameTestRule.taskQueue)
+        .build()
+    )
+    stub.start("World")
+    val result = stub.getResult(String::class.java)
+
+    assertEquals("Custom Hello, World!", result)
+    assertEquals(1, ExplicitNameActivitiesImpl.executionCount.get())
   }
 }

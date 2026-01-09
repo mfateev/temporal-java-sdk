@@ -8,7 +8,7 @@ import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
 import io.temporal.internal.async.FunctionWrappingUtil
 import io.temporal.internal.sync.AsyncInternal
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import org.junit.Assert
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -23,14 +23,14 @@ class KotlinAsyncLambdaTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(LambdaWorkflowImpl::class.java)
-    .setWorkflowClientOptions(
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(LambdaWorkflowImpl::class)
+    setWorkflowClientOptions(
       WorkflowClientOptions.newBuilder()
         .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
         .build()
     )
-    .build()
+  }
 
   @WorkflowInterface
   interface Workflow {

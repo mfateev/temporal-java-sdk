@@ -25,7 +25,7 @@ package io.temporal.kotlin.integration
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.delay
@@ -48,9 +48,9 @@ class JavaClientToSuspendWorkflowTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setDoNotStart(true)
-    .build()
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+  }
 
   private fun setupWorkflow() {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())

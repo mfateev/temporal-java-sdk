@@ -6,7 +6,7 @@ import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import org.junit.Rule
 import org.junit.Test
 
@@ -14,18 +14,18 @@ class KotlinChildWorkflowStubExtTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(
-      ParentWorkflowImpl::class.java,
-      AsyncParentWorkflowImpl::class.java,
-      ChildWorkflowImpl::class.java
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(
+      ParentWorkflowImpl::class,
+      AsyncParentWorkflowImpl::class,
+      ChildWorkflowImpl::class
     )
-    .setWorkflowClientOptions(
+    setWorkflowClientOptions(
       WorkflowClientOptions.newBuilder()
         .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
         .build()
     )
-    .build()
+  }
 
   @WorkflowInterface
   interface ChildWorkflow {

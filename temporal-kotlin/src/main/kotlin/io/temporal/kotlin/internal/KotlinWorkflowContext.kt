@@ -329,7 +329,7 @@ internal class KotlinWorkflowContext(
     ) { result: Optional<Payloads>, failure: Failure? ->
       if (failure != null) {
         cont.resumeWithException(
-          RuntimeException("Activity failed: ${failure.message}")
+          dataConverter.failureToException(failure)
         )
       } else {
         cont.resume(result)
@@ -359,7 +359,7 @@ internal class KotlinWorkflowContext(
       LocalActivityCallback { result, exception ->
         if (exception != null) {
           cont.resumeWithException(
-            RuntimeException("Local activity failed: ${exception.failure.message}", exception)
+            dataConverter.failureToException(exception.failure)
           )
         } else {
           cont.resume(result)

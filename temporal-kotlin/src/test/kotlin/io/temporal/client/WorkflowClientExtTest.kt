@@ -4,7 +4,7 @@ package io.temporal.client
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface
@@ -18,14 +18,14 @@ class WorkflowClientExtTest {
 
   @Rule
   @JvmField
-  val testWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(TestWorkflowImpl::class.java)
-    .setWorkflowClientOptions(
+  val testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(TestWorkflowImpl::class)
+    setWorkflowClientOptions(
       WorkflowClientOptions {
         setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
       }
     )
-    .build()
+  }
 
   @Test
   fun `signalWithStart extension should work the same as the original method`() {

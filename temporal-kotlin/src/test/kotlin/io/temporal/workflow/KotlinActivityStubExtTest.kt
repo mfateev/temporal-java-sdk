@@ -9,7 +9,7 @@ import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
-import io.temporal.testing.internal.SDKTestWorkflowRule
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import org.junit.Rule
 import org.junit.Test
 import java.time.Duration
@@ -18,18 +18,18 @@ class KotlinActivityStubExtTest {
 
   @Rule
   @JvmField
-  var testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setWorkflowTypes(
-      SyncWorkflowImpl::class.java,
-      AsyncWorkflowImpl::class.java
+  var testWorkflowRule = KSDKTestWorkflowRule {
+    setWorkflowTypes(
+      SyncWorkflowImpl::class,
+      AsyncWorkflowImpl::class
     )
-    .setActivityImplementations(ActivityImpl())
-    .setWorkflowClientOptions(
+    setActivityImplementations(ActivityImpl())
+    setWorkflowClientOptions(
       WorkflowClientOptions.newBuilder()
         .setDataConverter(DefaultDataConverter(JacksonJsonPayloadConverter(KotlinObjectMapperFactory.new())))
         .build()
     )
-    .build()
+  }
 
   @WorkflowInterface
   interface SyncWorkflow {

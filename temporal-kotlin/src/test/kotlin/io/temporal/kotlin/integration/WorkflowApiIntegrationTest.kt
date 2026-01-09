@@ -27,8 +27,8 @@ import io.temporal.common.SearchAttributeKey
 import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
-import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.UpdateMethod
@@ -294,9 +294,9 @@ class WorkflowApiIntegrationTest {
 
   @Rule
   @JvmField
-  val testWorkflowRule: SDKTestWorkflowRule = SDKTestWorkflowRule.newBuilder()
-    .setDoNotStart(true)
-    .build()
+  val testWorkflowRule = KSDKTestWorkflowRule {
+    setDoNotStart(true)
+  }
 
   private fun setupKotlinWorkflows(vararg workflowClasses: Class<*>) {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
