@@ -24,8 +24,10 @@ import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
 import io.temporal.activity.ActivityOptions
 import io.temporal.client.WorkflowException
+import io.temporal.client.WorkflowOptions
 import io.temporal.failure.ActivityFailure
 import io.temporal.failure.ApplicationFailure
+import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
@@ -37,6 +39,7 @@ import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.Mockito
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -48,6 +51,9 @@ import java.util.concurrent.TimeUnit
  * - Verifying mock invocations
  * - Error handling for unregistered activity types
  * - Exception propagation from mocks
+ *
+ * Note: These tests use sync workflows because they test the underlying activity
+ * mocking infrastructure. The workflows are executed via Java client stubs.
  */
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KActivityMockingIntegrationTest {
@@ -127,10 +133,36 @@ class KActivityMockingIntegrationTest {
         }
     }
 
+    private fun createWorkflowStub(
+        testEnv: KTestWorkflowEnvironment,
+        options: KWorkflowOptions,
+    ): WorkflowWithActivity {
+        return testEnv.workflowClient.workflowClient.newWorkflowStub(
+            WorkflowWithActivity::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue(options.taskQueue)
+                .setWorkflowId("test-${UUID.randomUUID()}")
+                .build(),
+        )
+    }
+
+    private fun createMultiActivityWorkflowStub(
+        testEnv: KTestWorkflowEnvironment,
+        options: KWorkflowOptions,
+    ): WorkflowWithMultipleActivities {
+        return testEnv.workflowClient.workflowClient.newWorkflowStub(
+            WorkflowWithMultipleActivities::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue(options.taskQueue)
+                .setWorkflowId("test-multi-${UUID.randomUUID()}")
+                .build(),
+        )
+    }
+
     @Test
     fun `mock activity returns expected value`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithActivity,
+        options: KWorkflowOptions,
     ) {
         // Create mock using Mockito
         val mockActivity = Mockito.mock(GreetingActivity::class.java)
@@ -140,7 +172,8 @@ class KActivityMockingIntegrationTest {
         // Register mock
         testEnv.registerActivitiesImplementations(mockActivity)
 
-        // Execute workflow
+        // Create workflow stub and execute
+        val workflow = createWorkflowStub(testEnv, options)
         val result = workflow.process("World")
 
         // Verify result
@@ -150,7 +183,7 @@ class KActivityMockingIntegrationTest {
     @Test
     fun `mock activity receives correct arguments`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithActivity,
+        options: KWorkflowOptions,
     ) {
         // Create mock
         val mockActivity = Mockito.mock(GreetingActivity::class.java)
@@ -160,7 +193,8 @@ class KActivityMockingIntegrationTest {
         // Register mock
         testEnv.registerActivitiesImplementations(mockActivity)
 
-        // Execute workflow
+        // Create workflow stub and execute
+        val workflow = createWorkflowStub(testEnv, options)
         val result = workflow.process("TestInput")
 
         // Verify
@@ -171,7 +205,7 @@ class KActivityMockingIntegrationTest {
     @Test
     fun `mock activity can throw exception`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithActivity,
+        options: KWorkflowOptions,
     ) {
         // Create mock that throws a non-retryable exception
         val mockActivity = Mockito.mock(GreetingActivity::class.java)
@@ -181,7 +215,8 @@ class KActivityMockingIntegrationTest {
         // Register mock
         testEnv.registerActivitiesImplementations(mockActivity)
 
-        // Execute workflow and expect failure
+        // Create workflow stub and execute, expecting failure
+        val workflow = createWorkflowStub(testEnv, options)
         try {
             workflow.process("Test")
             fail("Expected WorkflowException")
@@ -199,7 +234,7 @@ class KActivityMockingIntegrationTest {
     @Test
     fun `mock multiple activities in same workflow`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithMultipleActivities,
+        options: KWorkflowOptions,
     ) {
         // Create mocks
         val mockGreeting = Mockito.mock(GreetingActivity::class.java)
@@ -213,7 +248,8 @@ class KActivityMockingIntegrationTest {
         // Register both mocks
         testEnv.registerActivitiesImplementations(mockGreeting, mockCounter)
 
-        // Execute workflow
+        // Create workflow stub and execute
+        val workflow = createMultiActivityWorkflowStub(testEnv, options)
         val result = workflow.processMultiple("Test")
 
         // Verify
@@ -225,11 +261,12 @@ class KActivityMockingIntegrationTest {
     @Test
     fun `error message when activity not registered`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithActivity,
+        options: KWorkflowOptions,
     ) {
         // Don't register any activity mock
 
-        // Execute workflow and expect failure
+        // Create workflow stub and execute, expecting failure
+        val workflow = createWorkflowStub(testEnv, options)
         try {
             workflow.process("Test")
             fail("Expected WorkflowException")
@@ -250,7 +287,7 @@ class KActivityMockingIntegrationTest {
     @Test
     fun `can register activities at any time before workflow call`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: WorkflowWithActivity,
+        options: KWorkflowOptions,
     ) {
         // Verify environment is already started
         assertTrue(testEnv.isStarted)
@@ -262,7 +299,8 @@ class KActivityMockingIntegrationTest {
 
         testEnv.registerActivitiesImplementations(mockActivity)
 
-        // Execute workflow
+        // Create workflow stub and execute
+        val workflow = createWorkflowStub(testEnv, options)
         val result = workflow.process("Test")
 
         // Verify
@@ -325,12 +363,19 @@ class KRealActivityRegistrationTest {
     @Test
     fun `real activity implementation works via registerActivitiesImplementations`(
         testEnv: KTestWorkflowEnvironment,
-        workflow: CalculatorWorkflow,
+        options: KWorkflowOptions,
     ) {
         // Register real implementation (not a mock)
         testEnv.registerActivitiesImplementations(CalculatorImpl())
 
-        // Execute workflow
+        // Create workflow stub and execute
+        val workflow = testEnv.workflowClient.workflowClient.newWorkflowStub(
+            CalculatorWorkflow::class.java,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue(options.taskQueue)
+                .setWorkflowId("calculator-${UUID.randomUUID()}")
+                .build(),
+        )
         val result = workflow.calculate(5, 3)
 
         // Verify

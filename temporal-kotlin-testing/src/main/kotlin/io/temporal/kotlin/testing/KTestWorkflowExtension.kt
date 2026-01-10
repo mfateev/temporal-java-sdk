@@ -22,18 +22,14 @@ package io.temporal.kotlin.testing
 
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.client.WorkflowClientOptions
-import io.temporal.common.metadata.POJOWorkflowImplMetadata
-import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.testing.TestWorkflowEnvironment
-import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkerOptions
 import io.temporal.worker.WorkflowImplementationOptions
-import io.temporal.workflow.DynamicWorkflow
 import org.junit.jupiter.api.extension.AfterEachCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -50,8 +46,12 @@ import java.time.Instant
  * This extension simplifies workflow testing by:
  * - Automatically creating an isolated test environment for each test
  * - Registering workflow and activity implementations
- * - Injecting workflow stubs, clients, and environments into test methods
+ * - Injecting [KTestWorkflowEnvironment], [KWorkflowClient], and [KWorker] into test methods
  * - Providing diagnostics on test failure
+ *
+ * This extension only supports suspend workflows and promotes the method reference
+ * pattern for workflow execution. Use `runTest` from kotlinx-coroutines-test for
+ * suspend test functions.
  *
  * Example:
  * ```kotlin
@@ -66,15 +66,26 @@ import java.time.Instant
  *     }
  *
  *     @Test
- *     fun `test workflow execution`(workflow: MyWorkflow) {
- *         val result = workflow.execute("input")
+ *     fun `test workflow execution`(
+ *         client: KWorkflowClient,
+ *         options: KWorkflowOptions,
+ *     ) = runTest {
+ *         val result = client.executeWorkflow(
+ *             MyWorkflow::execute,
+ *             options.copy(workflowId = "test-${UUID.randomUUID()}"),
+ *             "input"
+ *         )
  *         assertEquals("expected", result)
  *     }
  *
  *     @Test
  *     @WorkflowInitialTime("2024-06-15T12:00:00Z")
- *     fun `test workflow with specific initial time`(workflow: MyWorkflow) {
+ *     fun `test workflow with specific initial time`(
+ *         client: KWorkflowClient,
+ *         options: KWorkflowOptions,
+ *     ) = runTest {
  *         // Test runs with June 15, 2024 as initial time
+ *         val result = client.executeWorkflow(MyWorkflow::execute, options.copy(workflowId = "test"), "input")
  *     }
  * }
  * ```
@@ -141,47 +152,20 @@ public class KTestWorkflowExtension private constructor(
         }
     }
 
-    // ========== Commit 17: Workflow interface type support ==========
-
     /**
      * Set of parameter types that can be resolved by this extension.
-     * Includes core types and workflow interfaces extracted from registered implementations.
+     *
+     * Only Kotlin-idiomatic types are supported. Use [KWorkflowClient] with method references
+     * (e.g., `client.executeWorkflow(MyWorkflow::execute, ...)`) for workflow execution.
      */
-    private val supportedParameterTypes: Set<Class<*>> = run {
-        val types = mutableSetOf<Class<*>>()
+    private val supportedParameterTypes: Set<Class<*>> = setOf(
+        KTestWorkflowEnvironment::class.java,
+        KWorkflowClient::class.java,
+        KWorkflowOptions::class.java,
+        KWorker::class.java,
+    )
 
-        // Core types
-        types.add(KTestWorkflowEnvironment::class.java)
-        types.add(KWorkflowClient::class.java)
-        types.add(KWorkflowOptions::class.java)
-        types.add(KWorker::class.java)
-        types.add(Worker::class.java)
-
-        // Extract workflow interfaces from registered implementations
-        config.workflowTypes.keys.forEach { workflowType ->
-            if (!DynamicWorkflow::class.java.isAssignableFrom(workflowType)) {
-                try {
-                    val metadata = POJOWorkflowImplMetadata.newInstance(workflowType)
-                    metadata.workflowInterfaces.forEach { interfaceMetadata ->
-                        types.add(interfaceMetadata.interfaceClass)
-                    }
-                } catch (e: Exception) {
-                    // Skip if metadata extraction fails
-                }
-            }
-        }
-        types.toSet()
-    }
-
-    /**
-     * Whether any registered workflow type implements DynamicWorkflow.
-     * If true, we need to check for workflow interfaces dynamically.
-     */
-    private val includesDynamicWorkflow: Boolean = config.workflowTypes.keys.any {
-        DynamicWorkflow::class.java.isAssignableFrom(it)
-    }
-
-    // ========== Commit 16: Parameter resolution ==========
+    // ========== Parameter resolution ==========
 
     override fun supportsParameter(
         parameterContext: ParameterContext,
@@ -192,21 +176,7 @@ public class KTestWorkflowExtension private constructor(
         // Don't resolve constructor parameters
         if (parameter.declaringExecutable is Constructor<*>) return false
 
-        val parameterType = parameter.type
-
-        // Check if it's a directly supported type
-        if (supportedParameterTypes.contains(parameterType)) return true
-
-        // If we have dynamic workflows, check if the parameter type is a valid workflow interface
-        if (!includesDynamicWorkflow) return false
-
-        // Try to validate as a workflow interface
-        return try {
-            POJOWorkflowInterfaceMetadata.newInstance(parameterType)
-            true
-        } catch (e: Exception) {
-            false
-        }
+        return supportedParameterTypes.contains(parameter.type)
     }
 
     override fun resolveParameter(
@@ -221,16 +191,10 @@ public class KTestWorkflowExtension private constructor(
             KWorkflowClient::class.java -> getTestEnvironment(store).workflowClient
             KWorkflowOptions::class.java -> getWorkflowOptions(store)
             KWorker::class.java -> getKWorker(store)
-            Worker::class.java -> getKWorker(store).worker
-            else -> {
-                // Create workflow stub for the interface type
-                val testEnv = getTestEnvironment(store)
-                val options = getWorkflowOptions(store)
-                testEnv.workflowClient.workflowClient.newWorkflowStub(
-                    parameterType,
-                    options.toJavaOptions(),
-                )
-            }
+            else -> throw IllegalArgumentException(
+                "Unsupported parameter type: ${parameterType.name}. " +
+                    "Supported types: KTestWorkflowEnvironment, KWorkflowClient, KWorkflowOptions, KWorker",
+            )
         }
     }
 
@@ -765,6 +729,7 @@ public class KTestWorkflowExtension private constructor(
  * DSL function to create a [KTestWorkflowExtension].
  *
  * This is the recommended way to create a test workflow extension in Kotlin.
+ * Use `runTest` from kotlinx-coroutines-test for suspend test functions.
  *
  * Example:
  * ```kotlin
@@ -787,8 +752,15 @@ public class KTestWorkflowExtension private constructor(
  *     }
  *
  *     @Test
- *     fun `test workflow`(workflow: MyWorkflow) {
- *         val result = workflow.execute("input")
+ *     fun `test workflow`(
+ *         client: KWorkflowClient,
+ *         options: KWorkflowOptions,
+ *     ) = runTest {
+ *         val result = client.executeWorkflow(
+ *             MyWorkflow::execute,
+ *             options.copy(workflowId = "test-${UUID.randomUUID()}"),
+ *             "input"
+ *         )
  *         assertEquals("expected", result)
  *     }
  * }

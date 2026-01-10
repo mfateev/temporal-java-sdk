@@ -27,18 +27,18 @@ import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.worker.KWorker
-import io.temporal.worker.Worker
 import io.temporal.workflow.Workflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.extension.RegisterExtension
-import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -47,11 +47,13 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Tests cover:
  * - Extension lifecycle (beforeEach/afterEach)
- * - Parameter injection (environment, client, options, worker, workflow stubs)
+ * - Parameter injection (environment, client, options, worker)
  * - @WorkflowInitialTime annotation support
  * - Search attribute configuration
  * - Workflow and activity registration
  * - DSL configuration
+ *
+ * All tests use suspend workflows and the method reference pattern with `runTest`.
  */
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 class KTestWorkflowExtensionIntegrationTest {
@@ -61,19 +63,19 @@ class KTestWorkflowExtensionIntegrationTest {
     @WorkflowInterface
     interface GreetingWorkflow {
         @WorkflowMethod
-        fun greet(name: String): String
+        suspend fun greet(name: String): String
     }
 
     @WorkflowInterface
     interface TimerWorkflow {
         @WorkflowMethod
-        fun waitAndReturn(seconds: Long): String
+        suspend fun waitAndReturn(seconds: Long): String
     }
 
     @WorkflowInterface
     interface WorkflowWithActivity {
         @WorkflowMethod
-        fun process(input: String): String
+        suspend fun process(input: String): String
     }
 
     @ActivityInterface
@@ -85,14 +87,14 @@ class KTestWorkflowExtensionIntegrationTest {
     // ==================== Test Implementations ====================
 
     class GreetingWorkflowImpl : GreetingWorkflow {
-        override fun greet(name: String): String {
+        override suspend fun greet(name: String): String {
             return "Hello, $name!"
         }
     }
 
     class TimerWorkflowImpl : TimerWorkflow {
-        override fun waitAndReturn(seconds: Long): String {
-            Workflow.sleep(Duration.ofSeconds(seconds))
+        override suspend fun waitAndReturn(seconds: Long): String {
+            Workflow.sleep(java.time.Duration.ofSeconds(seconds))
             return "Waited ${seconds}s"
         }
     }
@@ -101,11 +103,11 @@ class KTestWorkflowExtensionIntegrationTest {
         private val activities = Workflow.newActivityStub(
             GreetingActivities::class.java,
             ActivityOptions.newBuilder()
-                .setStartToCloseTimeout(Duration.ofMinutes(1))
+                .setStartToCloseTimeout(java.time.Duration.ofMinutes(1))
                 .build(),
         )
 
-        override fun process(input: String): String {
+        override suspend fun process(input: String): String {
             return activities.formatGreeting(input)
         }
     }
@@ -167,63 +169,58 @@ class KTestWorkflowExtensionIntegrationTest {
     }
 
     @Test
-    fun `inject Java Worker`(worker: Worker) {
-        assertNotNull(worker)
-    }
-
-    @Test
-    fun `inject workflow stub`(workflow: GreetingWorkflow) {
-        assertNotNull(workflow)
-
-        val result = workflow.greet("World")
-        assertEquals("Hello, World!", result)
-    }
-
-    @Test
     fun `inject multiple parameters`(
         testEnv: KTestWorkflowEnvironment,
         client: KWorkflowClient,
         options: KWorkflowOptions,
-        workflow: GreetingWorkflow,
     ) {
         assertNotNull(testEnv)
         assertNotNull(client)
         assertNotNull(options)
-        assertNotNull(workflow)
-
-        val result = workflow.greet("Test")
-        assertEquals("Hello, Test!", result)
     }
 
     // ==================== Workflow Execution Tests ====================
 
     @Test
-    fun `execute simple workflow via injected stub`(workflow: GreetingWorkflow) {
-        val result = workflow.greet("Kotlin")
+    fun `execute simple workflow via method reference`(
+        client: KWorkflowClient,
+        options: KWorkflowOptions,
+    ) = runTest {
+        val result = client.executeWorkflow(
+            GreetingWorkflow::greet,
+            options.copy(workflowId = "greeting-${UUID.randomUUID()}"),
+            "Kotlin",
+        )
         assertEquals("Hello, Kotlin!", result)
     }
 
     @Test
-    fun `execute workflow via client and options`(
+    fun `execute workflow with different input`(
         client: KWorkflowClient,
         options: KWorkflowOptions,
-    ) {
-        val workflow = client.workflowClient.newWorkflowStub(
-            GreetingWorkflow::class.java,
-            options.toJavaOptions(),
+    ) = runTest {
+        val result = client.executeWorkflow(
+            GreetingWorkflow::greet,
+            options.copy(workflowId = "greeting-world-${UUID.randomUUID()}"),
+            "World",
         )
-
-        val result = workflow.greet("Manual")
-        assertEquals("Hello, Manual!", result)
+        assertEquals("Hello, World!", result)
     }
 
     // ==================== Timer and Time Skipping Tests ====================
 
     @Test
-    fun `timer workflow completes quickly with time skipping`(workflow: TimerWorkflow) {
+    fun `timer workflow completes quickly with time skipping`(
+        client: KWorkflowClient,
+        options: KWorkflowOptions,
+    ) = runTest {
         val startTime = System.currentTimeMillis()
 
-        val result = workflow.waitAndReturn(3600) // 1 hour
+        val result = client.executeWorkflow(
+            TimerWorkflow::waitAndReturn,
+            options.copy(workflowId = "timer-${UUID.randomUUID()}"),
+            3600L, // 1 hour
+        )
 
         val elapsed = System.currentTimeMillis() - startTime
         assertEquals("Waited 3600s", result)
@@ -234,10 +231,17 @@ class KTestWorkflowExtensionIntegrationTest {
     // ==================== Activity Integration Tests ====================
 
     @Test
-    fun `workflow with activity executes correctly`(workflow: WorkflowWithActivity) {
+    fun `workflow with activity executes correctly`(
+        client: KWorkflowClient,
+        options: KWorkflowOptions,
+    ) = runTest {
         GreetingActivitiesImpl.executionCount.set(0)
 
-        val result = workflow.process("Test Input")
+        val result = client.executeWorkflow(
+            WorkflowWithActivity::process,
+            options.copy(workflowId = "activity-${UUID.randomUUID()}"),
+            "Test Input",
+        )
 
         assertEquals("Formatted: Test Input", result)
         assertEquals(1, GreetingActivitiesImpl.executionCount.get())
@@ -273,15 +277,14 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `each test gets isolated environment`(
-        testEnv: KTestWorkflowEnvironment,
+        client: KWorkflowClient,
         options: KWorkflowOptions,
-    ) {
-        // Execute a workflow
-        val workflow = testEnv.workflowClient.workflowClient.newWorkflowStub(
-            GreetingWorkflow::class.java,
-            options.toJavaOptions(),
+    ) = runTest {
+        val result = client.executeWorkflow(
+            GreetingWorkflow::greet,
+            options.copy(workflowId = "isolation-${UUID.randomUUID()}"),
+            "Isolation",
         )
-        val result = workflow.greet("Isolation")
 
         assertEquals("Hello, Isolation!", result)
         // Each test gets its own environment, so this should always work
@@ -309,11 +312,11 @@ class KTestWorkflowExtensionNamespaceTest {
     @WorkflowInterface
     interface SimpleWorkflow {
         @WorkflowMethod
-        fun execute(): String
+        suspend fun execute(): String
     }
 
     class SimpleWorkflowImpl : SimpleWorkflow {
-        override fun execute(): String = "done"
+        override suspend fun execute(): String = "done"
     }
 
     companion object {
@@ -329,6 +332,18 @@ class KTestWorkflowExtensionNamespaceTest {
     fun `custom namespace is applied`(testEnv: KTestWorkflowEnvironment) {
         assertEquals("custom-test-namespace", testEnv.namespace)
     }
+
+    @Test
+    fun `workflow executes in custom namespace`(
+        client: KWorkflowClient,
+        options: KWorkflowOptions,
+    ) = runTest {
+        val result = client.executeWorkflow(
+            SimpleWorkflow::execute,
+            options.copy(workflowId = "namespace-test-${UUID.randomUUID()}"),
+        )
+        assertEquals("done", result)
+    }
 }
 
 /**
@@ -340,11 +355,11 @@ class KTestWorkflowExtensionInitialTimeTest {
     @WorkflowInterface
     interface SimpleWorkflow {
         @WorkflowMethod
-        fun execute(): String
+        suspend fun execute(): String
     }
 
     class SimpleWorkflowImpl : SimpleWorkflow {
-        override fun execute(): String = "done"
+        override suspend fun execute(): String = "done"
     }
 
     companion object {
