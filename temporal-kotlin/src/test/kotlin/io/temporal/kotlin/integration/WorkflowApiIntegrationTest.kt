@@ -129,7 +129,7 @@ class WorkflowApiIntegrationTest {
   class SearchAttributeWorkflowImpl : SearchAttributeWorkflow {
     override suspend fun execute(): String {
       // Get initial search attributes (verifies API works)
-      KWorkflow.getTypedSearchAttributes()
+      KWorkflow.typedSearchAttributes
 
       // Upsert search attributes
       val statusKey = SearchAttributeKey.forKeyword("CustomKeywordField")
@@ -138,7 +138,7 @@ class WorkflowApiIntegrationTest {
       )
 
       // Get updated search attributes
-      val updatedAttrs = KWorkflow.getTypedSearchAttributes()
+      val updatedAttrs = KWorkflow.typedSearchAttributes
       val status = updatedAttrs.get(statusKey)
 
       return "status=$status"
@@ -164,7 +164,7 @@ class WorkflowApiIntegrationTest {
   class ReplayingWorkflowImpl : ReplayingWorkflow {
     override suspend fun execute(): Boolean {
       // isReplaying should be false on first execution
-      return KWorkflow.isReplaying()
+      return KWorkflow.isReplaying
     }
   }
 
@@ -195,8 +195,8 @@ class WorkflowApiIntegrationTest {
 
   class MetricsScopeWorkflowImpl : MetricsScopeWorkflow {
     override suspend fun execute(): Boolean {
-      // getMetricsScope() returns non-null Scope, verify it works
-      val scope = KWorkflow.getMetricsScope()
+      // metricsScope returns non-null Scope, verify it works
+      val scope = KWorkflow.metricsScope
       // Try using the scope - if it doesn't throw, it works
       scope.counter("test_counter").inc(1)
       return true
@@ -206,23 +206,23 @@ class WorkflowApiIntegrationTest {
   class WorkflowDetailsWorkflowImpl : WorkflowDetailsWorkflow {
     override suspend fun execute(): String {
       // Initially no details
-      val initial = KWorkflow.getCurrentDetails()
+      val initial = KWorkflow.currentDetails
 
       // Set details
-      KWorkflow.setCurrentDetails("Processing step 1")
+      KWorkflow.currentDetails = "Processing step 1"
 
       // Get details
-      val step1 = KWorkflow.getCurrentDetails()
+      val step1 = KWorkflow.currentDetails
 
       // Update details
-      KWorkflow.setCurrentDetails("Processing step 2")
-      val step2 = KWorkflow.getCurrentDetails()
+      KWorkflow.currentDetails = "Processing step 2"
+      val step2 = KWorkflow.currentDetails
 
       return "initial=$initial, step1=$step1, step2=$step2"
     }
 
     override fun getDetails(): String? {
-      return KWorkflow.getCurrentDetails()
+      return KWorkflow.currentDetails
     }
   }
 
@@ -235,7 +235,7 @@ class WorkflowApiIntegrationTest {
       KWorkflow.awaitCondition { signalReceived }
 
       // Check if all handlers are finished
-      return KWorkflow.isEveryHandlerFinished()
+      return KWorkflow.isEveryHandlerFinished
     }
 
     override suspend fun processSignal(value: String) {
@@ -244,7 +244,7 @@ class WorkflowApiIntegrationTest {
     }
 
     override fun getHandlerStatus(): Boolean {
-      return KWorkflow.isEveryHandlerFinished()
+      return KWorkflow.isEveryHandlerFinished
     }
   }
 
@@ -259,7 +259,7 @@ class WorkflowApiIntegrationTest {
 
     override suspend fun myUpdate(input: String): String {
       // Get current update info
-      val updateInfo = KWorkflow.getCurrentUpdateInfo()
+      val updateInfo = KWorkflow.currentUpdateInfo
       val name = updateInfo?.updateName ?: "unknown"
       val id = updateInfo?.updateId ?: "unknown"
 

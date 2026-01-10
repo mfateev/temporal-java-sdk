@@ -72,32 +72,32 @@ class KWorkflowTest {
   // ==================== getCurrentUpdateInfo Tests ====================
 
   @Test
-  fun `getCurrentUpdateInfo throws when no context is set`() {
+  fun `currentUpdateInfo throws when no context is set`() {
     // Ensure no context is set
     KWorkflow.currentContext.remove()
 
     val exception = assertThrows(IllegalStateException::class.java) {
-      KWorkflow.getCurrentUpdateInfo()
+      KWorkflow.currentUpdateInfo
     }
     assertEquals(
-      "KWorkflow.getCurrentUpdateInfo must be called from within workflow code",
+      "KWorkflow.currentUpdateInfo must be accessed from within workflow code",
       exception.message
     )
   }
 
   @Test
-  fun `getCurrentUpdateInfo returns null when not in update handler`() {
+  fun `currentUpdateInfo returns null when not in update handler`() {
     // Set up a context with mocked ReplayWorkflowContext
     val mockReplayContext = mock(ReplayWorkflowContext::class.java)
     val context = KotlinWorkflowContext(mockReplayContext)
     KWorkflow.currentContext.set(context)
 
     // When not in an update handler, should return null
-    assertNull(KWorkflow.getCurrentUpdateInfo())
+    assertNull(KWorkflow.currentUpdateInfo)
   }
 
   @Test
-  fun `getCurrentUpdateInfo returns update info when in update handler`() {
+  fun `currentUpdateInfo returns update info when in update handler`() {
     // Set up a context with mocked ReplayWorkflowContext
     val mockReplayContext = mock(ReplayWorkflowContext::class.java)
     val context = KotlinWorkflowContext(mockReplayContext)
@@ -108,7 +108,7 @@ class KWorkflowTest {
     context.currentUpdateInfo.set(updateInfo)
 
     // Should return the update info
-    val result = KWorkflow.getCurrentUpdateInfo()
+    val result = KWorkflow.currentUpdateInfo
     assertEquals("myUpdate", result?.updateName)
     assertEquals("update-id-123", result?.updateId)
   }

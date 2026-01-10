@@ -283,15 +283,30 @@ public object KWorkflow {
   // ==================== Search Attributes ====================
 
   /**
+   * The current search attributes as a typed [SearchAttributes] object.
+   *
+   * Example:
+   * ```kotlin
+   * val attrs = KWorkflow.typedSearchAttributes
+   * val status = attrs.get(SearchAttributeKey.forKeyword("Status"))
+   * ```
+   */
+  public val typedSearchAttributes: SearchAttributes
+    @JvmName("typedSearchAttributes")
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.typedSearchAttributes must be accessed from within workflow code")
+      return context.getTypedSearchAttributes()
+    }
+
+  /**
    * Returns the current search attributes as a typed [SearchAttributes] object.
    *
    * @return the search attributes (empty if none set)
+   * @deprecated Use [typedSearchAttributes] property instead
    */
-  public fun getTypedSearchAttributes(): SearchAttributes {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.getTypedSearchAttributes must be called from within workflow code")
-    return context.getTypedSearchAttributes()
-  }
+  @Deprecated("Use typedSearchAttributes property instead", ReplaceWith("typedSearchAttributes"))
+  public fun getTypedSearchAttributes(): SearchAttributes = typedSearchAttributes
 
   /**
    * Gets a single search attribute value by key.
@@ -391,54 +406,84 @@ public object KWorkflow {
   }
 
   /**
-   * Gets the failure from the previous run of this workflow, if any.
+   * The failure from the previous run of this workflow, if any.
    * Useful for cron workflows or continue-as-new chains.
    *
-   * @return the previous run failure, or null if the previous run succeeded
+   * Example:
+   * ```kotlin
+   * val failure = KWorkflow.previousRunFailure
+   * if (failure != null) {
+   *     logger.warn("Previous run failed: ${failure.message}")
+   * }
+   * ```
    */
-  public fun getPreviousRunFailure(): Exception? {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.getPreviousRunFailure must be called from within workflow code")
-    return context.getPreviousRunFailure()
-  }
+  public val previousRunFailure: Exception?
+    @JvmName("previousRunFailure")
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.previousRunFailure must be accessed from within workflow code")
+      return context.getPreviousRunFailure()
+    }
+
+  /**
+   * Gets the failure from the previous run of this workflow, if any.
+   *
+   * @return the previous run failure, or null if the previous run succeeded
+   * @deprecated Use [previousRunFailure] property instead
+   */
+  @Deprecated("Use previousRunFailure property instead", ReplaceWith("previousRunFailure"))
+  public fun getPreviousRunFailure(): Exception? = previousRunFailure
 
   // ==================== Replay Detection ====================
 
   /**
-   * Returns true if the workflow code is being replayed.
+   * Whether the workflow code is currently being replayed.
    *
    * Use this to conditionally skip operations that shouldn't be repeated during replay,
    * such as logging or external notifications.
    *
    * Example:
    * ```kotlin
-   * if (!KWorkflow.isReplaying()) {
+   * if (!KWorkflow.isReplaying) {
    *     logger.info("Processing order: $orderId")
    * }
    * ```
-   *
-   * @return true if replaying, false otherwise
    */
-  public fun isReplaying(): Boolean {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.isReplaying must be called from within workflow code")
-    return context.isReplaying
-  }
+  public val isReplaying: Boolean
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.isReplaying must be accessed from within workflow code")
+      return context.isReplaying
+    }
 
   // ==================== Metrics ====================
 
   /**
-   * Returns the metrics scope for this workflow.
+   * The metrics scope for this workflow.
    *
    * Use this to emit custom metrics from workflow code.
    *
-   * @return the metrics scope
+   * Example:
+   * ```kotlin
+   * KWorkflow.metricsScope.counter("orders_processed").inc(1)
+   * ```
    */
-  public fun getMetricsScope(): Scope {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.getMetricsScope must be called from within workflow code")
-    return context.getMetricsScope()
-  }
+  public val metricsScope: Scope
+    @JvmName("metricsScope")
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.metricsScope must be accessed from within workflow code")
+      return context.getMetricsScope()
+    }
+
+  /**
+   * Returns the metrics scope for this workflow.
+   *
+   * @return the metrics scope
+   * @deprecated Use [metricsScope] property instead
+   */
+  @Deprecated("Use metricsScope property instead", ReplaceWith("metricsScope"))
+  public fun getMetricsScope(): Scope = metricsScope
 
   // ==================== Mutable Side Effect ====================
 
@@ -588,7 +633,7 @@ public object KWorkflow {
   // ==================== Update Info ====================
 
   /**
-   * Returns information about the currently executing update, if any.
+   * Information about the currently executing update, if any.
    *
    * This is only available when called from within an update handler.
    * Returns null if called from the main workflow method or a signal handler.
@@ -597,26 +642,35 @@ public object KWorkflow {
    * ```kotlin
    * @UpdateMethod
    * suspend fun processUpdate(data: String): String {
-   *     val updateInfo = KWorkflow.getCurrentUpdateInfo()
+   *     val updateInfo = KWorkflow.currentUpdateInfo
    *     if (updateInfo != null) {
    *         logger.info("Processing update: ${updateInfo.updateId}")
    *     }
    *     return "processed"
    * }
    * ```
+   */
+  public val currentUpdateInfo: UpdateInfo?
+    @JvmName("currentUpdateInfo")
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.currentUpdateInfo must be accessed from within workflow code")
+      return context.getCurrentUpdateInfo()
+    }
+
+  /**
+   * Returns information about the currently executing update, if any.
    *
    * @return the current update info, or null if not in an update handler
+   * @deprecated Use [currentUpdateInfo] property instead
    */
-  public fun getCurrentUpdateInfo(): UpdateInfo? {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.getCurrentUpdateInfo must be called from within workflow code")
-    return context.getCurrentUpdateInfo()
-  }
+  @Deprecated("Use currentUpdateInfo property instead", ReplaceWith("currentUpdateInfo"))
+  public fun getCurrentUpdateInfo(): UpdateInfo? = currentUpdateInfo
 
   // ==================== Handler Completion Check ====================
 
   /**
-   * Returns true if all signal and update handlers have completed.
+   * Whether all signal and update handlers have completed.
    *
    * This is useful for ensuring graceful completion before continuing-as-new
    * or completing the workflow. You can use this with [awaitCondition] to
@@ -625,22 +679,21 @@ public object KWorkflow {
    * Example:
    * ```kotlin
    * // Before continuing as new, wait for handlers to complete
-   * KWorkflow.awaitCondition { KWorkflow.isEveryHandlerFinished() }
+   * KWorkflow.awaitCondition { KWorkflow.isEveryHandlerFinished }
    * KWorkflow.continueAsNew(newState)
    * ```
-   *
-   * @return true if all handlers have finished
    */
-  public fun isEveryHandlerFinished(): Boolean {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.isEveryHandlerFinished must be called from within workflow code")
-    return context.isEveryHandlerFinished()
-  }
+  public val isEveryHandlerFinished: Boolean
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.isEveryHandlerFinished must be accessed from within workflow code")
+      return context.isEveryHandlerFinished()
+    }
 
   // ==================== Workflow Details ====================
 
   /**
-   * Sets the current workflow details.
+   * The current workflow details.
    *
    * Details are user-defined strings that provide additional context about
    * the workflow's current state. They are visible in the Temporal UI and
@@ -648,29 +701,45 @@ public object KWorkflow {
    *
    * Example:
    * ```kotlin
-   * KWorkflow.setCurrentDetails("Processing batch 5 of 10")
+   * KWorkflow.currentDetails = "Processing batch 5 of 10"
    * // ... do work ...
-   * KWorkflow.setCurrentDetails("Waiting for approval")
+   * KWorkflow.currentDetails = "Waiting for approval"
    * ```
+   */
+  public var currentDetails: String?
+    @JvmName("currentDetails")
+    get() {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.currentDetails must be accessed from within workflow code")
+      return context.getCurrentDetails()
+    }
+
+    @JvmName("currentDetails")
+    set(value) {
+      val context = currentContext.get()
+        ?: throw IllegalStateException("KWorkflow.currentDetails must be accessed from within workflow code")
+      context.setCurrentDetails(value)
+    }
+
+  /**
+   * Sets the current workflow details.
    *
    * @param details the details string to set, or null to clear
+   * @deprecated Use [currentDetails] property instead
    */
+  @Deprecated("Use currentDetails property instead", ReplaceWith("currentDetails = details"))
   public fun setCurrentDetails(details: String?) {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.setCurrentDetails must be called from within workflow code")
-    context.setCurrentDetails(details)
+    currentDetails = details
   }
 
   /**
    * Gets the current workflow details.
    *
    * @return the current details, or null if not set
+   * @deprecated Use [currentDetails] property instead
    */
-  public fun getCurrentDetails(): String? {
-    val context = currentContext.get()
-      ?: throw IllegalStateException("KWorkflow.getCurrentDetails must be called from within workflow code")
-    return context.getCurrentDetails()
-  }
+  @Deprecated("Use currentDetails property instead", ReplaceWith("currentDetails"))
+  public fun getCurrentDetails(): String? = currentDetails
 
   /**
    * Default version constant for workflow versioning.

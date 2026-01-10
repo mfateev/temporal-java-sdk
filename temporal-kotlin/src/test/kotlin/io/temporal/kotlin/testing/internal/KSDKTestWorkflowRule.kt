@@ -29,7 +29,6 @@ import io.temporal.api.history.v1.History
 import io.temporal.api.history.v1.HistoryEvent
 import io.temporal.api.nexus.v1.Endpoint
 import io.temporal.client.WorkflowClientOptions
-import io.temporal.client.WorkflowStub
 import io.temporal.common.SearchAttributeKey
 import io.temporal.common.WorkflowExecutionHistory
 import io.temporal.common.interceptors.WorkerInterceptor
@@ -44,7 +43,6 @@ import io.temporal.serviceclient.WorkflowServiceStubsOptions
 import io.temporal.testing.TestWorkflowEnvironment
 import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.testing.internal.TracingWorkerInterceptor
-import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkerOptions
 import io.temporal.worker.WorkflowImplementationOptions
@@ -57,53 +55,43 @@ import kotlin.reflect.KClass
 /**
  * Kotlin test rule for workflow testing that wraps [SDKTestWorkflowRule] with Kotlin idioms.
  *
+ * This rule only exposes Kotlin-idiomatic APIs and is designed for testing suspend workflows
+ * using the method reference pattern. For Java workflows or sync workflows, use the Java
+ * [SDKTestWorkflowRule] directly.
+ *
  * Provides:
  * - DSL-style builder pattern with Kotlin properties
- * - [KWorker] and [KWorkflowClient] for Kotlin-idiomatic APIs
+ * - [KWorker] for registering suspend workflows and activities
+ * - [KWorkflowClient] for executing workflows via method references
  * - Automatic [KotlinPlugin] configuration for suspend workflow support
- * - All utility methods from the Java [SDKTestWorkflowRule]
+ * - History access and test utilities
  *
  * Example usage:
  * ```kotlin
+ * @WorkflowInterface
+ * interface GreetingWorkflow {
+ *     @WorkflowMethod
+ *     suspend fun greet(name: String): String
+ * }
+ *
  * @Rule
  * @JvmField
  * val testRule = KSDKTestWorkflowRule {
- *     workflowTypes(MyWorkflowImpl::class)
- *     activityImplementations(MyActivitiesImpl())
+ *     workflowTypes(GreetingWorkflowImpl::class)
+ *     suspendActivityImplementations(MyActivitiesImpl())
  * }
  *
  * @Test
- * fun `test workflow`() {
- *     val workflow = testRule.workflowClient.newWorkflowStub(
- *         MyWorkflow::class.java,
- *         WorkflowOptions.newBuilder()
- *             .setTaskQueue(testRule.taskQueue)
- *             .build()
+ * fun `test workflow`() = runBlocking {
+ *     val result = testRule.kWorkflowClient.executeWorkflow(
+ *         GreetingWorkflow::greet,
+ *         KWorkflowOptions(
+ *             workflowId = "test-123",
+ *             taskQueue = testRule.taskQueue
+ *         ),
+ *         "World"
  *     )
- *     // test workflow...
- * }
- * ```
- *
- * For suspend workflows:
- * ```kotlin
- * @Rule
- * @JvmField
- * val testRule = KSDKTestWorkflowRule {
- *     workflowTypes(MySuspendWorkflowImpl::class)
- *     suspendActivityImplementations(MySuspendActivitiesImpl())
- * }
- * ```
- *
- * With nested DSL options:
- * ```kotlin
- * @Rule
- * @JvmField
- * val testRule = KSDKTestWorkflowRule {
- *     workflowTypes(MyWorkflowImpl::class)
- *     doNotStart = true
- *     workflowClientOptions {
- *         setDataConverter(myConverter)
- *     }
+ *     assertEquals("Hello, World!", result)
  * }
  * ```
  */
@@ -124,23 +112,34 @@ public class KSDKTestWorkflowRule private constructor(
   public val nexusEndpoint: Endpoint
     get() = delegate.nexusEndpoint
 
-  /** The underlying Java Worker. Use [kWorker] for Kotlin-idiomatic APIs. */
-  public val worker: Worker
-    get() = delegate.worker
-
   /** Kotlin worker with idiomatic APIs for registering workflows and activities. */
   public val kWorker: KWorker by lazy {
     KWorker(delegate.worker, kWorkerInterceptors)
   }
 
-  /** The underlying Java WorkflowClient. Use [kWorkflowClient] for Kotlin-idiomatic APIs. */
-  public val workflowClient: io.temporal.client.WorkflowClient
-    get() = delegate.workflowClient
-
   /** Kotlin workflow client with suspend functions and type-safe APIs. */
   public val kWorkflowClient: KWorkflowClient by lazy {
     KWorkflowClient(delegate.workflowClient)
   }
+
+  /**
+   * The underlying Java Worker for advanced use cases.
+   *
+   * Prefer [kWorker] for Kotlin-idiomatic APIs. Use this only when you need
+   * direct access to the Java Worker API (e.g., for runtime activity registration).
+   */
+  public val worker: io.temporal.worker.Worker
+    get() = delegate.worker
+
+  /**
+   * The underlying Java WorkflowClient for advanced use cases.
+   *
+   * Prefer [kWorkflowClient] and method references (e.g., `kWorkflowClient.executeWorkflow(...)`)
+   * for Kotlin-idiomatic workflow execution. Use this only when you need direct access
+   * to the Java WorkflowClient API.
+   */
+  public val workflowClient: io.temporal.client.WorkflowClient
+    get() = delegate.workflowClient
 
   /** The WorkflowServiceStubs for direct service access. */
   public val workflowServiceStubs: WorkflowServiceStubs
@@ -176,71 +175,6 @@ public class KSDKTestWorkflowRule private constructor(
    */
   public inline fun <reified T : WorkerInterceptor> getInterceptor(): T? {
     return getInterceptor(T::class.java)
-  }
-
-  // ========== Workflow Stub Creation ==========
-
-  /**
-   * Create a typed workflow stub for the default task queue.
-   */
-  public fun <T> newWorkflowStub(workflow: Class<T>): T {
-    return delegate.newWorkflowStub(workflow)
-  }
-
-  /**
-   * Create a typed workflow stub using reified generics.
-   */
-  public inline fun <reified T> newWorkflowStub(): T {
-    return newWorkflowStub(T::class.java)
-  }
-
-  /**
-   * Create a typed workflow stub using KClass.
-   */
-  public fun <T : Any> newWorkflowStub(workflow: KClass<T>): T {
-    return newWorkflowStub(workflow.java)
-  }
-
-  /**
-   * Create a typed workflow stub with timeout options.
-   */
-  public fun <T> newWorkflowStubTimeoutOptions(workflow: Class<T>): T {
-    return delegate.newWorkflowStubTimeoutOptions(workflow)
-  }
-
-  /**
-   * Create a typed workflow stub with timeout options using reified generics.
-   */
-  public inline fun <reified T> newWorkflowStubTimeoutOptions(): T {
-    return newWorkflowStubTimeoutOptions(T::class.java)
-  }
-
-  /**
-   * Create a typed workflow stub with timeout options and workflow ID prefix.
-   */
-  public fun <T> newWorkflowStubTimeoutOptions(workflow: Class<T>, workflowIdPrefix: String): T {
-    return delegate.newWorkflowStubTimeoutOptions(workflow, workflowIdPrefix)
-  }
-
-  /**
-   * Create a typed workflow stub with 200s timeout options.
-   */
-  public fun <T> newWorkflowStub200sTimeoutOptions(workflow: Class<T>): T {
-    return delegate.newWorkflowStub200sTimeoutOptions(workflow)
-  }
-
-  /**
-   * Create an untyped workflow stub.
-   */
-  public fun newUntypedWorkflowStub(workflow: String): WorkflowStub {
-    return delegate.newUntypedWorkflowStub(workflow)
-  }
-
-  /**
-   * Create an untyped workflow stub with timeout options.
-   */
-  public fun newUntypedWorkflowStubTimeoutOptions(workflow: String): WorkflowStub {
-    return delegate.newUntypedWorkflowStubTimeoutOptions(workflow)
   }
 
   // ========== History Access ==========
@@ -375,14 +309,6 @@ public class KSDKTestWorkflowRule private constructor(
      */
     @JvmStatic
     public fun newBuilder(): Builder = Builder()
-
-    /**
-     * Wait for the first workflow task to complete by querying the stack trace.
-     */
-    @JvmStatic
-    public fun waitForOKQuery(stub: Any) {
-      SDKTestWorkflowRule.waitForOKQuery(stub)
-    }
 
     /**
      * Assert that no history event of the given type exists in the history.
