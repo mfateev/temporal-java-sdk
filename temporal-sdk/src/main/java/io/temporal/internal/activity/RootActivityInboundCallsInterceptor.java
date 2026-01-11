@@ -3,6 +3,7 @@ package io.temporal.internal.activity;
 import io.temporal.activity.Activity;
 import io.temporal.activity.ActivityExecutionContext;
 import io.temporal.activity.DynamicActivity;
+import io.temporal.activity.TypedDynamicActivity;
 import io.temporal.common.converter.EncodedValues;
 import io.temporal.common.interceptors.ActivityInboundCallsInterceptor;
 import java.lang.reflect.InvocationTargetException;
@@ -54,6 +55,24 @@ abstract class RootActivityInboundCallsInterceptor implements ActivityInboundCal
     private final DynamicActivity activity;
 
     DynamicActivityInboundCallsInterceptor(DynamicActivity activity) {
+      this.activity = activity;
+    }
+
+    @Override
+    protected Object executeActivity(ActivityInput input) {
+      try {
+        return activity.execute((EncodedValues) input.getArguments()[0]);
+      } catch (Exception e) {
+        throw Activity.wrap(e);
+      }
+    }
+  }
+
+  static class TypedDynamicActivityInboundCallsInterceptor
+      extends RootActivityInboundCallsInterceptor {
+    private final TypedDynamicActivity activity;
+
+    TypedDynamicActivityInboundCallsInterceptor(TypedDynamicActivity activity) {
       this.activity = activity;
     }
 

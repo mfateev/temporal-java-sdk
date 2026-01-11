@@ -24,6 +24,7 @@ package io.temporal.kotlin.testing
 
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
+import io.temporal.kotlin.activity.KActivityRegistry
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorker
@@ -69,7 +70,7 @@ import kotlin.time.Duration as KotlinDuration
  */
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
-    internal val mockRegistry: KActivityMockRegistry = KActivityMockRegistry(),
+    internal val activityRegistry: KActivityRegistry = KActivityRegistry(),
 ) : Closeable {
 
     // ========== Commit 7: Basic structure with worker creation ==========
@@ -405,7 +406,7 @@ public class KTestWorkflowEnvironment private constructor(
      */
     public fun registerActivitiesImplementations(vararg activities: Any) {
         activities.forEach { activity ->
-            mockRegistry.register(activity)
+            activityRegistry.registerMockImplementation(activity)
         }
     }
 

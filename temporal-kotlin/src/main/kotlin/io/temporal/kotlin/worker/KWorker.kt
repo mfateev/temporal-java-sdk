@@ -20,19 +20,34 @@
 
 package io.temporal.kotlin.worker
 
-import io.temporal.kotlin.activity.SuspendActivityOptions
-import io.temporal.kotlin.activity.registerSuspendActivities
+import io.temporal.activity.ActivityInterface
+import io.temporal.common.metadata.POJOActivityInterfaceMetadata
+import io.temporal.kotlin.activity.KotlinActivityWrapper
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkflowImplementationOptions
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlin.reflect.KClass
 
 /**
  * Kotlin worker that provides idiomatic APIs for registering
- * Kotlin workflows and suspend activities.
+ * Kotlin workflows and activities (including suspend activities).
  *
  * Use [worker] property for direct access to the underlying Java Worker
  * when interoperating with Java workflows/activities.
+ *
+ * ## Activity Registration
+ *
+ * This worker uses [TypedDynamicActivity][io.temporal.activity.TypedDynamicActivity] wrappers
+ * to register Kotlin activities directly with the Java SDK. Each activity method is wrapped
+ * in a [KotlinActivityWrapper] that handles both suspend and non-suspend methods.
+ *
+ * This design ensures:
+ * - Proper handling of Kotlin suspend functions
+ * - No conflicts with Java DynamicActivity registrations
+ * - Compatibility with test mocking frameworks
+ * - Full support for activity interceptors
  *
  * Example:
  * ```kotlin
@@ -47,11 +62,8 @@ import kotlin.reflect.KClass
  *     setFailWorkflowExceptionTypes(IllegalArgumentException::class.java)
  * }
  *
- * // Register activities
- * kWorker.registerActivitiesImplementations(MyActivitiesImpl())
- *
- * // Register suspend activities
- * kWorker.registerSuspendActivities(MySuspendActivitiesImpl())
+ * // Register activities (works with both suspend and non-suspend)
+ * kWorker.registerActivities(MyActivitiesImpl())
  *
  * // Register Nexus services
  * kWorker.registerNexusServiceImplementations(MyNexusServiceImpl())
@@ -61,9 +73,10 @@ public class KWorker(
   /** The underlying Java Worker for interop scenarios */
   public val worker: Worker,
   /** Kotlin worker interceptors for activity interception */
-  internal val workerInterceptors: List<KWorkerInterceptor> = emptyList()
+  internal val workerInterceptors: List<KWorkerInterceptor> = emptyList(),
+  /** Coroutine dispatcher for suspend activities */
+  private val activityDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
-
   // ========== Workflow Registration ==========
 
   /**
@@ -144,50 +157,175 @@ public class KWorker(
 
   /**
    * Register activity implementations.
-   * Works with both regular and suspend activity implementations.
+   *
+   * This method handles both suspend and non-suspend activity methods by wrapping
+   * each method in a [KotlinActivityWrapper] and registering it as a
+   * [TypedDynamicActivity][io.temporal.activity.TypedDynamicActivity] with the Java SDK.
    *
    * Example:
    * ```kotlin
-   * kWorker.registerActivitiesImplementations(
-   *     MyActivitiesImpl(),
-   *     AnotherActivitiesImpl()
-   * )
+   * @ActivityInterface
+   * interface MyActivities {
+   *     fun syncOperation(): String           // Regular method
+   *     suspend fun asyncOperation(): Data    // Suspend method
+   * }
+   *
+   * kWorker.registerActivities(MyActivitiesImpl())
    * ```
    *
    * @param activities Activity implementation instances to register
    */
+  public fun registerActivities(vararg activities: Any) {
+    for (activity in activities) {
+      registerActivity(activity)
+    }
+  }
+
+  /**
+   * Register a single activity implementation.
+   *
+   * Extracts activity interfaces, creates a [KotlinActivityWrapper] for each method,
+   * and registers them with the Java worker.
+   */
+  private fun registerActivity(activity: Any) {
+    val implClass = activity::class.java
+
+    // Find all activity interfaces implemented by this class
+    val activityInterfaces = findActivityInterfaces(implClass)
+    if (activityInterfaces.isEmpty()) {
+      throw IllegalArgumentException(
+        "Implementation does not implement any @ActivityInterface annotated interfaces: ${implClass.name}"
+      )
+    }
+
+    // Create wrappers for all activity methods and register them
+    val wrappers = mutableListOf<KotlinActivityWrapper>()
+
+    for (activityInterface in activityInterfaces) {
+      val metadata = POJOActivityInterfaceMetadata.newInstance(activityInterface)
+      for (methodMetadata in metadata.methodsMetadata) {
+        val activityTypeName = methodMetadata.activityTypeName
+        val interfaceMethod = methodMetadata.method
+
+        // Find the implementation method (may be different for suspend functions)
+        val implMethod = findImplementationMethod(implClass, interfaceMethod)
+
+        val wrapper = KotlinActivityWrapper(
+          activityTypeName = activityTypeName,
+          implementation = activity,
+          method = implMethod,
+          dispatcher = activityDispatcher
+        )
+        wrappers.add(wrapper)
+      }
+    }
+
+    // Register all wrappers with the Java worker
+    worker.registerActivitiesImplementations(*wrappers.toTypedArray())
+  }
+
+  /**
+   * Find the implementation method for an interface method.
+   *
+   * For suspend functions, the implementation method will have a Continuation parameter.
+   */
+  private fun findImplementationMethod(
+    implClass: Class<*>,
+    interfaceMethod: java.lang.reflect.Method
+  ): java.lang.reflect.Method {
+    val methodName = interfaceMethod.name
+    val interfaceParams = interfaceMethod.parameterTypes
+
+    // First try exact match (for non-suspend methods)
+    try {
+      return implClass.getMethod(methodName, *interfaceParams)
+    } catch (_: NoSuchMethodException) {
+      // Not found, continue to search for suspend variant
+    }
+
+    // For suspend methods, the implementation has an extra Continuation parameter
+    // Look for a method with the same name and compatible parameter count
+    val continuationClass = kotlin.coroutines.Continuation::class.java
+    for (method in implClass.methods) {
+      if (method.name == methodName) {
+        val params = method.parameterTypes
+        // Suspend method: same params + Continuation at the end
+        if (params.size == interfaceParams.size + 1 &&
+          continuationClass.isAssignableFrom(params.last())
+        ) {
+          // Verify the other params match
+          var matches = true
+          for (i in interfaceParams.indices) {
+            if (interfaceParams[i] != params[i]) {
+              matches = false
+              break
+            }
+          }
+          if (matches) {
+            return method
+          }
+        }
+      }
+    }
+
+    throw IllegalStateException(
+      "Could not find implementation method for ${interfaceMethod.name} in ${implClass.name}"
+    )
+  }
+
+  /**
+   * Find all activity interfaces implemented by a class.
+   */
+  private fun findActivityInterfaces(clazz: Class<*>): List<Class<*>> {
+    val result = mutableListOf<Class<*>>()
+
+    fun collectInterfaces(cls: Class<*>) {
+      for (iface in cls.interfaces) {
+        if (iface.isAnnotationPresent(ActivityInterface::class.java)) {
+          result.add(iface)
+        }
+        collectInterfaces(iface)
+      }
+      cls.superclass?.let { collectInterfaces(it) }
+    }
+
+    collectInterfaces(clazz)
+    return result.distinct()
+  }
+
+  /**
+   * Register activity implementations directly with the Java Worker.
+   *
+   * Use this for Java activity implementations that don't need Kotlin suspend support.
+   * For Kotlin activities (especially those with suspend functions), use [registerActivities].
+   *
+   * Example:
+   * ```kotlin
+   * kWorker.registerActivitiesImplementations(JavaActivitiesImpl())
+   * ```
+   *
+   * @param activities Activity implementation instances to register
+   */
+  @Deprecated(
+    message = "Use registerActivities() for Kotlin activities with suspend support",
+    replaceWith = ReplaceWith("registerActivities(*activities)")
+  )
   public fun registerActivitiesImplementations(vararg activities: Any) {
     worker.registerActivitiesImplementations(*activities)
   }
 
   /**
    * Register suspend activity implementations.
-   * Wraps suspend functions for execution in the Temporal activity context.
    *
-   * This method uses [io.temporal.kotlin.activity.registerSuspendActivities] extension
-   * which automatically detects suspend functions and wraps them appropriately.
-   *
-   * Example:
-   * ```kotlin
-   * @ActivityInterface
-   * interface MySuspendActivities {
-   *     suspend fun fetchData(url: String): Data
-   * }
-   *
-   * class MySuspendActivitiesImpl : MySuspendActivities {
-   *     override suspend fun fetchData(url: String): Data {
-   *         // Suspend function implementation
-   *     }
-   * }
-   *
-   * kWorker.registerSuspendActivities(MySuspendActivitiesImpl())
-   * ```
-   *
-   * @param activities Activity implementation objects containing suspend functions
+   * @deprecated Use [registerActivities] instead, which handles both suspend
+   * and non-suspend methods uniformly.
    */
+  @Deprecated(
+    message = "Use registerActivities() instead",
+    replaceWith = ReplaceWith("registerActivities(*activities)")
+  )
   public fun registerSuspendActivities(vararg activities: Any) {
-    val options = SuspendActivityOptions(workerInterceptors = workerInterceptors)
-    worker.registerSuspendActivities(*activities, options = options)
+    registerActivities(*activities)
   }
 
   // ========== Nexus Registration ==========

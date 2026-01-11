@@ -5,6 +5,7 @@ import static io.temporal.internal.activity.ActivityTaskHandlerImpl.mapToActivit
 import com.uber.m3.tally.Scope;
 import io.temporal.activity.ActivityInfo;
 import io.temporal.activity.DynamicActivity;
+import io.temporal.activity.TypedDynamicActivity;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
@@ -240,6 +241,45 @@ final class ActivityTaskExecutors {
     @Override
     ActivityInboundCallsInterceptor createRootInboundInterceptor() {
       return new RootActivityInboundCallsInterceptor.DynamicActivityInboundCallsInterceptor(
+          activity);
+    }
+
+    @Override
+    Object getActivity() {
+      return activity;
+    }
+
+    @Override
+    Object[] provideArgs(Optional<Payloads> input, DataConverter dataConverterWithActivityContext) {
+      EncodedValues encodedValues = new EncodedValues(input, dataConverterWithActivityContext);
+      return new Object[] {encodedValues};
+    }
+
+    @Override
+    protected ActivityTaskHandler.Result constructSuccessfulResultValue(
+        ActivityInfoInternal info,
+        ActivityOutput result,
+        DataConverter dataConverterWithActivityContext) {
+      return constructResultValue(info, result, dataConverterWithActivityContext);
+    }
+  }
+
+  static class TypedDynamicActivityImplementation extends BaseActivityTaskExecutor {
+    private final TypedDynamicActivity activity;
+
+    TypedDynamicActivityImplementation(
+        TypedDynamicActivity activity,
+        DataConverter dataConverter,
+        List<ContextPropagator> contextPropagators,
+        WorkerInterceptor[] interceptors,
+        ActivityExecutionContextFactory executionContextFactory) {
+      super(dataConverter, contextPropagators, interceptors, executionContextFactory);
+      this.activity = activity;
+    }
+
+    @Override
+    ActivityInboundCallsInterceptor createRootInboundInterceptor() {
+      return new RootActivityInboundCallsInterceptor.TypedDynamicActivityInboundCallsInterceptor(
           activity);
     }
 

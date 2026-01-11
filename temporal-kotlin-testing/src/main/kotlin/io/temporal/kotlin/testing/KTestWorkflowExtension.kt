@@ -23,6 +23,8 @@ package io.temporal.kotlin.testing
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.kotlin.TemporalDsl
+import io.temporal.kotlin.activity.KActivityRegistry
+import io.temporal.kotlin.activity.KDynamicActivityHandler
 import io.temporal.kotlin.client.KWorkflowClient
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.worker.KWorker
@@ -245,13 +247,15 @@ public class KTestWorkflowExtension private constructor(
         // Create Java test environment
         val javaTestEnv = TestWorkflowEnvironment.newInstance(testEnvOptions)
 
-        // Create mock registry and Kotlin wrapper for the test environment
-        val mockRegistry = KActivityMockRegistry()
-        val testEnvironment = createKTestWorkflowEnvironment(javaTestEnv, mockRegistry)
+        // Create unified activity registry shared between test environment and worker
+        val activityRegistry = KActivityRegistry()
+        val testEnvironment = createKTestWorkflowEnvironment(javaTestEnv, activityRegistry)
 
         // Generate unique task queue per test
         val taskQueue = generateTaskQueue(context)
         val worker = javaTestEnv.newWorker(taskQueue, config.workerOptions)
+
+        // Create KWorker (note: for test mocking, activities are registered via the registry/dynamic handler)
         val kWorker = KWorker(worker)
 
         // Register workflows
@@ -259,25 +263,27 @@ public class KTestWorkflowExtension private constructor(
             worker.registerWorkflowImplementationTypes(options, workflowType)
         }
 
-        // Register regular activities (via worker for pre-registered activities)
+        // Register the unified dynamic activity handler
+        // This single handler routes all Kotlin activity calls through the shared registry
+        val dynamicHandler = KDynamicActivityHandler(activityRegistry)
+        worker.registerActivitiesImplementations(dynamicHandler)
+
+        // Register regular activities via the unified registry
         if (config.activityImplementations.isNotEmpty()) {
-            worker.registerActivitiesImplementations(*config.activityImplementations)
+            config.activityImplementations.forEach { activity ->
+                activityRegistry.register(activity)
+            }
         }
 
-        // Register suspend activities
+        // Register suspend activities via the unified registry
         config.suspendActivityImplementations.forEach { activity ->
-            kWorker.registerSuspendActivities(activity)
+            activityRegistry.register(activity)
         }
 
         // Register Nexus services
         if (config.nexusServiceImplementations.isNotEmpty()) {
             worker.registerNexusServiceImplementation(*config.nexusServiceImplementations)
         }
-
-        // Register dynamic activity handler for runtime mock support
-        // This allows testEnv.registerActivitiesImplementations() to work at any time
-        val dynamicHandler = KMockDynamicActivityHandler(mockRegistry)
-        worker.registerActivitiesImplementations(dynamicHandler)
 
         // Start unless doNotStart is set
         if (!config.doNotStart) {
@@ -360,15 +366,15 @@ public class KTestWorkflowExtension private constructor(
      */
     private fun createKTestWorkflowEnvironment(
         javaTestEnv: TestWorkflowEnvironment,
-        mockRegistry: KActivityMockRegistry,
+        activityRegistry: KActivityRegistry,
     ): KTestWorkflowEnvironment {
         // Use reflection to access the private constructor
         val constructor = KTestWorkflowEnvironment::class.java.getDeclaredConstructor(
             TestWorkflowEnvironment::class.java,
-            KActivityMockRegistry::class.java,
+            KActivityRegistry::class.java,
         )
         constructor.isAccessible = true
-        return constructor.newInstance(javaTestEnv, mockRegistry)
+        return constructor.newInstance(javaTestEnv, activityRegistry)
     }
 
     // ========== Commit 13: Companion object with factory ==========

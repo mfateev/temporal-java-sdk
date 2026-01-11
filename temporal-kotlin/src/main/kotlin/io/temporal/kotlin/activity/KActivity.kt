@@ -80,33 +80,56 @@ public object KActivity {
    * This is the primary entry point for accessing activity APIs, matching
    * Java SDK's [Activity.getExecutionContext] pattern with Kotlin idiomatic syntax.
    *
+   * Works in both regular and suspend activities.
+   *
    * @throws IllegalStateException if called outside of activity code
    */
   public val context: KActivityContext
-    get() = KActivityContextImpl(Activity.getExecutionContext())
+    get() {
+      // First try the suspend activity context (for suspend activities running on coroutine threads)
+      val suspendContext = CurrentSuspendActivityContext.get()
+      if (suspendContext != null) {
+        return KActivityContextImpl(suspendContext.executionContext)
+      }
+
+      // Fall back to Java SDK's thread-local context (for regular activities)
+      return KActivityContextImpl(Activity.getExecutionContext())
+    }
 
   /**
-   * Returns information about the current activity execution.
+   * Information about the current activity execution.
    *
    * Works in both regular and suspend activities.
    *
-   * @return the activity information with Kotlin-friendly types
    * @throws IllegalStateException if called outside of activity code
    */
-  public fun getInfo(): KActivityInfo {
-    // Try thread-local context (regular activities)
-    val context = Activity.getExecutionContext()
-    return KActivityInfoImpl(context.info)
-  }
+  public val info: KActivityInfo
+    get() {
+      // First try the suspend activity context (for suspend activities running on coroutine threads)
+      val suspendContext = CurrentSuspendActivityContext.get()
+      if (suspendContext != null) {
+        return KActivityInfoImpl(suspendContext.executionContext.info)
+      }
+
+      // Fall back to Java SDK's thread-local context (for regular activities)
+      return KActivityInfoImpl(Activity.getExecutionContext().info)
+    }
 
   /**
    * Returns a logger for the current activity.
    *
-   * Uses the activity type as the logger name.
+   * Uses the activity type as the logger name. Works in both regular and suspend activities.
    *
    * @return SLF4J logger for activity logging
    */
   public fun logger(): Logger {
+    // First try the suspend activity context (for suspend activities running on coroutine threads)
+    val suspendContext = CurrentSuspendActivityContext.get()
+    if (suspendContext != null) {
+      return LoggerFactory.getLogger(suspendContext.executionContext.info.activityType)
+    }
+
+    // Fall back to Java SDK's thread-local context (for regular activities)
     return LoggerFactory.getLogger(Activity.getExecutionContext().info.activityType)
   }
 
@@ -164,11 +187,22 @@ public object KActivity {
    * This is useful for resuming work after a retry. Returns null if
    * there are no details from a previous attempt.
    *
+   * Works in both regular and suspend activities.
+   *
    * @param T the expected type of the heartbeat details
    * @param detailsClass the class of the expected details type
    * @return the heartbeat details, or null if none
    */
   public fun <T> heartbeatDetails(detailsClass: Class<T>): T? {
+    // First try the suspend activity context (for suspend activities running on coroutine threads)
+    val suspendContext = CurrentSuspendActivityContext.get()
+    if (suspendContext != null) {
+      return suspendContext.executionContext
+        .getHeartbeatDetails(detailsClass)
+        .orElse(null)
+    }
+
+    // Fall back to Java SDK's thread-local context (for regular activities)
     return Activity.getExecutionContext()
       .getHeartbeatDetails(detailsClass)
       .orElse(null)
@@ -191,38 +225,52 @@ public object KActivity {
   }
 
   /**
-   * Returns the raw execution context for advanced use cases.
+   * The raw execution context for advanced use cases.
    *
-   * Prefer using the other methods on this object when possible.
-   *
-   * @return the underlying activity execution context
+   * Prefer using the other properties on this object when possible.
+   * Works in both regular and suspend activities.
    */
-  public fun getExecutionContext(): ActivityExecutionContext {
-    return Activity.getExecutionContext()
-  }
+  public val executionContext: ActivityExecutionContext
+    get() {
+      // First try the suspend activity context (for suspend activities running on coroutine threads)
+      val suspendContext = CurrentSuspendActivityContext.get()
+      if (suspendContext != null) {
+        return suspendContext.executionContext
+      }
+
+      // Fall back to Java SDK's thread-local context (for regular activities)
+      return Activity.getExecutionContext()
+    }
 
   /**
-   * Returns the task token for async activity completion.
+   * The task token for async activity completion.
    *
    * Use this when you need to complete the activity asynchronously
-   * from a different process.
-   *
-   * @return the task token bytes
+   * from a different process. Works in both regular and suspend activities.
    */
-  public fun getTaskToken(): ByteArray {
-    return Activity.getExecutionContext().taskToken
-  }
+  public val taskToken: ByteArray
+    get() {
+      // First try the suspend activity context (for suspend activities running on coroutine threads)
+      val suspendContext = CurrentSuspendActivityContext.get()
+      if (suspendContext != null) {
+        return suspendContext.executionContext.taskToken
+      }
+
+      // Fall back to Java SDK's thread-local context (for regular activities)
+      return Activity.getExecutionContext().taskToken
+    }
 
   /**
    * Marks this activity to be completed asynchronously.
    *
    * After calling this method, the activity method should return immediately.
    * The activity will remain open until completed via [ActivityCompletionClient].
+   * Works in both regular and suspend activities.
    *
    * Example:
    * ```kotlin
    * override fun processAsync(input: String) {
-   *   val taskToken = KActivity.getTaskToken()
+   *   val taskToken = KActivity.taskToken
    *   // Store taskToken for later completion
    *   externalService.startProcessing(input, taskToken)
    *   KActivity.doNotCompleteOnReturn()
@@ -231,21 +279,34 @@ public object KActivity {
    * ```
    */
   public fun doNotCompleteOnReturn() {
+    // First try the suspend activity context (for suspend activities running on coroutine threads)
+    val suspendContext = CurrentSuspendActivityContext.get()
+    if (suspendContext != null) {
+      suspendContext.executionContext.doNotCompleteOnReturn()
+      return
+    }
+
+    // Fall back to Java SDK's thread-local context (for regular activities)
     Activity.getExecutionContext().doNotCompleteOnReturn()
   }
 
   /**
-   * Checks if a cancellation has been requested for this activity.
+   * Whether a cancellation has been requested for this activity.
    *
    * Activities should periodically check this and clean up if true.
-   *
-   * @return true if cancellation was requested
+   * Works in both regular and suspend activities.
    */
-  public fun isCancellationRequested(): Boolean {
-    return try {
-      Activity.getExecutionContext().info.let { false }
+  public val isCancellationRequested: Boolean
+    get() = try {
+      // First try the suspend activity context (for suspend activities running on coroutine threads)
+      val suspendContext = CurrentSuspendActivityContext.get()
+      if (suspendContext != null) {
+        suspendContext.executionContext.info.let { false }
+      } else {
+        // Fall back to Java SDK's thread-local context (for regular activities)
+        Activity.getExecutionContext().info.let { false }
+      }
     } catch (e: Exception) {
       false
     }
-  }
 }

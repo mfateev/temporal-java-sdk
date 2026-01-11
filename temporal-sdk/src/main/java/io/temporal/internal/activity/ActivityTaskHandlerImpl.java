@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableSet;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.util.ImmutableMap;
 import io.temporal.activity.DynamicActivity;
+import io.temporal.activity.TypedDynamicActivity;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponseOrBuilder;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest;
@@ -42,6 +43,13 @@ public final class ActivityTaskHandlerImpl implements ActivityTaskHandler {
           .add(
               ReflectionUtils.getMethodNameForStackTraceCutoff(
                   ActivityTaskExecutors.DynamicActivityImplementation.class,
+                  "execute",
+                  ActivityInfoInternal.class,
+                  Scope.class))
+          // TypedDynamic
+          .add(
+              ReflectionUtils.getMethodNameForStackTraceCutoff(
+                  ActivityTaskExecutors.TypedDynamicActivityImplementation.class,
                   "execute",
                   ActivityInfoInternal.class,
                   Scope.class))
@@ -144,6 +152,21 @@ public final class ActivityTaskHandlerImpl implements ActivityTaskHandler {
               contextPropagators,
               interceptors,
               executionContextFactory);
+    } else if (activity instanceof TypedDynamicActivity) {
+      TypedDynamicActivity typedDynamic = (TypedDynamicActivity) activity;
+      String typeName = typedDynamic.getActivityType();
+      if (activities.containsKey(typeName)) {
+        throw new TypeAlreadyRegisteredException(
+            typeName, "\"" + typeName + "\" activity type is already registered with the worker");
+      }
+      activities.put(
+          typeName,
+          new ActivityTaskExecutors.TypedDynamicActivityImplementation(
+              typedDynamic,
+              dataConverter,
+              contextPropagators,
+              interceptors,
+              executionContextFactory));
     } else {
       Class<?> cls = activity.getClass();
       POJOActivityImplMetadata activityImplMetadata = POJOActivityImplMetadata.newInstance(cls);

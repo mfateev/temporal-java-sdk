@@ -35,7 +35,6 @@ import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -571,11 +570,8 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestGreetWorkflowImpl::class.java)
     dispatcherTestRule.worker.registerWorkflowImplementationFactory(factory)
-    // Use IO dispatcher to verify we can configure the dispatcher
-    dispatcherTestRule.kWorker.worker.registerSuspendActivities(
-      SuspendActivitiesImpl(),
-      options = SuspendActivityOptions(dispatcher = Dispatchers.IO)
-    )
+    // Register suspend activities via kWorker
+    dispatcherTestRule.kWorker.registerActivities(SuspendActivitiesImpl())
     dispatcherTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
