@@ -32,7 +32,7 @@ import io.temporal.failure.ApplicationFailure
  * (including mocks) need to be registered at runtime. It implements [DynamicActivity]
  * which acts as a catch-all for any activity type not handled by other registrations.
  *
- * Note: For production use, prefer [KWorker.registerActivities] which uses TypedDynamicActivity
+ * Note: For production use, prefer [KWorker.registerActivitiesImplementations] which uses TypedDynamicActivity
  * for better performance and type safety.
  *
  * Usage in tests:

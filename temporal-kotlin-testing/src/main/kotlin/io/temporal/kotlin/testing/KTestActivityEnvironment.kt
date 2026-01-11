@@ -86,38 +86,6 @@ public class KTestActivityEnvironment private constructor(
         testEnvironment.registerActivitiesImplementations(*activities)
     }
 
-    /**
-     * Register suspend activity implementations.
-     * Wraps suspend functions for execution in the Temporal activity context.
-     *
-     * Example:
-     * ```kotlin
-     * @ActivityInterface
-     * interface MySuspendActivities {
-     *     suspend fun fetchData(url: String): Data
-     * }
-     *
-     * class MySuspendActivitiesImpl : MySuspendActivities {
-     *     override suspend fun fetchData(url: String): Data {
-     *         // Suspend function implementation
-     *     }
-     * }
-     *
-     * activityEnv.registerSuspendActivities(MySuspendActivitiesImpl())
-     * ```
-     *
-     * @param activities Activity implementation objects containing suspend functions
-     */
-    public fun registerSuspendActivities(vararg activities: Any) {
-        // Use a mock worker to leverage the existing registerSuspendActivities extension
-        // Since TestActivityEnvironment doesn't have a worker, we need to wrap manually
-        activities.forEach { activity ->
-            // For suspend activities in test, we register via the test environment
-            // which internally handles the dynamic activity registration
-            testEnvironment.registerActivitiesImplementations(activity)
-        }
-    }
-
     // ========== Commit 19: Lifecycle ==========
 
     /**

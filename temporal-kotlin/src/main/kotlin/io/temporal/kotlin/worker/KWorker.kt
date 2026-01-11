@@ -63,7 +63,7 @@ import kotlin.reflect.KClass
  * }
  *
  * // Register activities (works with both suspend and non-suspend)
- * kWorker.registerActivities(MyActivitiesImpl())
+ * kWorker.registerActivitiesImplementations(MyActivitiesImpl())
  *
  * // Register Nexus services
  * kWorker.registerNexusServiceImplementations(MyNexusServiceImpl())
@@ -170,14 +170,14 @@ public class KWorker(
    *     suspend fun asyncOperation(): Data    // Suspend method
    * }
    *
-   * kWorker.registerActivities(MyActivitiesImpl())
+   * kWorker.registerActivitiesImplementations(MyActivitiesImpl())
    * ```
    *
    * @param activities Activity implementation instances to register
    */
-  public fun registerActivities(vararg activities: Any) {
+  public fun registerActivitiesImplementations(vararg activities: Any) {
     for (activity in activities) {
-      registerActivity(activity)
+      registerActivityImplementation(activity)
     }
   }
 
@@ -187,7 +187,7 @@ public class KWorker(
    * Extracts activity interfaces, creates a [KotlinActivityWrapper] for each method,
    * and registers them with the Java worker.
    */
-  private fun registerActivity(activity: Any) {
+  private fun registerActivityImplementation(activity: Any) {
     val implClass = activity::class.java
 
     // Find all activity interfaces implemented by this class
@@ -291,41 +291,6 @@ public class KWorker(
 
     collectInterfaces(clazz)
     return result.distinct()
-  }
-
-  /**
-   * Register activity implementations directly with the Java Worker.
-   *
-   * Use this for Java activity implementations that don't need Kotlin suspend support.
-   * For Kotlin activities (especially those with suspend functions), use [registerActivities].
-   *
-   * Example:
-   * ```kotlin
-   * kWorker.registerActivitiesImplementations(JavaActivitiesImpl())
-   * ```
-   *
-   * @param activities Activity implementation instances to register
-   */
-  @Deprecated(
-    message = "Use registerActivities() for Kotlin activities with suspend support",
-    replaceWith = ReplaceWith("registerActivities(*activities)")
-  )
-  public fun registerActivitiesImplementations(vararg activities: Any) {
-    worker.registerActivitiesImplementations(*activities)
-  }
-
-  /**
-   * Register suspend activity implementations.
-   *
-   * @deprecated Use [registerActivities] instead, which handles both suspend
-   * and non-suspend methods uniformly.
-   */
-  @Deprecated(
-    message = "Use registerActivities() instead",
-    replaceWith = ReplaceWith("registerActivities(*activities)")
-  )
-  public fun registerSuspendActivities(vararg activities: Any) {
-    registerActivities(*activities)
   }
 
   // ========== Nexus Registration ==========

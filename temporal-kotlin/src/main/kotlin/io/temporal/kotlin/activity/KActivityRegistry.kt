@@ -36,7 +36,7 @@ import kotlin.reflect.jvm.kotlinFunction
  * supporting both regular and suspend activity methods. It's designed for use with
  * [KDynamicActivityHandler] to enable runtime registration of activity mocks in tests.
  *
- * Note: For production use, prefer [KWorker.registerActivities] which uses TypedDynamicActivity
+ * Note: For production use, prefer [KWorker.registerActivitiesImplementations] which uses TypedDynamicActivity
  * for better performance and type safety.
  */
 public class KActivityRegistry {

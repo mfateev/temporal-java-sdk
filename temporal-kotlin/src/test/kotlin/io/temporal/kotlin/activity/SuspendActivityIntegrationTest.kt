@@ -341,7 +341,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestGreetWorkflowImpl::class.java)
     greetTestRule.worker.registerWorkflowImplementationFactory(factory)
-    greetTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    greetTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     greetTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -373,7 +373,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestAddWorkflowImpl::class.java)
     addTestRule.worker.registerWorkflowImplementationFactory(factory)
-    addTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    addTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     addTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -405,7 +405,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestDelayWorkflowImpl::class.java)
     delayTestRule.worker.registerWorkflowImplementationFactory(factory)
-    delayTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    delayTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     delayTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -437,7 +437,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestNoReturnWorkflowImpl::class.java)
     noReturnTestRule.worker.registerWorkflowImplementationFactory(factory)
-    noReturnTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    noReturnTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     noReturnTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -469,7 +469,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestErrorWorkflowImpl::class.java)
     errorTestRule.worker.registerWorkflowImplementationFactory(factory)
-    errorTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    errorTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     errorTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -502,7 +502,7 @@ class SuspendActivityIntegrationTest {
     factory.registerWorkflowImplementationType(TestMixedWorkflowImpl::class.java)
     mixedTestRule.worker.registerWorkflowImplementationFactory(factory)
     // Register suspend activities
-    mixedTestRule.kWorker.registerSuspendActivities(SuspendActivitiesImpl())
+    mixedTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     // Register regular activities separately
     mixedTestRule.kWorker.registerActivitiesImplementations(RegularActivitiesImpl())
 
@@ -538,7 +538,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestHeartbeatWorkflowImpl::class.java)
     heartbeatTestRule.worker.registerWorkflowImplementationFactory(factory)
-    heartbeatTestRule.kWorker.registerSuspendActivities(HeartbeatActivitiesImpl())
+    heartbeatTestRule.kWorker.registerActivitiesImplementations(HeartbeatActivitiesImpl())
     heartbeatTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -571,7 +571,7 @@ class SuspendActivityIntegrationTest {
     factory.registerWorkflowImplementationType(TestGreetWorkflowImpl::class.java)
     dispatcherTestRule.worker.registerWorkflowImplementationFactory(factory)
     // Register suspend activities via kWorker
-    dispatcherTestRule.kWorker.registerActivities(SuspendActivitiesImpl())
+    dispatcherTestRule.kWorker.registerActivitiesImplementations(SuspendActivitiesImpl())
     dispatcherTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
@@ -606,7 +606,7 @@ class SuspendActivityIntegrationTest {
     val factory = KotlinWorkflowImplementationFactory(DataConverter.getDefaultInstance())
     factory.registerWorkflowImplementationType(TestExplicitNameWorkflowImpl::class.java)
     explicitNameTestRule.worker.registerWorkflowImplementationFactory(factory)
-    explicitNameTestRule.kWorker.registerSuspendActivities(ExplicitNameActivitiesImpl())
+    explicitNameTestRule.kWorker.registerActivitiesImplementations(ExplicitNameActivitiesImpl())
     explicitNameTestRule.testEnvironment.start()
 
     // Use untyped stub since Java proxy doesn't support suspend functions on client side
