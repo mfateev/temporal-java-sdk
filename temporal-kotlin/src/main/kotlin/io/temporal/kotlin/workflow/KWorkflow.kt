@@ -100,17 +100,23 @@ public object KWorkflow {
   internal val currentContext = ThreadLocal<KotlinWorkflowContext?>()
 
   /**
-   * Returns information about the current workflow execution.
+   * Information about the current workflow execution.
    *
-   * @return the workflow information with Kotlin-friendly nullable types
-   * @throws IllegalStateException if called outside of workflow code
+   * Example:
+   * ```kotlin
+   * if (KWorkflow.info.isContinueAsNewSuggested) {
+   *     KWorkflow.continueAsNew(state)
+   * }
+   * ```
+   *
+   * @throws IllegalStateException if accessed outside of workflow code
    */
-  public fun getInfo(): KWorkflowInfo {
-    // For now, delegate to the Java SDK's Workflow.getInfo()
-    // Once we have full Kotlin context integration, we can use our own context
-    val javaInfo: WorkflowInfo = Workflow.getInfo()
-    return KWorkflowInfoImpl(javaInfo)
-  }
+  public val info: KWorkflowInfo
+    @JvmName("info")
+    get() {
+      val javaInfo: WorkflowInfo = Workflow.getInfo()
+      return KWorkflowInfoImpl(javaInfo)
+    }
 
   /**
    * Returns a logger for the current workflow.
@@ -302,22 +308,13 @@ public object KWorkflow {
     }
 
   /**
-   * Returns the current search attributes as a typed [SearchAttributes] object.
-   *
-   * @return the search attributes (empty if none set)
-   * @deprecated Use [typedSearchAttributes] property instead
-   */
-  @Deprecated("Use typedSearchAttributes property instead", ReplaceWith("typedSearchAttributes"))
-  public fun getTypedSearchAttributes(): SearchAttributes = typedSearchAttributes
-
-  /**
    * Gets a single search attribute value by key.
    *
    * @param key the search attribute key
    * @return the search attribute value, or null if not found
    */
   public fun <T> getSearchAttribute(key: SearchAttributeKey<T>): T? {
-    return getTypedSearchAttributes().get(key)
+    return typedSearchAttributes.get(key)
   }
 
   /**
@@ -431,10 +428,7 @@ public object KWorkflow {
    * Gets the failure from the previous run of this workflow, if any.
    *
    * @return the previous run failure, or null if the previous run succeeded
-   * @deprecated Use [previousRunFailure] property instead
    */
-  @Deprecated("Use previousRunFailure property instead", ReplaceWith("previousRunFailure"))
-  public fun getPreviousRunFailure(): Exception? = previousRunFailure
 
   // ==================== Replay Detection ====================
 
@@ -477,15 +471,6 @@ public object KWorkflow {
         ?: throw IllegalStateException("KWorkflow.metricsScope must be accessed from within workflow code")
       return context.getMetricsScope()
     }
-
-  /**
-   * Returns the metrics scope for this workflow.
-   *
-   * @return the metrics scope
-   * @deprecated Use [metricsScope] property instead
-   */
-  @Deprecated("Use metricsScope property instead", ReplaceWith("metricsScope"))
-  public fun getMetricsScope(): Scope = metricsScope
 
   // ==================== Mutable Side Effect ====================
 
@@ -664,10 +649,7 @@ public object KWorkflow {
    * Returns information about the currently executing update, if any.
    *
    * @return the current update info, or null if not in an update handler
-   * @deprecated Use [currentUpdateInfo] property instead
    */
-  @Deprecated("Use currentUpdateInfo property instead", ReplaceWith("currentUpdateInfo"))
-  public fun getCurrentUpdateInfo(): UpdateInfo? = currentUpdateInfo
 
   // ==================== Handler Completion Check ====================
 
@@ -722,26 +704,6 @@ public object KWorkflow {
         ?: throw IllegalStateException("KWorkflow.currentDetails must be accessed from within workflow code")
       context.setCurrentDetails(value)
     }
-
-  /**
-   * Sets the current workflow details.
-   *
-   * @param details the details string to set, or null to clear
-   * @deprecated Use [currentDetails] property instead
-   */
-  @Deprecated("Use currentDetails property instead", ReplaceWith("currentDetails = details"))
-  public fun setCurrentDetails(details: String?) {
-    currentDetails = details
-  }
-
-  /**
-   * Gets the current workflow details.
-   *
-   * @return the current details, or null if not set
-   * @deprecated Use [currentDetails] property instead
-   */
-  @Deprecated("Use currentDetails property instead", ReplaceWith("currentDetails"))
-  public fun getCurrentDetails(): String? = currentDetails
 
   /**
    * Default version constant for workflow versioning.

@@ -25,6 +25,7 @@ import io.temporal.workflow.WorkflowMethod
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.declaredFunctions
+import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 
@@ -174,12 +175,29 @@ internal class KotlinWorkflowDefinition(
     }
 
     private fun findQueryMethods(workflowInterface: KClass<*>): Map<String, KFunction<*>> {
-      return workflowInterface.declaredFunctions
+      // Find query methods from declared functions
+      val functionQueries = workflowInterface.declaredFunctions
         .filter { it.findAnnotation<io.temporal.workflow.QueryMethod>() != null }
         .associateBy { func ->
           val annotation = func.findAnnotation<io.temporal.workflow.QueryMethod>()!!
           if (annotation.name.isNotEmpty()) annotation.name else func.name
         }
+
+      // Find query methods from property getters (supports @get:QueryMethod on val properties)
+      val propertyQueries = workflowInterface.declaredMemberProperties
+        .mapNotNull { prop ->
+          val getter = prop.getter
+          val annotation = getter.findAnnotation<io.temporal.workflow.QueryMethod>()
+          if (annotation != null) {
+            val name = if (annotation.name.isNotEmpty()) annotation.name else prop.name
+            name to getter
+          } else {
+            null
+          }
+        }
+        .toMap()
+
+      return functionQueries + propertyQueries
     }
 
     private fun findUpdateMethods(workflowInterface: KClass<*>): Map<String, KFunction<*>> {

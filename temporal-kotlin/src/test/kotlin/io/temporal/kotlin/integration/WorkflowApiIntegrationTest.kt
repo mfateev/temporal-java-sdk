@@ -124,6 +124,27 @@ class WorkflowApiIntegrationTest {
     suspend fun execute(): String
   }
 
+  /**
+   * Workflow interface demonstrating @QueryMethod on Kotlin val properties.
+   * This is the Kotlin-idiomatic syntax for query methods.
+   */
+  @WorkflowInterface
+  interface QueryPropertyWorkflow {
+    @WorkflowMethod
+    suspend fun execute(): String
+
+    @SignalMethod
+    fun setStatus(newStatus: String)
+
+    /** Query as a property - Kotlin-idiomatic syntax */
+    @get:QueryMethod
+    val status: String
+
+    /** Query as a property with custom name */
+    @get:QueryMethod(name = "itemCount")
+    val count: Int
+  }
+
   // ==================== Workflow Implementations ====================
 
   class SearchAttributeWorkflowImpl : SearchAttributeWorkflow {
@@ -288,6 +309,28 @@ class WorkflowApiIntegrationTest {
 
       return result
     }
+  }
+
+  class QueryPropertyWorkflowImpl : QueryPropertyWorkflow {
+    private var _status = "initial"
+    private var _count = 0
+
+    override suspend fun execute(): String {
+      // Wait for a signal to change state
+      KWorkflow.awaitCondition { _status == "done" }
+      return "completed with count=$_count"
+    }
+
+    override fun setStatus(newStatus: String) {
+      _status = newStatus
+      _count++
+    }
+
+    override val status: String
+      get() = _status
+
+    override val count: Int
+      get() = _count
   }
 
   // ==================== Test Infrastructure ====================
@@ -463,5 +506,41 @@ class WorkflowApiIntegrationTest {
     val result = stub.getResult(String::class.java)
 
     assertEquals("success after 3 attempts", result)
+  }
+
+  @Test
+  fun `QueryMethod annotation works on Kotlin val properties`() {
+    setupKotlinWorkflows(QueryPropertyWorkflowImpl::class.java)
+
+    val client = testWorkflowRule.workflowClient
+    val options = WorkflowOptions.newBuilder()
+      .setTaskQueue(testWorkflowRule.taskQueue)
+      .build()
+
+    val stub = client.newUntypedWorkflowStub("QueryPropertyWorkflow", options)
+    stub.start()
+
+    // Query initial state using property name (not getter name)
+    val initialStatus = stub.query("status", String::class.java)
+    assertEquals("initial", initialStatus)
+
+    // Query using custom name specified in @QueryMethod annotation
+    val initialCount = stub.query("itemCount", Int::class.java)
+    assertEquals(0, initialCount)
+
+    // Send signals to change state
+    stub.signal("setStatus", "processing")
+    stub.signal("setStatus", "done")
+
+    // Query updated state
+    val finalStatus = stub.query("status", String::class.java)
+    assertEquals("done", finalStatus)
+
+    val finalCount = stub.query("itemCount", Int::class.java)
+    assertEquals(2, finalCount)
+
+    // Get workflow result
+    val result = stub.getResult(String::class.java)
+    assertEquals("completed with count=2", result)
   }
 }
