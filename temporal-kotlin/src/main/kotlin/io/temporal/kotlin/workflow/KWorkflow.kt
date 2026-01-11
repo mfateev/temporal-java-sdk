@@ -83,8 +83,8 @@ import kotlin.time.Duration
  * class MyWorkflowImpl : MyWorkflow {
  *   override suspend fun execute(): String {
  *     val info = KWorkflow.getInfo()
- *     val currentTime = KWorkflow.currentTime()
- *     return "Workflow ${info.workflowId} at $currentTime"
+ *     val now = KWorkflow.now()
+ *     return "Workflow ${info.workflowId} at $now"
  *   }
  * }
  * ```
@@ -147,12 +147,14 @@ public object KWorkflow {
    * Returns the current workflow time as an [Instant].
    *
    * This is deterministic and returns the same value during replay.
-   * Must be used instead of [System.currentTimeMillis] or [Instant.now]
+   * Must be used instead of [System.currentTimeMillis] or [java.time.Instant.now]
    * to ensure deterministic workflow execution.
+   *
+   * Matches Kotlin's idiomatic `Clock.System.now()` naming.
    *
    * @return the current workflow time
    */
-  public fun currentTime(): Instant {
+  public fun now(): Instant {
     return Instant.ofEpochMilli(currentTimeMillis())
   }
 

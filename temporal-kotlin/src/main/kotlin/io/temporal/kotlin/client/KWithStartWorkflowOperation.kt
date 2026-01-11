@@ -30,13 +30,13 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Represents a workflow start operation for use with update-with-start.
  *
- * Created via [KWorkflowClient.withStartWorkflowOperation].
+ * Created via [KWorkflowClient.newWithStartWorkflowOperation].
  * This class captures the workflow method, arguments, and options for atomic execution
  * with an update operation.
  *
  * Example:
  * ```kotlin
- * val startOp = client.withStartWorkflowOperation(
+ * val startOp = client.newWithStartWorkflowOperation(
  *     OrderWorkflow::processOrder,
  *     KWorkflowOptions(
  *         workflowId = "order-123",

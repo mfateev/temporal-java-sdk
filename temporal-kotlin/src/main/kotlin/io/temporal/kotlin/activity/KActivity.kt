@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory
 /**
  * Provides access to Temporal activity APIs from within Kotlin activity code.
  *
- * Use the [context] property to obtain a [KActivityContext] for accessing activity APIs.
+ * Use the [executionContext] property to obtain a [KActivityContext] for accessing activity APIs.
  * This matches Java SDK's [Activity.getExecutionContext] pattern with Kotlin idiomatic syntax.
  *
  * Supports both regular and suspend activities:
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val context = KActivity.context
+ *     val context = KActivity.executionContext
  *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val context = KActivity.context
+ *     val context = KActivity.executionContext
  *     println("Fetching in activity ${context.info.activityId}")
  *
  *     for (i in 1..10) {
@@ -84,7 +84,7 @@ public object KActivity {
    *
    * @throws IllegalStateException if called outside of activity code
    */
-  public val context: KActivityContext
+  public val executionContext: KActivityContext
     get() {
       // First try the suspend activity context (for suspend activities running on coroutine threads)
       val suspendContext = CurrentSuspendActivityContext.get()
@@ -225,12 +225,12 @@ public object KActivity {
   }
 
   /**
-   * The raw execution context for advanced use cases.
+   * The raw Java execution context for advanced use cases.
    *
-   * Prefer using the other properties on this object when possible.
+   * Prefer using [executionContext] when possible.
    * Works in both regular and suspend activities.
    */
-  public val executionContext: ActivityExecutionContext
+  public val javaExecutionContext: ActivityExecutionContext
     get() {
       // First try the suspend activity context (for suspend activities running on coroutine threads)
       val suspendContext = CurrentSuspendActivityContext.get()

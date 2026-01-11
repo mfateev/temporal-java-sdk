@@ -66,7 +66,7 @@ import kotlin.reflect.KClass
  * kWorker.registerActivitiesImplementations(MyActivitiesImpl())
  *
  * // Register Nexus services
- * kWorker.registerNexusServiceImplementations(MyNexusServiceImpl())
+ * kWorker.registerNexusServiceImplementation(MyNexusServiceImpl())
  * ```
  */
 public class KWorker(
@@ -310,12 +310,12 @@ public class KWorker(
    *     override fun doSomething(input: String): String = "result"
    * }
    *
-   * kWorker.registerNexusServiceImplementations(MyNexusServiceImpl())
+   * kWorker.registerNexusServiceImplementation(MyNexusServiceImpl())
    * ```
    *
    * @param services Nexus service implementation instances to register
    */
-  public fun registerNexusServiceImplementations(vararg services: Any) {
+  public fun registerNexusServiceImplementation(vararg services: Any) {
     worker.registerNexusServiceImplementation(*services)
   }
 }

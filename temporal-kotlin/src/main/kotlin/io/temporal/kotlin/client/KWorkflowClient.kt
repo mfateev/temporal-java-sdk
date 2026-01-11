@@ -677,7 +677,7 @@ public class KWorkflowClient(
    * @return a start operation that can be used with [startUpdateWithStart] or [executeUpdateWithStart]
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, R> withStartWorkflowOperation(
+  public fun <T, R> newWithStartWorkflowOperation(
     workflow: KFunction1<T, R>,
     options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
@@ -696,7 +696,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with one argument.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, R> withStartWorkflowOperation(
+  public fun <T, A1, R> newWithStartWorkflowOperation(
     workflow: KFunction2<T, A1, R>,
     options: KWorkflowOptions,
     arg1: A1
@@ -716,7 +716,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with two arguments.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, R> newWithStartWorkflowOperation(
     workflow: KFunction3<T, A1, A2, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -737,7 +737,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with three arguments.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, R> newWithStartWorkflowOperation(
     workflow: KFunction4<T, A1, A2, A3, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -759,7 +759,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with four arguments.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, R> newWithStartWorkflowOperation(
     workflow: KFunction5<T, A1, A2, A3, A4, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -782,7 +782,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with five arguments.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, A5, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, A5, R> newWithStartWorkflowOperation(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -806,7 +806,7 @@ public class KWorkflowClient(
    * Create a workflow start operation with six arguments.
    */
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, A5, A6, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, A5, A6, R> newWithStartWorkflowOperation(
     workflow: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -834,7 +834,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation0")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, R> withStartWorkflowOperation(
+  public fun <T, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction1<T, R>,
     options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
@@ -854,7 +854,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation1")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, R> withStartWorkflowOperation(
+  public fun <T, A1, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction2<T, A1, R>,
     options: KWorkflowOptions,
     arg1: A1
@@ -875,7 +875,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation2")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction3<T, A1, A2, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -897,7 +897,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation3")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction4<T, A1, A2, A3, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -920,7 +920,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation4")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -944,7 +944,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation5")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, A5, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, A5, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
     options: KWorkflowOptions,
     arg1: A1,
@@ -969,7 +969,7 @@ public class KWorkflowClient(
    */
   @JvmName("withStartSuspendWorkflowOperation6")
   @OptIn(InternalTemporalApi::class)
-  public fun <T, A1, A2, A3, A4, A5, A6, R> withStartWorkflowOperation(
+  public fun <T, A1, A2, A3, A4, A5, A6, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
     options: KWorkflowOptions,
     arg1: A1,

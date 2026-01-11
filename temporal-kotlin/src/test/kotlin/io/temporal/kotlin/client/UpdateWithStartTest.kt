@@ -146,7 +146,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         createWorkflowOptions()
       )
@@ -168,7 +168,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         createWorkflowOptions()
       )
@@ -194,7 +194,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflowWithArgs::execute,
         createWorkflowOptions(),
         "startValue"
@@ -222,7 +222,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflowWithArgs::execute,
         createWorkflowOptions(),
         "initial"
@@ -252,7 +252,7 @@ class UpdateWithStartTest {
 
     runBlocking {
       val customUpdateId = "my-custom-update-id-${UUID.randomUUID()}"
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         createWorkflowOptions()
       )
@@ -279,7 +279,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         createWorkflowOptions()
       )
@@ -312,7 +312,7 @@ class UpdateWithStartTest {
     val client = createKWorkflowClient()
 
     runBlocking {
-      val startOp = client.withStartWorkflowOperation(
+      val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         createWorkflowOptions()
       )
@@ -342,7 +342,7 @@ class UpdateWithStartTest {
 
     runBlocking {
       // First, start the workflow
-      val startOp1 = client.withStartWorkflowOperation(
+      val startOp1 = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflow::execute,
         KWorkflowOptions(
           workflowId = workflowId,

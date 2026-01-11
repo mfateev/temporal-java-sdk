@@ -29,7 +29,7 @@ import io.temporal.client.WorkflowUpdateStage
  *
  * Example:
  * ```kotlin
- * val startOp = client.withStartWorkflowOperation(
+ * val startOp = client.newWithStartWorkflowOperation(
  *     OrderWorkflow::processOrder,
  *     KWorkflowOptions(
  *         workflowId = "order-123",
