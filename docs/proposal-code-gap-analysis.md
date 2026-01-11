@@ -262,25 +262,33 @@ The following items from the proposals were verified as correctly implemented:
 
 ---
 
-## Deprecated APIs Removed
+## API Changes
 
-The SDK is not yet released, so deprecated APIs were removed instead of maintained:
+### New Kotlin SDK Code (KWorkflow.kt)
 
-### KWorkflow.kt
-- Removed `getInfo()` - use `info` property
-- Removed `getTypedSearchAttributes()` - use `typedSearchAttributes` property
-- Removed `getPreviousRunFailure()` - use `previousRunFailure` property
-- Removed `getMetricsScope()` - use `metricsScope` property
-- Removed `getCurrentUpdateInfo()` - use `currentUpdateInfo` property
-- Removed `setCurrentDetails()` / `getCurrentDetails()` - use `currentDetails` property
+The new Kotlin SDK uses property-style APIs exclusively. No deprecated getter methods are provided since the SDK is not yet released:
 
-### WorkflowServiceStubsExt.kt
-- Removed deprecated `WorkflowServiceStubs()` functions
-- Removed deprecated parameter-order variant of `ConnectedWorkflowServiceStubs()`
+- `info` property (not `getInfo()`)
+- `typedSearchAttributes` property (not `getTypedSearchAttributes()`)
+- `previousRunFailure` property (not `getPreviousRunFailure()`)
+- `metricsScope` property (not `getMetricsScope()`)
+- `currentUpdateInfo` property (not `getCurrentUpdateInfo()`)
+- `currentDetails` property (not `setCurrentDetails()` / `getCurrentDetails()`)
 
-### WorkerExt.kt
-- Removed `addWorkflowImplementationFactory()` - use `registerWorkflowImplementationFactory()`
-- Removed `registerKotlinWorkflowImplementationTypes()` - use `KotlinPlugin` with standard registration
+### Preexisting Extension Files (Unchanged)
+
+The following extension files predate the Kotlin SDK work (2021-2022) and are maintained unchanged for backwards compatibility:
+
+**WorkflowServiceStubsExt.kt** - Deprecated methods retained:
+- `WorkflowServiceStubs()` - deprecated, use `LocalWorkflowServiceStubs()`
+- `WorkflowServiceStubs(options)` - deprecated, use `LazyWorkflowServiceStubs()` or `ConnectedWorkflowServiceStubs()`
+- `ConnectedWorkflowServiceStubs(options, timeout)` - deprecated, use `ConnectedWorkflowServiceStubs(timeout, options)`
+
+**WorkerExt.kt** - Deprecated methods retained:
+- `addWorkflowImplementationFactory(options, factory)` - deprecated, use `registerWorkflowImplementationFactory()`
+- `addWorkflowImplementationFactory(factory)` - deprecated, use `registerWorkflowImplementationFactory()`
+
+These deprecations follow Java SDK API changes and are maintained for existing users.
 
 ---
 
