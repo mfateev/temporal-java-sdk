@@ -23,11 +23,17 @@ package io.temporal.kotlin.worker
 import io.temporal.activity.ActivityInterface
 import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KotlinActivityWrapper
+import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
+import io.temporal.worker.WorkerFactory
+import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkflowImplementationOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import kotlin.reflect.KClass
 
 /**
@@ -49,7 +55,7 @@ import kotlin.reflect.KClass
  * - Compatibility with test mocking frameworks
  * - Full support for activity interceptors
  *
- * Example:
+ * Example using KWorkerFactory:
  * ```kotlin
  * val factory = KWorkerFactory(client)
  * val kWorker = factory.newWorker("task-queue")
@@ -57,26 +63,271 @@ import kotlin.reflect.KClass
  * // Register workflow using reified generics
  * kWorker.registerWorkflowImplementationTypes<MyWorkflowImpl>()
  *
- * // Register workflow with options
- * kWorker.registerWorkflowImplementationTypes<MyWorkflowImpl> {
- *     setFailWorkflowExceptionTypes(IllegalArgumentException::class.java)
- * }
- *
  * // Register activities (works with both suspend and non-suspend)
  * kWorker.registerActivitiesImplementations(MyActivitiesImpl())
  *
- * // Register Nexus services
- * kWorker.registerNexusServiceImplementation(MyNexusServiceImpl())
+ * factory.start()
+ * ```
+ *
+ * Example using simplified pattern:
+ * ```kotlin
+ * val worker = KWorker(
+ *     client,
+ *     KWorkerOptions(
+ *         taskQueue = "my-task-queue",
+ *         workflows = listOf(GreetingWorkflowImpl::class),
+ *         activities = listOf(GreetingActivitiesImpl())
+ *     )
+ * )
+ * worker.run()  // Blocks until shutdown
  * ```
  */
-public class KWorker(
+public class KWorker private constructor(
   /** The underlying Java Worker for interop scenarios */
   public val worker: Worker,
   /** Kotlin worker interceptors for activity interception */
-  internal val workerInterceptors: List<KWorkerInterceptor> = emptyList(),
+  internal val workerInterceptors: List<KWorkerInterceptor>,
   /** Coroutine dispatcher for suspend activities */
-  private val activityDispatcher: CoroutineDispatcher = Dispatchers.Default
+  private val activityDispatcher: CoroutineDispatcher,
+  /** The internal WorkerFactory (null when created via KWorkerFactory) */
+  private val internalWorkerFactory: WorkerFactory?
 ) {
+
+  /**
+   * Creates a KWorker wrapping an existing Java Worker.
+   *
+   * This constructor is primarily used for:
+   * - Interoperability with existing Java Worker instances
+   * - KWorkerFactory creating workers
+   * - Testing environments wrapping test workers
+   *
+   * For simplified worker setup, use [KWorker.invoke] instead.
+   *
+   * @param worker The underlying Java Worker to wrap
+   * @param workerInterceptors Optional Kotlin worker interceptors
+   * @param activityDispatcher Optional coroutine dispatcher for suspend activities
+   */
+  @JvmOverloads
+  public constructor(
+    worker: Worker,
+    workerInterceptors: List<KWorkerInterceptor> = emptyList(),
+    activityDispatcher: CoroutineDispatcher = Dispatchers.Default
+  ) : this(worker, workerInterceptors, activityDispatcher, null)
+
+  companion object {
+    /**
+     * Creates a new Kotlin worker with simplified configuration.
+     *
+     * This factory method follows the Python/.NET SDK pattern for simplified worker setup,
+     * allowing workflows and activities to be specified at construction time.
+     *
+     * Example:
+     * ```kotlin
+     * val worker = KWorker(
+     *     client,
+     *     KWorkerOptions(
+     *         taskQueue = "my-task-queue",
+     *         workflows = listOf(
+     *             GreetingWorkflowImpl::class,
+     *             OrderWorkflowImpl::class
+     *         ),
+     *         activities = listOf(
+     *             GreetingActivitiesImpl(),
+     *             OrderActivitiesImpl()
+     *         ),
+     *         maxConcurrentActivityExecutionSize = 100
+     *     )
+     * )
+     *
+     * // Block until shutdown or fatal error
+     * worker.run()
+     * ```
+     *
+     * @param client The KClient to use for workflow interactions
+     * @param options Configuration options including task queue, workflows, activities, and worker settings
+     * @return A new KWorker instance
+     */
+    public operator fun invoke(
+      client: KClient,
+      options: KWorkerOptions
+    ): KWorker {
+      // Create WorkerFactory with KotlinPlugin
+      val kotlinPlugin = KotlinPlugin.create(KotlinPluginOptions())
+      val factoryOptions = WorkerFactoryOptions.newBuilder()
+        .addPlugin(kotlinPlugin)
+        .build()
+      val workerFactory = WorkerFactory.newInstance(client.workflowClient, factoryOptions)
+
+      // Create worker
+      val worker = workerFactory.newWorker(options.taskQueue, options.toWorkerOptions())
+
+      // Create KWorker instance
+      val kWorker = KWorker(
+        worker = worker,
+        workerInterceptors = emptyList(),
+        activityDispatcher = Dispatchers.Default,
+        internalWorkerFactory = workerFactory
+      )
+
+      // Register workflows
+      if (options.workflows.isNotEmpty()) {
+        if (options.workflowImplementationOptions != null) {
+          kWorker.registerWorkflowImplementationTypes(options.workflowImplementationOptions, *options.workflows.toTypedArray())
+        } else {
+          kWorker.registerWorkflowImplementationTypes(*options.workflows.toTypedArray())
+        }
+      }
+
+      // Register activities
+      if (options.activities.isNotEmpty()) {
+        kWorker.registerActivitiesImplementations(*options.activities.toTypedArray())
+      }
+
+      return kWorker
+    }
+  }
+
+  // ========== Lifecycle Methods ==========
+
+  /**
+   * Starts the worker and blocks until shutdown or a fatal error occurs.
+   *
+   * This method starts the underlying worker factory and then awaits termination,
+   * propagating any fatal errors that occur during execution.
+   *
+   * Example:
+   * ```kotlin
+   * val worker = KWorker(client, options)
+   * worker.run()  // Blocks until shutdown
+   * ```
+   *
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public suspend fun run() {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "run() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.start() instead."
+      )
+
+    factory.start()
+
+    // Await termination indefinitely
+    withContext(Dispatchers.IO) {
+      factory.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+    }
+  }
+
+  /**
+   * Starts the worker without blocking.
+   *
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun start() {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "start() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.start() instead."
+      )
+    factory.start()
+  }
+
+  /**
+   * Initiates an orderly shutdown.
+   *
+   * The worker will stop accepting new tasks but will finish processing
+   * any tasks that have already started.
+   *
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun shutdown() {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "shutdown() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.shutdown() instead."
+      )
+    factory.shutdown()
+  }
+
+  /**
+   * Initiates an immediate shutdown.
+   *
+   * The worker will attempt to stop all processing immediately.
+   *
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun shutdownNow() {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "shutdownNow() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.shutdownNow() instead."
+      )
+    factory.shutdownNow()
+  }
+
+  /**
+   * Waits for the worker to terminate.
+   *
+   * @param timeout Maximum time to wait for termination
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public suspend fun awaitTermination(timeout: Duration) {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "awaitTermination() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.awaitTermination() instead."
+      )
+
+    withContext(Dispatchers.IO) {
+      factory.awaitTermination(timeout.toMillis(), TimeUnit.MILLISECONDS)
+    }
+  }
+
+  /**
+   * Checks if the worker has been started.
+   *
+   * @return true if the worker has been started
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun isStarted(): Boolean {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "isStarted() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.isStarted() instead."
+      )
+    return factory.isStarted
+  }
+
+  /**
+   * Checks if shutdown has been initiated.
+   *
+   * @return true if shutdown has been initiated
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun isShutdown(): Boolean {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "isShutdown() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.isShutdown() instead."
+      )
+    return factory.isShutdown
+  }
+
+  /**
+   * Checks if the worker has terminated.
+   *
+   * @return true if the worker has terminated
+   * @throws IllegalStateException if called on a worker created via KWorkerFactory
+   */
+  public fun isTerminated(): Boolean {
+    val factory = internalWorkerFactory
+      ?: throw IllegalStateException(
+        "isTerminated() can only be called on workers created with KWorker(client, options) constructor. " +
+          "For workers created via KWorkerFactory, use factory.isTerminated() instead."
+      )
+    return factory.isTerminated
+  }
+
   // ========== Workflow Registration ==========
 
   /**
