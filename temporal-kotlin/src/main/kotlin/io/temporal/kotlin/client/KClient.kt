@@ -25,11 +25,20 @@ import io.temporal.client.WorkflowClient
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.client.WorkflowOptions
 import io.temporal.client.WorkflowUpdateStage
+import io.temporal.client.schedules.ScheduleClient
+import io.temporal.client.schedules.ScheduleClientOptions
+import io.temporal.kotlin.client.schedules.KSchedule
+import io.temporal.kotlin.client.schedules.KScheduleHandle
+import io.temporal.kotlin.client.schedules.KScheduleListDescription
+import io.temporal.kotlin.client.schedules.KScheduleOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
@@ -1500,4 +1509,128 @@ public class KClient(
       stub.executeUpdateWithStart(updateOptions, updateArgs, startOp.args)
     }
   }
+
+  // ========== Schedule APIs ==========
+
+  /**
+   * Lazily initialized schedule client.
+   */
+  private val scheduleClient: ScheduleClient by lazy {
+    ScheduleClient.newInstance(
+      workflowService,
+      ScheduleClientOptions.newBuilder()
+        .setNamespace(workflowClient.options.namespace)
+        .setDataConverter(workflowClient.options.dataConverter)
+        .build()
+    )
+  }
+
+  /**
+   * Create a schedule and return a handle to it.
+   *
+   * Example:
+   * ```kotlin
+   * val handle = client.createSchedule(
+   *     "my-schedule-id",
+   *     KSchedule(
+   *         action = KScheduleActionStartWorkflow(
+   *             workflowType = "MyWorkflow",
+   *             options = WorkflowOptions.newBuilder()
+   *                 .setTaskQueue("my-queue")
+   *                 .build()
+   *         ),
+   *         spec = KScheduleSpec(
+   *             intervals = listOf(KScheduleIntervalSpec(Duration.ofHours(1)))
+   *         )
+   *     )
+   * )
+   * ```
+   *
+   * @param scheduleId Unique ID for the schedule.
+   * @param schedule Schedule to create.
+   * @param options Options for creating the schedule.
+   * @return A handle that can be used to perform operations on the schedule.
+   * @throws io.temporal.client.schedules.ScheduleAlreadyRunningException if the schedule is already running.
+   */
+  public suspend fun createSchedule(
+    scheduleId: String,
+    schedule: KSchedule,
+    options: KScheduleOptions = KScheduleOptions()
+  ): KScheduleHandle {
+    return withContext(Dispatchers.IO) {
+      val javaHandle = scheduleClient.createSchedule(
+        scheduleId,
+        schedule.toJava(),
+        options.toJava()
+      )
+      KScheduleHandle(javaHandle)
+    }
+  }
+
+  /**
+   * Get a handle to an existing schedule.
+   *
+   * Example:
+   * ```kotlin
+   * val handle = client.scheduleHandle("my-schedule-id")
+   * val description = handle.describe()
+   * handle.pause("Maintenance")
+   * ```
+   *
+   * @param scheduleId ID of the schedule to get a handle for.
+   * @return A handle that can be used to perform operations on the schedule.
+   */
+  public fun scheduleHandle(scheduleId: String): KScheduleHandle {
+    return KScheduleHandle(scheduleClient.getHandle(scheduleId))
+  }
+
+  /**
+   * List schedules.
+   *
+   * Example:
+   * ```kotlin
+   * client.listSchedules().collect { schedule ->
+   *     println("Schedule: ${schedule.scheduleId}")
+   * }
+   * ```
+   *
+   * @return Flow of schedule list descriptions.
+   */
+  public fun listSchedules(): Flow<KScheduleListDescription> = flow {
+    scheduleClient.listSchedules().use { stream ->
+      stream.iterator().forEach { description ->
+        emit(KScheduleListDescription.fromJava(description))
+      }
+    }
+  }.flowOn(Dispatchers.IO)
+
+  /**
+   * List schedules with pagination options.
+   *
+   * @param pageSize How many results to fetch from the Server at a time. Default is 100.
+   * @return Flow of schedule list descriptions.
+   */
+  public fun listSchedules(pageSize: Int): Flow<KScheduleListDescription> = flow {
+    scheduleClient.listSchedules(pageSize).use { stream ->
+      stream.iterator().forEach { description ->
+        emit(KScheduleListDescription.fromJava(description))
+      }
+    }
+  }.flowOn(Dispatchers.IO)
+
+  /**
+   * List schedules with query and pagination options.
+   *
+   * @param query Temporal Visibility Query, for syntax see
+   *        [Visibility docs](https://docs.temporal.io/visibility#list-filter).
+   * @param pageSize How many results to fetch from the Server at a time. Default is 100.
+   * @return Flow of schedule list descriptions.
+   */
+  public fun listSchedules(query: String?, pageSize: Int?): Flow<KScheduleListDescription> = flow {
+    scheduleClient.listSchedules(query, pageSize).use { stream ->
+      stream.iterator().forEach { description ->
+        emit(KScheduleListDescription.fromJava(description))
+      }
+    }
+  }.flowOn(Dispatchers.IO)
 }
