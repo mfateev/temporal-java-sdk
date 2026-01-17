@@ -53,17 +53,19 @@ import kotlin.reflect.jvm.javaMethod
 //  non-blocking suspension.
 
 /**
- * Kotlin workflow client providing suspend functions and type-safe workflow APIs.
+ * Unified Kotlin client providing suspend functions and type-safe workflow APIs.
  *
  * This class wraps a [WorkflowClient] and provides Kotlin-idiomatic APIs including
  * suspend functions and type-safe method references.
  *
- * Example:
+ * Example using connect (recommended):
  * ```kotlin
- * val service = WorkflowServiceStubs.newLocalServiceStubs()
- * val client = KWorkflowClient(service) {
- *     setNamespace("default")
- * }
+ * val client = KClient.connect(
+ *     KClientOptions(
+ *         target = "localhost:7233",
+ *         namespace = "default"
+ *     )
+ * )
  *
  * // Execute workflow and wait for result
  * val result = client.executeWorkflow(
@@ -76,37 +78,79 @@ import kotlin.reflect.jvm.javaMethod
  * )
  * ```
  *
+ * Example using existing service stubs:
+ * ```kotlin
+ * val service = WorkflowServiceStubs.newLocalServiceStubs()
+ * val client = KClient(service) {
+ *     setNamespace("default")
+ * }
+ * ```
+ *
  * @param workflowClient The underlying WorkflowClient to wrap
  */
-public class KWorkflowClient(
+public class KClient(
   public val workflowClient: WorkflowClient
 ) {
 
+  /**
+   * The underlying WorkflowServiceStubs for advanced use cases.
+   */
+  public val workflowService: WorkflowServiceStubs
+    get() = workflowClient.workflowServiceStubs
+
   public companion object {
     /**
-     * Create a KWorkflowClient connected to the specified service.
+     * Connect to Temporal service and create a client.
+     *
+     * This is the recommended way to create a KClient, providing a unified
+     * API similar to Python and .NET SDKs.
      *
      * Example:
      * ```kotlin
-     * val client = KWorkflowClient(service) {
+     * val client = KClient.connect(
+     *     KClientOptions(
+     *         target = "localhost:7233",
+     *         namespace = "default"
+     *     )
+     * )
+     * ```
+     *
+     * @param options Connection and client options
+     * @return A new KClient instance
+     */
+    @JvmStatic
+    public suspend fun connect(options: KClientOptions = KClientOptions()): KClient {
+      return withContext(Dispatchers.IO) {
+        val serviceStubs = WorkflowServiceStubs.newServiceStubs(options.toServiceStubsOptions())
+        val client = WorkflowClient.newInstance(serviceStubs, options.toClientOptions())
+        KClient(client)
+      }
+    }
+
+    /**
+     * Create a KClient connected to the specified service.
+     *
+     * Example:
+     * ```kotlin
+     * val client = KClient(service) {
      *     setNamespace("my-namespace")
      * }
      * ```
      *
      * @param service The WorkflowServiceStubs to connect to
      * @param options DSL builder for WorkflowClientOptions
-     * @return A new KWorkflowClient instance
+     * @return A new KClient instance
      */
     @JvmStatic
     public operator fun invoke(
       service: WorkflowServiceStubs,
       options: WorkflowClientOptions.Builder.() -> Unit = {}
-    ): KWorkflowClient {
+    ): KClient {
       val client = WorkflowClient.newInstance(
         service,
         WorkflowClientOptions.newBuilder().apply(options).build()
       )
-      return KWorkflowClient(client)
+      return KClient(client)
     }
   }
 

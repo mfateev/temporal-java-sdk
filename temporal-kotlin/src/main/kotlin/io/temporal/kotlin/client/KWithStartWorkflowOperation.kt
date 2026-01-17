@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Represents a workflow start operation for use with update-with-start.
  *
- * Created via [KWorkflowClient.newWithStartWorkflowOperation].
+ * Created via [KClient.newWithStartWorkflowOperation].
  * This class captures the workflow method, arguments, and options for atomic execution
  * with an update operation.
  *

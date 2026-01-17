@@ -20,7 +20,7 @@
 
 package io.temporal.kotlin.worker
 
-import io.temporal.kotlin.client.KWorkflowClient
+import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
@@ -45,7 +45,7 @@ import kotlin.reflect.KClass
  * Example:
  * ```kotlin
  * val service = WorkflowServiceStubs.newLocalServiceStubs()
- * val client = KWorkflowClient(service) { setNamespace("default") }
+ * val client = KClient(service) { setNamespace("default") }
  *
  * // KWorkerFactory automatically enables Kotlin coroutine support
  * val factory = KWorkerFactory(client) {
@@ -73,11 +73,11 @@ import kotlin.reflect.KClass
  * factory.start()
  * ```
  *
- * @param client The KWorkflowClient to use for workflow interactions
+ * @param client The KClient to use for workflow interactions
  * @param options DSL builder for KWorkerFactoryOptionsBuilder
  */
 public class KWorkerFactory(
-  client: KWorkflowClient,
+  client: KClient,
   options: KWorkerFactoryOptionsBuilder.() -> Unit = {}
 ) {
 
