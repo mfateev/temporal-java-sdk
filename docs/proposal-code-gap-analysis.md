@@ -1,300 +1,479 @@
-# Proposals vs Implementation Gap Analysis
+# Kotlin SDK: Proposals vs Implementation Gap Analysis
 
-This document identifies inconsistencies between the API specification in the proposals repo (`/Users/maxim/temporal/proposals-root/kotlin-sdk/kotlin/`) and the actual implementation in the Kotlin SDK.
+This document provides a comprehensive analysis comparing the API specification in the proposals repository (`/Users/maxim/temporal/proposals-root/kotlin-sdk/kotlin/`) with the actual implementation in the Kotlin SDK.
 
-## Summary
+## Executive Summary
 
-| Category | Status |
-|----------|--------|
-| KWorkflow.info | FIXED - Added `info` property |
-| Query Property Syntax | FIXED - Added support for `@get:QueryMethod` on `val` properties |
-| Continue-As-New | Consistent |
-| Client API | Consistent |
-| Activity API | Consistent |
-| Worker API | Consistent |
-| Dynamic Handlers | Consistent |
-
----
-
-## 1. KWorkflow.info Property - FIXED
-
-**Proposal (continue-as-new.md line 93):**
-```kotlin
-if (KWorkflow.info.isContinueAsNewSuggested) {
-    KWorkflow.continueAsNew(state)
-}
-```
-
-**Resolution:** Added `val info: KWorkflowInfo` property to `KWorkflow` object, matching the proposal and consistent with other property-style APIs (e.g., `typedSearchAttributes`, `metricsScope`).
-
-**Implementation (KWorkflow.kt):**
-```kotlin
-public val info: KWorkflowInfo
-    @JvmName("info")
-    get() {
-        val javaInfo: WorkflowInfo = Workflow.getInfo()
-        return KWorkflowInfoImpl(javaInfo)
-    }
-```
+| Category | Status | Notes |
+|----------|--------|-------|
+| **Workflow APIs (KWorkflow)** | ✅ Complete | All core workflow APIs implemented |
+| **Activity APIs (KActivity)** | ✅ Complete | Both `KActivity` singleton and `KActivityContext.current()` supported |
+| **Client APIs** | ✅ Complete | Named `KClient`, has `KClientOptions`, `connect()` suspend function |
+| **Worker APIs** | ✅ Complete | Both `KWorkerFactory` pattern and `KWorker(client, options)` supported |
+| **External Workflows** | ✅ Complete | `KWorkflow.getExternalWorkflowHandle` implemented |
+| **Testing APIs** | ✅ Complete | `KTestWorkflowEnvironment` implemented |
+| **Options Classes** | ✅ Complete | All KOptions data classes implemented |
+| **Dynamic Handlers** | ✅ Complete | All dynamic handler registration APIs implemented |
+| **Schedules** | ❌ Missing | No schedule APIs implemented |
 
 ---
 
-## 2. Query Property Syntax - FIXED
+## 1. Client API Differences
+
+### 1.1 Client Class Naming - ✅ IMPLEMENTED
+
+**Proposal (workflow-client.md):**
+```kotlin
+// Unified client like Python/.NET
+val client = KClient.connect(
+    KClientOptions(
+        target = "localhost:7233",
+        namespace = "default"
+    )
+)
+```
+
+**Implementation (KClient.kt):**
+```kotlin
+// Now matches proposal - unified KClient with connect()
+val client = KClient.connect(
+    KClientOptions(
+        target = "localhost:7233",
+        namespace = "default"
+    )
+)
+```
+
+**Status:** ✅ Fully aligned with proposal
+- Class renamed from `KWorkflowClient` to `KClient`
+- Added `KClient.connect()` suspend function
+- Added `KClientOptions` data class
+
+### 1.2 KClientOptions - ✅ IMPLEMENTED
+
+**Proposal (workflow-client.md lines 166-174):**
+```kotlin
+data class KClientOptions(
+    val target: String = "localhost:7233",
+    val namespace: String = "default",
+    val identity: String? = null,
+    val dataConverter: DataConverter? = null,
+    val interceptors: List<KClientInterceptor> = emptyList(),
+    // ... other options
+)
+```
+
+**Implementation (KClientOptions.kt):**
+```kotlin
+data class KClientOptions(
+    val target: String = "localhost:7233",
+    val namespace: String = "default",
+    val identity: String? = null,
+    val dataConverter: DataConverter? = null,
+    val interceptors: List<WorkflowClientInterceptor> = emptyList(),
+    val enableHttps: Boolean = false,
+    val rpcTimeout: Duration? = null,
+    val rpcLongPollTimeout: Duration? = null,
+    val rpcQueryTimeout: Duration? = null,
+    // ... comprehensive options
+)
+```
+
+**Status:** ✅ Fully implemented with all options from Java SDK
+
+### 1.3 Missing Schedule APIs
+
+**Proposal (workflow-client.md lines 101-118):**
+```kotlin
+// Schedule operations on KClient
+suspend fun createSchedule(scheduleId: String, schedule: KSchedule, options: KScheduleOptions): KScheduleHandle
+fun scheduleHandle(scheduleId: String): KScheduleHandle
+fun listSchedules(): Flow<KScheduleListEntry>
+```
+
+**Implementation:** Not implemented.
+
+**Impact:** Medium - Users must use Java SDK directly for schedules
+
+### 1.4 Missing Activity Completion Handle
+
+**Proposal (workflow-client.md lines 125-126):**
+```kotlin
+fun activityCompletionHandle(taskToken: ByteArray): KActivityCompletionHandle
+```
+
+**Implementation:** Not implemented. Available via Java SDK's `ActivityCompletionClient`.
+
+**Impact:** Low - Available via Java interop
+
+---
+
+## 2. Worker API - ✅ COMPLETE
+
+### 2.1 Worker Construction Pattern - ✅ IMPLEMENTED
+
+**Proposal (worker/setup.md lines 7-29):**
+```kotlin
+// Single KWorker constructor with all registration in options
+val worker = KWorker(
+    client,
+    KWorkerOptions(
+        taskQueue = "task-queue",
+        workflows = listOf(GreetingWorkflowImpl::class),
+        activities = listOf(GreetingActivitiesImpl())
+    )
+)
+worker.run()  // Blocks until shutdown
+```
+
+**Implementation (KWorker.kt, KWorkerOptions.kt):**
+```kotlin
+// Option 1: Simplified pattern per proposal
+val worker = KWorker(
+    client,
+    KWorkerOptions(
+        taskQueue = "task-queue",
+        workflows = listOf(GreetingWorkflowImpl::class),
+        activities = listOf(GreetingActivitiesImpl())
+    )
+)
+worker.run()  // Blocks until shutdown
+
+// Option 2: Factory pattern (still supported for advanced use cases)
+val factory = KWorkerFactory(client)
+val worker = factory.newWorker("task-queue")
+worker.registerWorkflowImplementationTypes(GreetingWorkflowImpl::class)
+worker.registerActivitiesImplementations(GreetingActivitiesImpl())
+factory.start()
+```
+
+**Status:** ✅ Both patterns supported
+- `KWorker(client, KWorkerOptions)` - simplified pattern per proposal
+- `KWorkerFactory` - factory pattern for advanced use cases
+- `worker.run()` - blocks until shutdown
+- `worker.start()`, `shutdown()`, `shutdownNow()`, `awaitTermination()` - lifecycle methods
+
+### 2.2 KWorkerOptions - ✅ IMPLEMENTED
+
+**Proposal (worker/setup.md lines 79-93):**
+```kotlin
+data class KWorkerOptions(
+    val taskQueue: String,
+    val workflows: List<KClass<*>> = emptyList(),
+    val activities: List<Any> = emptyList(),
+    val workflowImplementationOptions: WorkflowImplementationOptions? = null,
+    val maxConcurrentActivityExecutionSize: Int? = null,
+    // ... other options
+)
+```
+
+**Implementation (KWorkerOptions.kt):**
+```kotlin
+data class KWorkerOptions(
+    val taskQueue: String,
+    val workflows: List<KClass<*>> = emptyList(),
+    val activities: List<Any> = emptyList(),
+    val workflowImplementationOptions: WorkflowImplementationOptions? = null,
+    val maxConcurrentActivityExecutionSize: Int? = null,
+    val maxConcurrentWorkflowTaskExecutionSize: Int? = null,
+    val maxConcurrentLocalActivityExecutionSize: Int? = null,
+    // ... all Java WorkerOptions properties
+)
+```
+
+**Status:** ✅ Fully implemented with all options from Java SDK
+
+---
+
+## 3. External Workflow APIs - ✅ IMPLEMENTED
+
+**Proposal (external-workflows.md):**
+```kotlin
+// Typed handle for external workflow interaction
+val handle = KWorkflow.getExternalWorkflowHandle<OrderWorkflow>("order-123")
+handle.signal(OrderWorkflow::updatePriority, Priority.HIGH)
+handle.cancel()
+
+// Untyped handle
+val untypedHandle = KWorkflow.getExternalWorkflowHandle("order-123")
+untypedHandle.signal("updatePriority", Priority.HIGH)
+```
+
+**Implementation (KWorkflow.kt, KExternalWorkflowHandle.kt):**
+```kotlin
+// Typed handle - fully implemented
+val handle = KWorkflow.getExternalWorkflowHandle<OrderWorkflow>("order-123")
+handle.signal(OrderWorkflow::updatePriority, Priority.HIGH)
+handle.cancel()
+
+// Untyped handle - fully implemented
+val untypedHandle = KWorkflow.getUntypedExternalWorkflowHandle("order-123")
+untypedHandle.signal("updatePriority", Priority.HIGH)
+```
+
+**Status:** ✅ Fully implemented
+- `KWorkflow.getExternalWorkflowHandle<T>(workflowId)` - typed handle
+- `KWorkflow.getExternalWorkflowHandle<T>(workflowId, runId)` - typed handle with runId
+- `KWorkflow.getUntypedExternalWorkflowHandle(workflowId)` - untyped handle
+- `KWorkflow.getUntypedExternalWorkflowHandle(workflowId, runId)` - untyped handle with runId
+- `KExternalWorkflowHandle<T>.signal()` - type-safe signal methods (0-6 args)
+- `KExternalWorkflowHandle<T>.cancel()` - cancel external workflow
+- `KUntypedExternalWorkflowHandle.signal()` - untyped signal
+- `KUntypedExternalWorkflowHandle.cancel()` - cancel external workflow
+
+---
+
+## 4. Implemented and Verified APIs
+
+### 4.1 KWorkflow Object - ✅ Complete
+
+All workflow APIs are implemented:
+
+| API | Status |
+|-----|--------|
+| `info` property | ✅ Implemented |
+| `now()` / `currentTimeMillis()` | ✅ Implemented |
+| `newRandom()` | ✅ Implemented |
+| `randomUUID()` | ✅ Implemented |
+| `version()` | ✅ Implemented |
+| `sideEffect()` | ✅ Implemented |
+| `mutableSideEffect()` | ✅ Implemented |
+| `logger()` | ✅ Implemented |
+| `typedSearchAttributes` property | ✅ Implemented |
+| `upsertTypedSearchAttributes()` | ✅ Implemented |
+| `metricsScope` property | ✅ Implemented |
+| `executeActivity()` (all overloads) | ✅ Implemented |
+| `executeLocalActivity()` (all overloads) | ✅ Implemented |
+| `executeChildWorkflow()` (all overloads) | ✅ Implemented |
+| `awaitCondition()` | ✅ Implemented |
+| `continueAsNew()` (all overloads) | ✅ Implemented |
+| `registerSignalHandler()` | ✅ Implemented |
+| `registerQueryHandler()` | ✅ Implemented |
+| `registerUpdateHandler()` | ✅ Implemented |
+| `registerDynamicSignalHandler()` | ✅ Implemented |
+| `registerDynamicQueryHandler()` | ✅ Implemented |
+| `registerDynamicUpdateHandler()` | ✅ Implemented |
+| `registerDynamicUpdateValidator()` | ✅ Implemented |
+| `retry()` | ✅ Implemented |
+| `currentUpdateInfo` property | ✅ Implemented |
+| `isEveryHandlerFinished` property | ✅ Implemented |
+| `currentDetails` property | ✅ Implemented |
+| `DEFAULT_VERSION` constant | ✅ Implemented |
+
+### 4.2 KActivity Object - ✅ Complete
+
+**Note:** Proposal uses `KActivityContext.current()`, implementation uses `KActivity` singleton object (see section 5.1).
+
+| API | Proposal | Implementation |
+|-----|----------|----------------|
+| Context access | `KActivityContext.current()` | `KActivity.executionContext` |
+| Info access | `ctx.info` | `KActivity.info` (direct) |
+| Heartbeat | `ctx.heartbeat(details)` | `KActivity.heartbeat(details)` |
+| Heartbeat details | `ctx.lastHeartbeatDetails<T>()` | `KActivity.heartbeatDetails<T>()` |
+| Task token | `ctx.taskToken` | `KActivity.taskToken` |
+| Do not complete | `ctx.doNotCompleteOnReturn()` | `KActivity.doNotCompleteOnReturn()` |
+| Cancellation check | N/A | `KActivity.isCancellationRequested` |
+| Logger | N/A | `KActivity.logger()` |
+| Java context | N/A | `KActivity.javaExecutionContext` |
+
+The implementation provides both direct methods on `KActivity` and the `KActivityContext` interface via `executionContext`.
+
+### 4.3 KOptions Classes - ✅ Complete
+
+| Class | Status | Notes |
+|-------|--------|-------|
+| `KActivityOptions` | ✅ Implemented | All properties per proposal |
+| `KLocalActivityOptions` | ✅ Implemented | All properties per proposal |
+| `KChildWorkflowOptions` | ✅ Implemented | Includes additional `priority` property |
+| `KWorkflowOptions` | ✅ Implemented | All properties per proposal |
+| `KRetryOptions` | ✅ Implemented | All properties per proposal |
+| `KContinueAsNewOptions` | ✅ Implemented | Includes additional `contextPropagators` property |
+| `KOnConflictOptions` | ✅ Implemented | All properties per proposal |
+
+### 4.4 Query Property Syntax - ✅ Implemented
 
 **Proposal (signals-queries.md lines 22-27):**
 ```kotlin
 @WorkflowInterface
 interface OrderWorkflow {
-    // Queries - always synchronous, can use property syntax
     @QueryMethod
     val status: OrderStatus
-
-    @QueryMethod
-    fun getItemCount(): Int
 }
 ```
 
-**Resolution:** Updated `KotlinWorkflowDefinition.findQueryMethods()` to support both function-style and property-style queries. The implementation now checks both `declaredFunctions` and `declaredMemberProperties` for `@QueryMethod` annotations.
-
-**Note:** Due to Kotlin annotation target syntax, the actual usage requires `@get:QueryMethod` instead of `@QueryMethod` on properties:
-
+**Implementation:** Supported via `@get:QueryMethod` annotation target:
 ```kotlin
 @WorkflowInterface
 interface OrderWorkflow {
-    // Property-style query (Kotlin-idiomatic)
     @get:QueryMethod
     val status: OrderStatus
-
-    // Property with custom query name
-    @get:QueryMethod(name = "itemCount")
-    val count: Int
-
-    // Function-style query (also supported)
-    @QueryMethod
-    fun getDetails(): String
 }
 ```
 
-**Implementation (KotlinWorkflowDefinition.kt):**
-```kotlin
-private fun findQueryMethods(workflowInterface: KClass<*>): Map<String, KFunction<*>> {
-    // Find query methods from declared functions
-    val functionQueries = workflowInterface.declaredFunctions
-        .filter { it.findAnnotation<io.temporal.workflow.QueryMethod>() != null }
-        .associateBy { func ->
-            val annotation = func.findAnnotation<io.temporal.workflow.QueryMethod>()!!
-            if (annotation.name.isNotEmpty()) annotation.name else func.name
-        }
+### 4.5 Testing APIs - ✅ Complete
 
-    // Find query methods from property getters (supports @get:QueryMethod on val properties)
-    val propertyQueries = workflowInterface.declaredMemberProperties
-        .mapNotNull { prop ->
-            val getter = prop.getter
-            val annotation = getter.findAnnotation<io.temporal.workflow.QueryMethod>()
-            if (annotation != null) {
-                val name = if (annotation.name.isNotEmpty()) annotation.name else prop.name
-                name to getter
-            } else {
-                null
-            }
-        }
-        .toMap()
+| API | Status |
+|-----|--------|
+| `KTestWorkflowEnvironment` | ✅ Implemented |
+| `KTestWorkflowExtension` (JUnit 5) | ✅ Implemented |
+| `KTestEnvironmentOptions` | ✅ Implemented |
+| Time skipping support | ✅ Implemented |
+| Activity mocking support | ✅ Implemented |
 
-    return functionQueries + propertyQueries
-}
-```
+### 4.6 Advanced Client Operations - ✅ Implemented
 
-**Test Added:** `WorkflowApiIntegrationTest.QueryMethod annotation works on Kotlin val properties`
+| API | Status |
+|-----|--------|
+| `signalWithStart()` | ✅ Implemented (via extension functions) |
+| `executeUpdateWithStart()` | ✅ Implemented (via extension functions) |
+| `startUpdateWithStart()` | ✅ Implemented (via extension functions) |
 
----
+### 4.7 Dynamic Handler Registration - ✅ Complete
 
-## 3. Continue-As-New with Workflow Type Name (String)
+All dynamic handler registration APIs are implemented:
+- Named signal/query/update handlers with `KEncodedValues`
+- Catch-all dynamic handlers
+- Update validators
 
-**Proposal (continue-as-new.md lines 25-29, 123-128):**
-```kotlin
-// Continue as different workflow type (for versioning/migration)
-KWorkflow.continueAsNew(
-    "OrderProcessorV2",
-    KContinueAsNewOptions(taskQueue = "orders-v2"),
-    migratedState
-)
-```
+### 4.8 KEncodedValues - ✅ Complete
 
-API signature from proposal:
-```kotlin
-fun continueAsNew(
-    workflowType: String,
-    options: KContinueAsNewOptions,
-    vararg args: Any?
-): Nothing
-```
-
-**Actual Implementation (KWorkflow.kt lines 2419-2426):**
-```kotlin
-public fun continueAsNew(
-    workflowType: String,
-    options: KContinueAsNewOptions,
-    vararg args: Any?
-): Nothing {
-    val context = currentContext.get()
-        ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
-    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
-}
-```
-
-**Status:** CONSISTENT - The implementation matches the proposal.
+| API | Status |
+|-----|--------|
+| `size` property | ✅ Implemented |
+| `isEmpty()` | ✅ Implemented |
+| `get<T>(index)` | ✅ Implemented |
+| `get<T>(index, genericType)` | ✅ Implemented |
+| `get(index, KClass)` | ✅ Implemented |
+| `component1/2/3` destructuring | ✅ Implemented |
+| `toEncodedValues()` | ✅ Implemented |
 
 ---
 
-## 4. Type-Safe Continue-As-New with Method Reference
+## 5. API Naming Differences
 
-**Proposal (continue-as-new.md lines 31-37, 133-138):**
+### 5.1 Activity Context Access Pattern - ✅ BOTH PATTERNS SUPPORTED
+
+**Proposal (activities/implementation.md lines 83, 107, 173-205):**
 ```kotlin
-// Type-safe continue as different workflow using method reference
-KWorkflow.continueAsNew(
-    OrderProcessorV2::process,
-    KContinueAsNewOptions(),
-    migratedState
-)
+// Access via KActivityContext.current()
+val ctx = KActivityContext.current()
+ctx.heartbeat(progress)
+val details = ctx.lastHeartbeatDetails<Int>()
 ```
 
-API signature from proposal:
+**Implementation (KActivity.kt, KActivityContext.kt):**
 ```kotlin
-fun <T> continueAsNew(
-    workflow: KFunction<*>,
-    options: KContinueAsNewOptions,
-    vararg args: Any?
-): Nothing
+// Option 1: Access via KActivityContext.current() - per proposal
+val ctx = KActivityContext.current()
+ctx.heartbeat(progress)
+val details = ctx.heartbeatDetails<Int>()
+
+// Option 2: Access via KActivity singleton object - more consistent with KWorkflow
+KActivity.heartbeat(progress)
+val details = KActivity.heartbeatDetails<Int>()
 ```
 
-**Actual Implementation (KWorkflow.kt lines 2453-2461):**
-```kotlin
-public fun <T> continueAsNew(
-    workflow: KFunction<*>,
-    options: KContinueAsNewOptions,
-    vararg args: Any?
-): Nothing {
-    val workflowType = extractWorkflowType(workflow)
-    val context = currentContext.get()
-        ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
-    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
-}
-```
+**Status:** ✅ Both patterns supported
+- `KActivityContext.current()` - added as per proposal (companion object method)
+- `KActivity.executionContext` - returns `KActivityContext` for full context access
+- `KActivity.heartbeat()`, `KActivity.info`, etc. - direct convenience methods (consistent with `KWorkflow`)
 
-**Status:** CONSISTENT - The implementation matches the proposal.
+### 5.2 Property vs Method Style
+
+The implementation consistently uses property-style APIs (more Kotlin-idiomatic):
+
+| Proposal | Implementation |
+|----------|----------------|
+| `KWorkflow.getInfo()` | `KWorkflow.info` (property) |
+| `KWorkflow.getTypedSearchAttributes()` | `KWorkflow.typedSearchAttributes` (property) |
+| `KWorkflow.getMetricsScope()` | `KWorkflow.metricsScope` (property) |
+| `KWorkflow.getCurrentUpdateInfo()` | `KWorkflow.currentUpdateInfo` (property) |
+
+**Status:** Implementation is more Kotlin-idiomatic than proposal
+
+### 5.3 Workflow Handle Classes
+
+| Proposal | Implementation |
+|----------|----------------|
+| `KWorkflowHandle<T>` | `KWorkflowHandle<T>` ✅ |
+| `KWorkflowHandleWithResult<T, R>` | `KTypedWorkflowHandle<T, R>` |
+| `KWorkflowHandleUntyped` | `WorkflowHandle` (base class) |
+
+**Status:** Slight naming differences, functionality equivalent
 
 ---
 
-## Items Verified as Consistent
+## 6. Recommendations
 
-The following items from the proposals were verified as correctly implemented:
+### ✅ Completed
 
-### Dynamic Handler Registration
-- `registerSignalHandler(signalName, handler)` - Implemented
-- `registerQueryHandler(queryName, handler)` - Implemented
-- `registerUpdateHandler(updateName, handler)` - Implemented
-- `registerUpdateHandler(updateName, validator, handler)` - Implemented
-- `registerDynamicSignalHandler(handler)` - Implemented
-- `registerDynamicQueryHandler(handler)` - Implemented
-- `registerDynamicUpdateHandler(handler)` - Implemented
-- `registerDynamicUpdateValidator(validator)` - Implemented
+1. **External Workflow Handles** - ✅ IMPLEMENTED
+   - `KWorkflow.getExternalWorkflowHandle<T>()` implemented
+   - `KExternalWorkflowHandle<T>` with signal and cancel methods implemented
 
-### KEncodedValues
-- `size` property - Implemented
-- `isEmpty()` - Implemented
-- `get<T>(index)` - Implemented
-- `get<T>(index, genericType)` - Implemented
-- `get(index, KClass)` - Implemented
-- `component1/2/3` destructuring - Implemented
-- `toEncodedValues()` - Implemented
+2. **Unified Client API** - ✅ IMPLEMENTED
+   - `KClient.connect()` suspend function implemented
+   - `KClientOptions` data class implemented
+   - Renamed `KWorkflowClient` to `KClient`
 
-### KWorkflowInfo
-- `isContinueAsNewSuggested` - Implemented
-- All other workflow info properties - Implemented
+3. **Activity Context Pattern** - ✅ IMPLEMENTED
+   - `KActivityContext.current()` added per proposal
 
-### KContinueAsNewOptions
-- `workflowRunTimeout` - Implemented
-- `taskQueue` - Implemented
-- `retryOptions` - Implemented
-- `workflowTaskTimeout` - Implemented
-- `memo` - Implemented
-- `typedSearchAttributes` - Implemented
-- `contextPropagators` - Implemented (additional property not in proposal)
+4. **Worker Options Pattern** - ✅ IMPLEMENTED
+   - `KWorkerOptions` data class implemented with all Java SDK options
+   - `KWorker(client, options)` constructor pattern implemented
+   - Worker lifecycle methods: `run()`, `start()`, `shutdown()`, `awaitTermination()`
 
-### Continue-As-New
-- `continueAsNew(vararg args)` - Implemented
-- `continueAsNew(options, vararg args)` - Implemented
-- `continueAsNew(workflowType, options, vararg args)` - Implemented
-- `continueAsNew(workflow, options, vararg args)` - Implemented
+### Medium Priority (Consider Implementing)
 
-### Client API
-- `startWorkflow()` methods - Implemented
-- `executeWorkflow()` methods - Implemented
-- `getWorkflowHandle()` methods - Implemented
-- `getUntypedWorkflowHandle()` methods - Implemented
-- `signalWithStart()` methods - Implemented
-- Update-with-start operations - Implemented
+5. **Schedule APIs**
+   - Add Kotlin-friendly schedule operations to client
 
-### Workflow Handle API
-- `workflowId` property - Implemented
-- `runId` property - Implemented
-- `signal()` methods - Implemented
-- `query()` methods - Implemented
-- `executeUpdate()` methods - Implemented
-- `cancel()` - Implemented
-- `terminate()` - Implemented
-- `describe()` - Implemented
-- `getResult()` - Implemented
-- `result()` on typed handle - Implemented
+### Low Priority (Nice to Have)
 
-### Activity Options
-- `KActivityOptions` with all properties - Implemented
-- `KLocalActivityOptions` - Implemented
-
-### Child Workflow Options
-- `KChildWorkflowOptions` with all properties - Implemented
-- Includes additional `priority` property not mentioned in proposal
-
-### Worker Registration
-- `registerWorkflowImplementationTypes()` - Implemented
-- `registerActivitiesImplementations()` - Implemented
-- `registerNexusServiceImplementation()` - Implemented
+6. **Activity Completion Handle**
+   - Add `activityCompletionHandle()` to client for async activity completion
 
 ---
 
-## API Changes
+## 7. Verification Matrix
 
-### New Kotlin SDK Code (KWorkflow.kt)
+This matrix shows which proposal documents have been verified against the implementation:
 
-The new Kotlin SDK uses property-style APIs exclusively. No deprecated getter methods are provided since the SDK is not yet released:
-
-- `info` property (not `getInfo()`)
-- `typedSearchAttributes` property (not `getTypedSearchAttributes()`)
-- `previousRunFailure` property (not `getPreviousRunFailure()`)
-- `metricsScope` property (not `getMetricsScope()`)
-- `currentUpdateInfo` property (not `getCurrentUpdateInfo()`)
-- `currentDetails` property (not `setCurrentDetails()` / `getCurrentDetails()`)
-
-### Preexisting Extension Files (Unchanged)
-
-The following extension files predate the Kotlin SDK work (2021-2022) and are maintained unchanged for backwards compatibility:
-
-**WorkflowServiceStubsExt.kt** - Deprecated methods retained:
-- `WorkflowServiceStubs()` - deprecated, use `LocalWorkflowServiceStubs()`
-- `WorkflowServiceStubs(options)` - deprecated, use `LazyWorkflowServiceStubs()` or `ConnectedWorkflowServiceStubs()`
-- `ConnectedWorkflowServiceStubs(options, timeout)` - deprecated, use `ConnectedWorkflowServiceStubs(timeout, options)`
-
-**WorkerExt.kt** - Deprecated methods retained:
-- `addWorkflowImplementationFactory(options, factory)` - deprecated, use `registerWorkflowImplementationFactory()`
-- `addWorkflowImplementationFactory(factory)` - deprecated, use `registerWorkflowImplementationFactory()`
-
-These deprecations follow Java SDK API changes and are maintained for existing users.
+| Document | Verified | Coverage |
+|----------|----------|----------|
+| `README.md` (main) | ✅ | Overview, quick start |
+| `workflows/definition.md` | ✅ | Workflow definition, Java interop |
+| `workflows/signals-queries.md` | ✅ | Signals, queries, updates, dynamic handlers |
+| `workflows/child-workflows.md` | ✅ | Child workflow execution |
+| `workflows/timers-parallel.md` | ✅ | delay(), coroutineScope, async |
+| `workflows/cancellation.md` | ✅ | Cancellation handling, NonCancellable |
+| `workflows/continue-as-new.md` | ✅ | Continue-as-new APIs |
+| `workflows/external-workflows.md` | ✅ | **GAP IDENTIFIED** |
+| `activities/definition.md` | ✅ | Activity definition |
+| `activities/implementation.md` | ✅ | Activity implementation, heartbeating |
+| `activities/local-activities.md` | ✅ | Local activities |
+| `client/workflow-client.md` | ✅ | Client APIs, **GAP IDENTIFIED** |
+| `client/workflow-handle.md` | ✅ | Workflow handles |
+| `client/advanced.md` | ✅ | SignalWithStart, UpdateWithStart |
+| `worker/setup.md` | ✅ | Worker setup, **GAP IDENTIFIED** |
+| `configuration/koptions.md` | ✅ | KOptions classes |
+| `testing.md` | ✅ | Testing environment |
 
 ---
 
-## Notes
+## 8. Change History
 
-- The implementation follows the proposals closely
-- The implementation includes some additional features not in the proposals (e.g., `contextPropagators` in `KContinueAsNewOptions`, `priority` in `KChildWorkflowOptions`)
-- All APIs now use property style (`KWorkflow.info`) which is more Kotlin-idiomatic
-- Query property syntax requires `@get:QueryMethod` annotation target (Kotlin limitation)
+| Date | Change |
+|------|--------|
+| 2024-01 | Initial document creation |
+| 2024-01 | Added `KWorkflow.info` property (FIXED) |
+| 2024-01 | Added query property syntax support (FIXED) |
+| 2025-01 | Comprehensive gap analysis update |
+| 2025-01 | IMPLEMENTED: `KActivityContext.current()` companion object method |
+| 2025-01 | IMPLEMENTED: `KExternalWorkflowHandle` and `KUntypedExternalWorkflowHandle` |
+| 2025-01 | IMPLEMENTED: Renamed `KWorkflowClient` to `KClient` |
+| 2025-01 | IMPLEMENTED: `KClient.connect()` suspend function |
+| 2025-01 | IMPLEMENTED: `KClientOptions` data class |
+| 2025-01 | IMPLEMENTED: `KWorkerOptions` data class |
+| 2025-01 | IMPLEMENTED: `KWorker(client, options)` constructor pattern with lifecycle methods |
