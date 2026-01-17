@@ -2423,6 +2423,117 @@ public object KWorkflow {
     context.continueAsNew(workflowType, options.toJavaOptions(), *args)
   }
 
+  // ==================== External Workflow Handles ====================
+
+  /**
+   * Gets a typed handle for an external workflow by workflow ID.
+   *
+   * External workflows can be signaled and cancelled, but their results cannot
+   * be awaited from within a workflow (use the client API for that).
+   *
+   * Example:
+   * ```kotlin
+   * val handle = KWorkflow.getExternalWorkflowHandle<OrderWorkflow>("order-123")
+   * handle.signal(OrderWorkflow::updatePriority, Priority.HIGH)
+   * handle.cancel()
+   * ```
+   *
+   * @param T the external workflow interface type
+   * @param workflowId the ID of the external workflow
+   * @return a typed handle for interacting with the external workflow
+   */
+  public inline fun <reified T : Any> getExternalWorkflowHandle(workflowId: String): KExternalWorkflowHandle<T> {
+    return getExternalWorkflowHandle(T::class.java, workflowId)
+  }
+
+  /**
+   * Gets a typed handle for an external workflow by workflow ID and run ID.
+   *
+   * @param T the external workflow interface type
+   * @param workflowId the ID of the external workflow
+   * @param runId the run ID of the specific execution
+   * @return a typed handle for interacting with the external workflow
+   */
+  public inline fun <reified T : Any> getExternalWorkflowHandle(workflowId: String, runId: String): KExternalWorkflowHandle<T> {
+    return getExternalWorkflowHandle(T::class.java, workflowId, runId)
+  }
+
+  /**
+   * Gets a typed handle for an external workflow by workflow ID.
+   *
+   * @param workflowInterface the external workflow interface class
+   * @param workflowId the ID of the external workflow
+   * @return a typed handle for interacting with the external workflow
+   */
+  @PublishedApi
+  internal fun <T : Any> getExternalWorkflowHandle(
+    workflowInterface: Class<T>,
+    workflowId: String
+  ): KExternalWorkflowHandle<T> {
+    val typedStub = Workflow.newExternalWorkflowStub(workflowInterface, workflowId)
+    val untypedStub = io.temporal.workflow.ExternalWorkflowStub.fromTyped(typedStub)
+    return KExternalWorkflowHandle(untypedStub, workflowInterface)
+  }
+
+  /**
+   * Gets a typed handle for an external workflow by workflow ID and run ID.
+   *
+   * @param workflowInterface the external workflow interface class
+   * @param workflowId the ID of the external workflow
+   * @param runId the run ID of the specific execution
+   * @return a typed handle for interacting with the external workflow
+   */
+  @PublishedApi
+  internal fun <T : Any> getExternalWorkflowHandle(
+    workflowInterface: Class<T>,
+    workflowId: String,
+    runId: String
+  ): KExternalWorkflowHandle<T> {
+    val execution = io.temporal.api.common.v1.WorkflowExecution.newBuilder()
+      .setWorkflowId(workflowId)
+      .setRunId(runId)
+      .build()
+    val typedStub = Workflow.newExternalWorkflowStub(workflowInterface, execution)
+    val untypedStub = io.temporal.workflow.ExternalWorkflowStub.fromTyped(typedStub)
+    return KExternalWorkflowHandle(untypedStub, workflowInterface)
+  }
+
+  /**
+   * Gets an untyped handle for an external workflow by workflow ID.
+   *
+   * Use this when the workflow type is not known at compile time.
+   *
+   * Example:
+   * ```kotlin
+   * val handle = KWorkflow.getExternalWorkflowHandle("order-123")
+   * handle.signal("updatePriority", Priority.HIGH)
+   * handle.cancel()
+   * ```
+   *
+   * @param workflowId the ID of the external workflow
+   * @return an untyped handle for interacting with the external workflow
+   */
+  public fun getExternalWorkflowHandle(workflowId: String): KUntypedExternalWorkflowHandle {
+    val stub = Workflow.newUntypedExternalWorkflowStub(workflowId)
+    return KUntypedExternalWorkflowHandle(stub)
+  }
+
+  /**
+   * Gets an untyped handle for an external workflow by workflow ID and run ID.
+   *
+   * @param workflowId the ID of the external workflow
+   * @param runId the run ID of the specific execution
+   * @return an untyped handle for interacting with the external workflow
+   */
+  public fun getExternalWorkflowHandle(workflowId: String, runId: String): KUntypedExternalWorkflowHandle {
+    val execution = io.temporal.api.common.v1.WorkflowExecution.newBuilder()
+      .setWorkflowId(workflowId)
+      .setRunId(runId)
+      .build()
+    val stub = Workflow.newUntypedExternalWorkflowStub(execution)
+    return KUntypedExternalWorkflowHandle(stub)
+  }
+
   // ==================== Internal Helper Functions ====================
 
   /**
