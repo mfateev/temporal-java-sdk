@@ -24,7 +24,7 @@ import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
 import io.temporal.activity.ActivityOptions
 import io.temporal.api.enums.v1.IndexedValueType
-import io.temporal.kotlin.client.KWorkflowClient
+import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.workflow.Workflow
@@ -150,7 +150,7 @@ class KTestWorkflowExtensionIntegrationTest {
     }
 
     @Test
-    fun `inject KWorkflowClient`(client: KWorkflowClient) {
+    fun `inject KClient`(client: KClient) {
         assertNotNull(client)
         assertNotNull(client.workflowClient)
     }
@@ -171,7 +171,7 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `inject multiple parameters`(
         testEnv: KTestWorkflowEnvironment,
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) {
         assertNotNull(testEnv)
@@ -183,7 +183,7 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `execute simple workflow via method reference`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         val result = client.executeWorkflow(
@@ -196,7 +196,7 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `execute workflow with different input`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         val result = client.executeWorkflow(
@@ -211,7 +211,7 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `timer workflow completes quickly with time skipping`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         val startTime = System.currentTimeMillis()
@@ -232,7 +232,7 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `workflow with activity executes correctly`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         GreetingActivitiesImpl.executionCount.set(0)
@@ -277,7 +277,7 @@ class KTestWorkflowExtensionIntegrationTest {
 
     @Test
     fun `each test gets isolated environment`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         val result = client.executeWorkflow(
@@ -335,7 +335,7 @@ class KTestWorkflowExtensionNamespaceTest {
 
     @Test
     fun `workflow executes in custom namespace`(
-        client: KWorkflowClient,
+        client: KClient,
         options: KWorkflowOptions,
     ) = runTest {
         val result = client.executeWorkflow(

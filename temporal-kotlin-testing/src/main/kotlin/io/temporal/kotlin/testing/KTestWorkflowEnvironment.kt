@@ -25,7 +25,7 @@ package io.temporal.kotlin.testing
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
 import io.temporal.kotlin.activity.KActivityRegistry
-import io.temporal.kotlin.client.KWorkflowClient
+import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.serviceclient.OperatorServiceStubs
@@ -156,8 +156,8 @@ public class KTestWorkflowEnvironment private constructor(
      * )
      * ```
      */
-    public val workflowClient: KWorkflowClient by lazy {
-        KWorkflowClient(testEnvironment.workflowClient)
+    public val workflowClient: KClient by lazy {
+        KClient(testEnvironment.workflowClient)
     }
 
     /**

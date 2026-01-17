@@ -134,8 +134,8 @@ class UpdateWithStartTest {
     )
   }
 
-  private fun createKWorkflowClient(): KWorkflowClient {
-    return KWorkflowClient(testWorkflowRule.workflowClient)
+  private fun createKClient(): KClient {
+    return KClient(testWorkflowRule.workflowClient)
   }
 
   // ==================== Tests ====================
@@ -143,7 +143,7 @@ class UpdateWithStartTest {
   @Test
   fun `executeUpdateWithStart - no workflow args - no update args`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -165,7 +165,7 @@ class UpdateWithStartTest {
   @Test
   fun `startUpdateWithStart - returns handle to track update`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -191,7 +191,7 @@ class UpdateWithStartTest {
   @Test
   fun `executeUpdateWithStart - workflow with args`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowWithArgsImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -219,7 +219,7 @@ class UpdateWithStartTest {
   @Test
   fun `executeUpdateWithStart - update with multiple args`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowWithArgsImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -248,7 +248,7 @@ class UpdateWithStartTest {
   @Test
   fun `startUpdateWithStart - with custom updateId`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val customUpdateId = "my-custom-update-id-${UUID.randomUUID()}"
@@ -276,7 +276,7 @@ class UpdateWithStartTest {
   @Test
   fun `fail when start operation is reused`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -309,7 +309,7 @@ class UpdateWithStartTest {
   @Test
   fun `fail when waitForStage is ADMITTED`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
 
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
@@ -337,7 +337,7 @@ class UpdateWithStartTest {
   @Test
   fun `update with start - send to existing workflow with USE_EXISTING policy`() {
     setupKotlinWorkflows(UpdateWithStartWorkflowImpl::class.java)
-    val client = createKWorkflowClient()
+    val client = createKClient()
     val workflowId = UUID.randomUUID().toString()
 
     runBlocking {

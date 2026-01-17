@@ -33,7 +33,7 @@ import io.temporal.common.SearchAttributeKey
 import io.temporal.common.WorkflowExecutionHistory
 import io.temporal.common.interceptors.WorkerInterceptor
 import io.temporal.kotlin.TemporalDsl
-import io.temporal.kotlin.client.KWorkflowClient
+import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.kotlin.worker.KotlinPlugin
@@ -62,7 +62,7 @@ import kotlin.reflect.KClass
  * Provides:
  * - DSL-style builder pattern with Kotlin properties
  * - [KWorker] for registering suspend workflows and activities
- * - [KWorkflowClient] for executing workflows via method references
+ * - [KClient] for executing workflows via method references
  * - Automatic [KotlinPlugin] configuration for suspend workflow support
  * - History access and test utilities
  *
@@ -118,8 +118,8 @@ public class KSDKTestWorkflowRule private constructor(
   }
 
   /** Kotlin workflow client with suspend functions and type-safe APIs. */
-  public val kWorkflowClient: KWorkflowClient by lazy {
-    KWorkflowClient(delegate.workflowClient)
+  public val kClient: KClient by lazy {
+    KClient(delegate.workflowClient)
   }
 
   /**

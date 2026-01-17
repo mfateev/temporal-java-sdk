@@ -33,7 +33,7 @@ import org.junit.Test
 
 /**
  * Tests for [KSDKTestWorkflowRule] verifying the Kotlin DSL builder and
- * idiomatic Kotlin workflow execution using [io.temporal.kotlin.client.KWorkflowClient].
+ * idiomatic Kotlin workflow execution using [io.temporal.kotlin.client.KClient].
  */
 class KSDKTestWorkflowRuleTest {
 
@@ -88,7 +88,7 @@ class KSDKTestWorkflowRuleTest {
     // Verify the rule is properly initialized
     assertNotNull(testRule.taskQueue)
     assertNotNull(testRule.kWorker)
-    assertNotNull(testRule.kWorkflowClient)
+    assertNotNull(testRule.kClient)
   }
 
   @Test
@@ -98,15 +98,15 @@ class KSDKTestWorkflowRuleTest {
   }
 
   @Test
-  fun `kWorkflowClient property provides KWorkflowClient instance`() {
-    val kClient = testRule.kWorkflowClient
+  fun `kClient property provides KClient instance`() {
+    val kClient = testRule.kClient
     assertNotNull(kClient)
     assertNotNull(kClient.workflowClient)
   }
 
   @Test
   fun `workflow execution via method reference`() = runBlocking {
-    val result = testRule.kWorkflowClient.executeWorkflow(
+    val result = testRule.kClient.executeWorkflow(
       GreetingWorkflow::greet,
       KWorkflowOptions(
         workflowId = "greeting-test-${System.currentTimeMillis()}",
@@ -125,7 +125,7 @@ class KSDKTestWorkflowRuleTest {
     }
     // Note: We can't use a different rule in the same test class easily,
     // so we test with the greeting workflow instead
-    val result = testRule.kWorkflowClient.executeWorkflow(
+    val result = testRule.kClient.executeWorkflow(
       GreetingWorkflow::greet,
       KWorkflowOptions(
         workflowId = "greeting-multi-${System.currentTimeMillis()}",
@@ -170,7 +170,7 @@ class KSDKTestWorkflowRuleMultipleWorkflowsTest {
 
   @Test
   fun `multiple workflow types can be registered and executed`() = runBlocking {
-    val resultA = testRule.kWorkflowClient.executeWorkflow(
+    val resultA = testRule.kClient.executeWorkflow(
       WorkflowA::executeA,
       KWorkflowOptions(
         workflowId = "workflow-a-${System.currentTimeMillis()}",
@@ -178,7 +178,7 @@ class KSDKTestWorkflowRuleMultipleWorkflowsTest {
       )
     )
 
-    val resultB = testRule.kWorkflowClient.executeWorkflow(
+    val resultB = testRule.kClient.executeWorkflow(
       WorkflowB::executeB,
       KWorkflowOptions(
         workflowId = "workflow-b-${System.currentTimeMillis()}",
@@ -227,7 +227,7 @@ class KSDKTestWorkflowRuleWithActivitiesTest {
 
   @Test
   fun `workflow and activity implementations can be registered together`() = runBlocking {
-    val result = testRule.kWorkflowClient.executeWorkflow(
+    val result = testRule.kClient.executeWorkflow(
       EchoWorkflow::execute,
       KWorkflowOptions(
         workflowId = "echo-${System.currentTimeMillis()}",
@@ -279,7 +279,7 @@ class KSDKTestWorkflowRuleUtilitiesTest {
   fun `getExecutionHistory returns workflow history`() = runBlocking {
     val workflowId = "test-workflow-history-${System.currentTimeMillis()}"
 
-    testRule.kWorkflowClient.executeWorkflow(
+    testRule.kClient.executeWorkflow(
       SimpleWorkflow::execute,
       KWorkflowOptions(
         workflowId = workflowId,
