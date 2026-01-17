@@ -25,14 +25,14 @@ import org.slf4j.Logger
 /**
  * Context object passed to an Activity implementation.
  *
- * Use [KActivity.executionContext] from an activity implementation to access.
+ * Use [KActivityContext.current] from an activity implementation to access.
  * This matches Java SDK's [io.temporal.activity.ActivityExecutionContext] pattern.
  *
  * Example (regular activity):
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val context = KActivity.executionContext
+ *     val context = KActivityContext.current()
  *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
@@ -51,7 +51,7 @@ import org.slf4j.Logger
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val context = KActivity.executionContext
+ *     val context = KActivityContext.current()
  *     println("Fetching in activity ${context.info.activityId}")
  *
  *     for (i in 1..10) {
@@ -65,6 +65,20 @@ import org.slf4j.Logger
  * ```
  */
 public interface KActivityContext {
+
+  public companion object {
+    /**
+     * Returns the current activity context.
+     *
+     * This is the primary entry point for accessing activity APIs from within
+     * activity code. Works in both regular and suspend activities.
+     *
+     * @return the current activity context
+     * @throws IllegalStateException if called outside of activity code
+     */
+    @JvmStatic
+    public fun current(): KActivityContext = KActivity.executionContext
+  }
 
   /**
    * Information about the Activity Execution and the Workflow Execution that invoked it.
