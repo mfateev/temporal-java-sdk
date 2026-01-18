@@ -1633,4 +1633,33 @@ public class KClient(
       }
     }
   }.flowOn(Dispatchers.IO)
+
+  // ========== Activity Completion APIs ==========
+
+  /**
+   * Creates a new activity completion client for completing activities asynchronously.
+   *
+   * Use this when activities call `doNotCompleteOnReturn()` and need to be
+   * completed from outside the activity execution context.
+   *
+   * Example:
+   * ```kotlin
+   * val completionClient = client.newActivityCompletionClient()
+   *
+   * // Complete by task token
+   * completionClient.complete(taskToken, result)
+   *
+   * // Or get a handle for repeated operations
+   * val handle = completionClient.forTaskToken(taskToken)
+   * handle.heartbeat("progress")
+   * handle.complete(result)
+   * ```
+   *
+   * @return A new activity completion client.
+   * @see KActivityCompletionClient
+   * @see KActivityCompletionHandle
+   */
+  public fun newActivityCompletionClient(): KActivityCompletionClient {
+    return KActivityCompletionClient(workflowClient.newActivityCompletionClient())
+  }
 }
