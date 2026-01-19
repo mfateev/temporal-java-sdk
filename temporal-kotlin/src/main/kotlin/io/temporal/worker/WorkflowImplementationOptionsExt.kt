@@ -63,10 +63,10 @@ inline fun @TemporalDsl WorkflowImplementationOptions.Builder.setDefaultActivity
  * val options = WorkflowImplementationOptions {
  *   // ...
  *   setLocalActivityOptions(
- *     localActivityName(Activity1::method1) to LocalActivityOptions {
+ *     activityName(Activity1::method1) to LocalActivityOptions {
  *       // options for local activity method1
  *     },
- *     localActivityName(Activity2::method2) to LocalActivityOptions {
+ *     activityName(Activity2::method2) to LocalActivityOptions {
  *       // options for local activity method2
  *     },
  *   )

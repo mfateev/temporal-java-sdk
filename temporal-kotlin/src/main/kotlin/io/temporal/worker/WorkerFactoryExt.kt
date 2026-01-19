@@ -16,7 +16,7 @@ fun WorkerFactory(
 /**
  * @see WorkerFactory
  */
-fun WorkerFactory(
+inline fun WorkerFactory(
   workflowClient: WorkflowClient,
   options: @TemporalDsl WorkerFactoryOptions.Builder.() -> Unit
 ): WorkerFactory {
