@@ -14,7 +14,8 @@ This document provides a comprehensive analysis comparing the API specification 
 | **Testing APIs** | ✅ Complete | `KTestWorkflowEnvironment` implemented |
 | **Options Classes** | ✅ Complete | All KOptions data classes implemented |
 | **Dynamic Handlers** | ✅ Complete | All dynamic handler registration APIs implemented |
-| **Schedules** | ❌ Missing | No schedule APIs implemented |
+| **Schedules** | ✅ Complete | Full `KSchedule*` API suite implemented |
+| **Activity Completion** | ✅ Complete | `KActivityCompletionClient` implemented |
 
 ---
 
@@ -81,7 +82,7 @@ data class KClientOptions(
 
 **Status:** ✅ Fully implemented with all options from Java SDK
 
-### 1.3 Missing Schedule APIs
+### 1.3 Schedule APIs - ✅ IMPLEMENTED
 
 **Proposal (workflow-client.md lines 101-118):**
 ```kotlin
@@ -91,20 +92,66 @@ fun scheduleHandle(scheduleId: String): KScheduleHandle
 fun listSchedules(): Flow<KScheduleListEntry>
 ```
 
-**Implementation:** Not implemented.
+**Implementation (KClient.kt, client/schedules/*.kt):**
+```kotlin
+// Full schedule API suite implemented
+val handle = client.createSchedule(
+    "my-schedule",
+    KSchedule(
+        action = KScheduleActionStartWorkflow(...),
+        spec = KScheduleSpec(intervals = listOf(KScheduleIntervalSpec(every = 1.hours)))
+    )
+)
 
-**Impact:** Medium - Users must use Java SDK directly for schedules
+// Schedule handle operations
+val handle = client.getScheduleHandle("my-schedule")
+handle.describe()
+handle.update { ... }
+handle.pause()
+handle.unpause()
+handle.trigger()
+handle.delete()
+handle.backfill(...)
 
-### 1.4 Missing Activity Completion Handle
+// List schedules
+client.listSchedules().collect { entry -> ... }
+```
+
+**Status:** ✅ Fully implemented with comprehensive `KSchedule*` data classes:
+- `KSchedule`, `KScheduleOptions`, `KScheduleHandle`
+- `KScheduleSpec`, `KScheduleIntervalSpec`, `KScheduleCalendarSpec`
+- `KScheduleState`, `KSchedulePolicy`, `KScheduleInfo`
+- `KScheduleAction`, `KScheduleActionStartWorkflow`
+- `KScheduleDescription`, `KScheduleUpdate`, `KScheduleBackfill`
+- List/describe response types
+
+### 1.4 Activity Completion Client - ✅ IMPLEMENTED
 
 **Proposal (workflow-client.md lines 125-126):**
 ```kotlin
 fun activityCompletionHandle(taskToken: ByteArray): KActivityCompletionHandle
 ```
 
-**Implementation:** Not implemented. Available via Java SDK's `ActivityCompletionClient`.
+**Implementation (KActivityCompletionClient.kt, KActivityCompletionHandle.kt):**
+```kotlin
+// Get completion client from KClient
+val completionClient = client.activityCompletionClient()
 
-**Impact:** Low - Available via Java interop
+// Complete by task token
+completionClient.complete(taskToken, result)
+completionClient.completeExceptionally(taskToken, exception)
+completionClient.reportCancellation(taskToken, details)
+completionClient.heartbeat(taskToken, details)
+
+// Or use handle pattern
+val handle = completionClient.getHandle(taskToken)
+handle.complete(result)
+handle.fail(exception)
+handle.reportCancellation(details)
+handle.heartbeat(details)
+```
+
+**Status:** ✅ Fully implemented for async activity completion
 
 ---
 
@@ -424,15 +471,19 @@ The implementation consistently uses property-style APIs (more Kotlin-idiomatic)
    - `KWorker(client, options)` constructor pattern implemented
    - Worker lifecycle methods: `run()`, `start()`, `shutdown()`, `awaitTermination()`
 
-### Medium Priority (Consider Implementing)
+5. **Schedule APIs** - ✅ IMPLEMENTED
+   - Full `KSchedule*` API suite with all schedule operations
+   - Kotlin data classes for all schedule types
+   - `KScheduleHandle` with describe, update, pause, trigger, delete, backfill
 
-5. **Schedule APIs**
-   - Add Kotlin-friendly schedule operations to client
+6. **Activity Completion Client** - ✅ IMPLEMENTED
+   - `KActivityCompletionClient` for async activity completion
+   - `KActivityCompletionHandle` for handle-based operations
+   - Support for complete, fail, cancel, and heartbeat operations
 
-### Low Priority (Nice to Have)
+### All Proposal Gaps Closed
 
-6. **Activity Completion Handle**
-   - Add `activityCompletionHandle()` to client for async activity completion
+The Kotlin SDK now has **full feature parity** with the proposal specification.
 
 ---
 
@@ -449,14 +500,14 @@ This matrix shows which proposal documents have been verified against the implem
 | `workflows/timers-parallel.md` | ✅ | delay(), coroutineScope, async |
 | `workflows/cancellation.md` | ✅ | Cancellation handling, NonCancellable |
 | `workflows/continue-as-new.md` | ✅ | Continue-as-new APIs |
-| `workflows/external-workflows.md` | ✅ | **GAP IDENTIFIED** |
+| `workflows/external-workflows.md` | ✅ | External workflow handles |
 | `activities/definition.md` | ✅ | Activity definition |
 | `activities/implementation.md` | ✅ | Activity implementation, heartbeating |
 | `activities/local-activities.md` | ✅ | Local activities |
-| `client/workflow-client.md` | ✅ | Client APIs, **GAP IDENTIFIED** |
+| `client/workflow-client.md` | ✅ | Client APIs, schedules, activity completion |
 | `client/workflow-handle.md` | ✅ | Workflow handles |
 | `client/advanced.md` | ✅ | SignalWithStart, UpdateWithStart |
-| `worker/setup.md` | ✅ | Worker setup, **GAP IDENTIFIED** |
+| `worker/setup.md` | ✅ | Worker setup and options |
 | `configuration/koptions.md` | ✅ | KOptions classes |
 | `testing.md` | ✅ | Testing environment |
 
@@ -477,3 +528,6 @@ This matrix shows which proposal documents have been verified against the implem
 | 2025-01 | IMPLEMENTED: `KClientOptions` data class |
 | 2025-01 | IMPLEMENTED: `KWorkerOptions` data class |
 | 2025-01 | IMPLEMENTED: `KWorker(client, options)` constructor pattern with lifecycle methods |
+| 2025-01 | IMPLEMENTED: Schedule APIs - full `KSchedule*` suite |
+| 2025-01 | IMPLEMENTED: `KActivityCompletionClient` for async activity completion |
+| 2025-01 | ALL GAPS CLOSED - Full feature parity with proposal |
