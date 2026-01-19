@@ -25,6 +25,7 @@ package io.temporal.kotlin.client
 import io.temporal.api.enums.v1.WorkflowIdConflictPolicy
 import io.temporal.client.WorkflowUpdateStage
 import io.temporal.common.converter.DataConverter
+import io.temporal.kotlin.common.kargs
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
@@ -153,8 +154,8 @@ class UpdateWithStartTest {
 
       val updateResult = client.executeUpdateWithStart(
         UpdateWithStartWorkflow::updateValue,
-        KUpdateWithStartOptions(startWorkflowOperation = startOp),
-        "hello"
+        "hello",
+        KUpdateWithStartOptions(startWorkflowOperation = startOp)
       )
 
       assertEquals("updated:hello", updateResult)
@@ -175,11 +176,11 @@ class UpdateWithStartTest {
 
       val updateHandle = client.startUpdateWithStart(
         UpdateWithStartWorkflow::updateValue,
+        "world",
         KUpdateWithStartOptions(
           startWorkflowOperation = startOp,
           waitForStage = WorkflowUpdateStage.ACCEPTED
-        ),
-        "world"
+        )
       )
 
       val updateResult = updateHandle.result()
@@ -196,14 +197,14 @@ class UpdateWithStartTest {
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflowWithArgs::execute,
-        createWorkflowOptions(),
-        "startValue"
+        "startValue",
+        createWorkflowOptions()
       )
 
       val updateResult = client.executeUpdateWithStart(
         UpdateWithStartWorkflowWithArgs::updateValue,
-        KUpdateWithStartOptions(startWorkflowOperation = startOp),
-        "newValue"
+        "newValue",
+        KUpdateWithStartOptions(startWorkflowOperation = startOp)
       )
 
       assertEquals("updated:newValue", updateResult)
@@ -224,15 +225,14 @@ class UpdateWithStartTest {
     runBlocking {
       val startOp = client.newWithStartWorkflowOperation(
         UpdateWithStartWorkflowWithArgs::execute,
-        createWorkflowOptions(),
-        "initial"
+        "initial",
+        createWorkflowOptions()
       )
 
       val updateResult = client.executeUpdateWithStart(
         UpdateWithStartWorkflowWithArgs::updateMultipleValues,
-        KUpdateWithStartOptions(startWorkflowOperation = startOp),
-        "value",
-        42
+        kargs("value", 42),
+        KUpdateWithStartOptions(startWorkflowOperation = startOp)
       )
 
       assertEquals("updated:value-42", updateResult)
@@ -259,12 +259,12 @@ class UpdateWithStartTest {
 
       val updateHandle = client.startUpdateWithStart(
         UpdateWithStartWorkflow::updateValue,
+        "test",
         KUpdateWithStartOptions(
           startWorkflowOperation = startOp,
           waitForStage = WorkflowUpdateStage.ACCEPTED,
           updateId = customUpdateId
-        ),
-        "test"
+        )
       )
 
       assertEquals(customUpdateId, updateHandle.updateId)
@@ -287,8 +287,8 @@ class UpdateWithStartTest {
       // First use should succeed
       client.executeUpdateWithStart(
         UpdateWithStartWorkflow::updateValue,
-        KUpdateWithStartOptions(startWorkflowOperation = startOp),
-        "first"
+        "first",
+        KUpdateWithStartOptions(startWorkflowOperation = startOp)
       )
 
       // Second use should fail
@@ -296,8 +296,8 @@ class UpdateWithStartTest {
         runBlocking {
           client.executeUpdateWithStart(
             UpdateWithStartWorkflow::updateValue,
-            KUpdateWithStartOptions(startWorkflowOperation = startOp),
-            "second"
+            "second",
+            KUpdateWithStartOptions(startWorkflowOperation = startOp)
           )
         }
       }
@@ -321,11 +321,11 @@ class UpdateWithStartTest {
         runBlocking {
           client.startUpdateWithStart(
             UpdateWithStartWorkflow::updateValue,
+            "test",
             KUpdateWithStartOptions(
               startWorkflowOperation = startOp,
               waitForStage = WorkflowUpdateStage.ADMITTED // Not allowed
-            ),
-            "test"
+            )
           )
         }
       }
@@ -353,8 +353,8 @@ class UpdateWithStartTest {
 
       client.executeUpdateWithStart(
         UpdateWithStartWorkflow::updateValue,
-        KUpdateWithStartOptions(startWorkflowOperation = startOp1),
-        "first"
+        "first",
+        KUpdateWithStartOptions(startWorkflowOperation = startOp1)
       )
 
       // Now try to send update-with-start to the same workflow ID with USE_EXISTING

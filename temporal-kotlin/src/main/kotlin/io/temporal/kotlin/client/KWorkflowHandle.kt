@@ -24,6 +24,11 @@ import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.client.WorkflowStub
 import io.temporal.client.WorkflowUpdateHandle
 import io.temporal.kotlin.TemporalDsl
+import io.temporal.kotlin.common.KArgs2
+import io.temporal.kotlin.common.KArgs3
+import io.temporal.kotlin.common.KArgs4
+import io.temporal.kotlin.common.KArgs5
+import io.temporal.kotlin.common.KArgs6
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.UpdateMethod
@@ -35,6 +40,11 @@ import java.util.concurrent.TimeUnit
 import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
 import kotlin.reflect.KFunction2
+import kotlin.reflect.KFunction3
+import kotlin.reflect.KFunction4
+import kotlin.reflect.KFunction5
+import kotlin.reflect.KFunction6
+import kotlin.reflect.KFunction7
 import kotlin.reflect.jvm.javaMethod
 
 // TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
@@ -257,6 +267,58 @@ public open class KWorkflowHandle<T>(
   }
 
   /**
+   * Sends a signal with two arguments to the workflow.
+   */
+  public suspend fun <A1, A2> signal(signal: KFunction3<T, A1, A2, Unit>, args: KArgs2<A1, A2>) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2)
+  }
+
+  /**
+   * Sends a signal with three arguments to the workflow.
+   */
+  public suspend fun <A1, A2, A3> signal(
+    signal: KFunction4<T, A1, A2, A3, Unit>,
+    args: KArgs3<A1, A2, A3>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3)
+  }
+
+  /**
+   * Sends a signal with four arguments to the workflow.
+   */
+  public suspend fun <A1, A2, A3, A4> signal(
+    signal: KFunction5<T, A1, A2, A3, A4, Unit>,
+    args: KArgs4<A1, A2, A3, A4>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4)
+  }
+
+  /**
+   * Sends a signal with five arguments to the workflow.
+   */
+  public suspend fun <A1, A2, A3, A4, A5> signal(
+    signal: KFunction6<T, A1, A2, A3, A4, A5, Unit>,
+    args: KArgs5<A1, A2, A3, A4, A5>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5)
+  }
+
+  /**
+   * Sends a signal with six arguments to the workflow.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, A6> signal(
+    signal: KFunction7<T, A1, A2, A3, A4, A5, A6, Unit>,
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+  }
+
+  /**
    * Queries the workflow using a method reference.
    *
    * Example:
@@ -283,6 +345,66 @@ public open class KWorkflowHandle<T>(
   }
 
   /**
+   * Queries the workflow with two arguments.
+   */
+  public suspend fun <A1, A2, R> query(
+    query: KFunction3<T, A1, A2, R>,
+    args: KArgs2<A1, A2>
+  ): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, args.a1, args.a2)
+  }
+
+  /**
+   * Queries the workflow with three arguments.
+   */
+  public suspend fun <A1, A2, A3, R> query(
+    query: KFunction4<T, A1, A2, A3, R>,
+    args: KArgs3<A1, A2, A3>
+  ): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, args.a1, args.a2, args.a3)
+  }
+
+  /**
+   * Queries the workflow with four arguments.
+   */
+  public suspend fun <A1, A2, A3, A4, R> query(
+    query: KFunction5<T, A1, A2, A3, A4, R>,
+    args: KArgs4<A1, A2, A3, A4>
+  ): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4)
+  }
+
+  /**
+   * Queries the workflow with five arguments.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, R> query(
+    query: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    args: KArgs5<A1, A2, A3, A4, A5>
+  ): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5)
+  }
+
+  /**
+   * Queries the workflow with six arguments.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, A6, R> query(
+    query: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
+  ): R {
+    val (queryName, resultClass) = extractQueryMetadata(query)
+    @Suppress("UNCHECKED_CAST")
+    return query(queryName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+  }
+
+  /**
    * Executes an update on the workflow and waits for the result.
    *
    * @param update the update method reference
@@ -301,6 +423,66 @@ public open class KWorkflowHandle<T>(
     val (updateName, resultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
     return executeUpdate(updateName, resultClass as Class<R>, arg)
+  }
+
+  /**
+   * Executes an update with two arguments and waits for the result.
+   */
+  public suspend fun <A1, A2, R> executeUpdate(
+    update: KFunction3<T, A1, A2, R>,
+    args: KArgs2<A1, A2>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2)
+  }
+
+  /**
+   * Executes an update with three arguments and waits for the result.
+   */
+  public suspend fun <A1, A2, A3, R> executeUpdate(
+    update: KFunction4<T, A1, A2, A3, R>,
+    args: KArgs3<A1, A2, A3>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3)
+  }
+
+  /**
+   * Executes an update with four arguments and waits for the result.
+   */
+  public suspend fun <A1, A2, A3, A4, R> executeUpdate(
+    update: KFunction5<T, A1, A2, A3, A4, R>,
+    args: KArgs4<A1, A2, A3, A4>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4)
+  }
+
+  /**
+   * Executes an update with five arguments and waits for the result.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, R> executeUpdate(
+    update: KFunction6<T, A1, A2, A3, A4, A5, R>,
+    args: KArgs5<A1, A2, A3, A4, A5>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5)
+  }
+
+  /**
+   * Executes an update with six arguments and waits for the result.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, A6, R> executeUpdate(
+    update: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   private fun extractSignalName(signal: KFunction<*>): String {

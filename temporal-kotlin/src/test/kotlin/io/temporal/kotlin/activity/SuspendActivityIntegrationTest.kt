@@ -30,6 +30,7 @@ import io.temporal.common.converter.DefaultDataConverter
 import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.common.kargs
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
@@ -228,7 +229,7 @@ class SuspendActivityIntegrationTest {
 
     override suspend fun runGreet(name: String): String {
       // Use method reference - tests activity type name derivation
-      return KWorkflow.executeActivity(SuspendActivities::greet, options, name)
+      return KWorkflow.executeActivity(SuspendActivities::greet, name, options)
     }
   }
 
@@ -236,7 +237,7 @@ class SuspendActivityIntegrationTest {
     private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
 
     override suspend fun runAdd(a: Int, b: Int): Int {
-      return KWorkflow.executeActivity(SuspendActivities::add, options, a, b)
+      return KWorkflow.executeActivity(SuspendActivities::add, kargs(a, b), options)
     }
   }
 
@@ -244,7 +245,7 @@ class SuspendActivityIntegrationTest {
     private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
 
     override suspend fun runDelay(input: String, delayMs: Long): String {
-      return KWorkflow.executeActivity(SuspendActivities::processWithDelay, options, input, delayMs)
+      return KWorkflow.executeActivity(SuspendActivities::processWithDelay, kargs(input, delayMs), options)
     }
   }
 
@@ -252,7 +253,7 @@ class SuspendActivityIntegrationTest {
     private val options = KActivityOptions(startToCloseTimeout = 1.minutes)
 
     override suspend fun runNoReturn(message: String): String {
-      KWorkflow.executeActivity(SuspendActivities::noReturnValue, options, message)
+      KWorkflow.executeActivity(SuspendActivities::noReturnValue, message, options)
       return "completed"
     }
   }
@@ -265,7 +266,7 @@ class SuspendActivityIntegrationTest {
 
     override suspend fun runError(message: String): String {
       return try {
-        KWorkflow.executeActivity(SuspendActivities::throwError, options, message)
+        KWorkflow.executeActivity(SuspendActivities::throwError, message, options)
       } catch (e: Exception) {
         // Exception chain: ActivityFailure -> ApplicationFailure -> original message
         // Traverse the chain to find the original message
@@ -285,10 +286,10 @@ class SuspendActivityIntegrationTest {
 
     override suspend fun runMixed(name: String): String {
       // Call suspend activity via method reference
-      val suspendResult = KWorkflow.executeActivity(SuspendActivities::greet, options, name)
+      val suspendResult = KWorkflow.executeActivity(SuspendActivities::greet, name, options)
 
       // Call regular (non-suspend) activity via method reference
-      val regularResult = KWorkflow.executeActivity(RegularActivities::regularGreet, options, name)
+      val regularResult = KWorkflow.executeActivity(RegularActivities::regularGreet, name, options)
       return "$suspendResult | $regularResult"
     }
   }
@@ -300,7 +301,7 @@ class SuspendActivityIntegrationTest {
     )
 
     override suspend fun runHeartbeat(items: Int): Int {
-      return KWorkflow.executeActivity(HeartbeatActivities::processWithHeartbeat, options, items)
+      return KWorkflow.executeActivity(HeartbeatActivities::processWithHeartbeat, items, options)
     }
   }
 
@@ -309,7 +310,7 @@ class SuspendActivityIntegrationTest {
 
     override suspend fun runExplicitName(name: String): String {
       // Tests that @ActivityMethod(name = "CustomGreet") is respected
-      return KWorkflow.executeActivity(ExplicitNameActivities::greet, options, name)
+      return KWorkflow.executeActivity(ExplicitNameActivities::greet, name, options)
     }
   }
 

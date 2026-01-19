@@ -24,6 +24,11 @@ import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttribut
 import io.temporal.api.common.v1.Payloads
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.common.converter.DataConverter
+import io.temporal.kotlin.common.KArgs2
+import io.temporal.kotlin.common.KArgs3
+import io.temporal.kotlin.common.KArgs4
+import io.temporal.kotlin.common.KArgs5
+import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.workflow.SignalMethod
@@ -34,6 +39,11 @@ import kotlin.coroutines.resumeWithException
 import kotlin.reflect.KFunction
 import kotlin.reflect.KFunction1
 import kotlin.reflect.KFunction2
+import kotlin.reflect.KFunction3
+import kotlin.reflect.KFunction4
+import kotlin.reflect.KFunction5
+import kotlin.reflect.KFunction6
+import kotlin.reflect.KFunction7
 import kotlin.reflect.jvm.javaMethod
 
 /**
@@ -113,6 +123,58 @@ public class KChildWorkflowHandle<T, R> @InternalTemporalApi internal constructo
   public suspend fun <A> signal(signal: KFunction2<T, A, Unit>, arg: A) {
     val signalName = extractSignalName(signal)
     signal(signalName, arg)
+  }
+
+  /**
+   * Sends a signal with two arguments to the child workflow.
+   */
+  public suspend fun <A1, A2> signal(signal: KFunction3<T, A1, A2, Unit>, args: KArgs2<A1, A2>) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2)
+  }
+
+  /**
+   * Sends a signal with three arguments to the child workflow.
+   */
+  public suspend fun <A1, A2, A3> signal(
+    signal: KFunction4<T, A1, A2, A3, Unit>,
+    args: KArgs3<A1, A2, A3>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3)
+  }
+
+  /**
+   * Sends a signal with four arguments to the child workflow.
+   */
+  public suspend fun <A1, A2, A3, A4> signal(
+    signal: KFunction5<T, A1, A2, A3, A4, Unit>,
+    args: KArgs4<A1, A2, A3, A4>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4)
+  }
+
+  /**
+   * Sends a signal with five arguments to the child workflow.
+   */
+  public suspend fun <A1, A2, A3, A4, A5> signal(
+    signal: KFunction6<T, A1, A2, A3, A4, A5, Unit>,
+    args: KArgs5<A1, A2, A3, A4, A5>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5)
+  }
+
+  /**
+   * Sends a signal with six arguments to the child workflow.
+   */
+  public suspend fun <A1, A2, A3, A4, A5, A6> signal(
+    signal: KFunction7<T, A1, A2, A3, A4, A5, A6, Unit>,
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
+  ) {
+    val signalName = extractSignalName(signal)
+    signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   /**

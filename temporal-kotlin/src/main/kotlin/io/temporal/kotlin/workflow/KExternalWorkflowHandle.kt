@@ -21,6 +21,11 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.api.common.v1.WorkflowExecution
+import io.temporal.kotlin.common.KArgs2
+import io.temporal.kotlin.common.KArgs3
+import io.temporal.kotlin.common.KArgs4
+import io.temporal.kotlin.common.KArgs5
+import io.temporal.kotlin.common.KArgs6
 import io.temporal.workflow.ExternalWorkflowStub
 import io.temporal.workflow.SignalMethod
 import kotlin.reflect.KFunction
@@ -101,63 +106,66 @@ public class KExternalWorkflowHandle<T : Any> internal constructor(
 
   /**
    * Sends a signal to the external workflow with 2 arguments.
+   *
+   * @param method the signal method reference (must be annotated with @SignalMethod)
+   * @param args the arguments wrapped using [io.temporal.kotlin.common.kargs]
    */
-  public fun <A1, A2> signal(method: KFunction3<T, A1, A2, *>, arg1: A1, arg2: A2) {
+  public fun <A1, A2> signal(method: KFunction3<T, A1, A2, *>, args: KArgs2<A1, A2>) {
     val signalName = extractSignalName(method)
-    stub.signal(signalName, arg1, arg2)
+    stub.signal(signalName, args.a1, args.a2)
   }
 
   /**
    * Sends a signal to the external workflow with 3 arguments.
+   *
+   * @param method the signal method reference (must be annotated with @SignalMethod)
+   * @param args the arguments wrapped using [io.temporal.kotlin.common.kargs]
    */
-  public fun <A1, A2, A3> signal(method: KFunction4<T, A1, A2, A3, *>, arg1: A1, arg2: A2, arg3: A3) {
+  public fun <A1, A2, A3> signal(method: KFunction4<T, A1, A2, A3, *>, args: KArgs3<A1, A2, A3>) {
     val signalName = extractSignalName(method)
-    stub.signal(signalName, arg1, arg2, arg3)
+    stub.signal(signalName, args.a1, args.a2, args.a3)
   }
 
   /**
    * Sends a signal to the external workflow with 4 arguments.
+   *
+   * @param method the signal method reference (must be annotated with @SignalMethod)
+   * @param args the arguments wrapped using [io.temporal.kotlin.common.kargs]
    */
   public fun <A1, A2, A3, A4> signal(
     method: KFunction5<T, A1, A2, A3, A4, *>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>
   ) {
     val signalName = extractSignalName(method)
-    stub.signal(signalName, arg1, arg2, arg3, arg4)
+    stub.signal(signalName, args.a1, args.a2, args.a3, args.a4)
   }
 
   /**
    * Sends a signal to the external workflow with 5 arguments.
+   *
+   * @param method the signal method reference (must be annotated with @SignalMethod)
+   * @param args the arguments wrapped using [io.temporal.kotlin.common.kargs]
    */
   public fun <A1, A2, A3, A4, A5> signal(
     method: KFunction6<T, A1, A2, A3, A4, A5, *>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>
   ) {
     val signalName = extractSignalName(method)
-    stub.signal(signalName, arg1, arg2, arg3, arg4, arg5)
+    stub.signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5)
   }
 
   /**
    * Sends a signal to the external workflow with 6 arguments.
+   *
+   * @param method the signal method reference (must be annotated with @SignalMethod)
+   * @param args the arguments wrapped using [io.temporal.kotlin.common.kargs]
    */
   public fun <A1, A2, A3, A4, A5, A6> signal(
     method: KFunction7<T, A1, A2, A3, A4, A5, A6, *>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
   ) {
     val signalName = extractSignalName(method)
-    stub.signal(signalName, arg1, arg2, arg3, arg4, arg5, arg6)
+    stub.signal(signalName, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   // ==================== Cancel ====================

@@ -108,11 +108,11 @@ class KSDKTestWorkflowRuleTest {
   fun `workflow execution via method reference`() = runBlocking {
     val result = testRule.kClient.executeWorkflow(
       GreetingWorkflow::greet,
+      "World",
       KWorkflowOptions(
         workflowId = "greeting-test-${System.currentTimeMillis()}",
         taskQueue = testRule.taskQueue
-      ),
-      "World"
+      )
     )
     assertEquals("Hello, World!", result)
   }
@@ -127,11 +127,11 @@ class KSDKTestWorkflowRuleTest {
     // so we test with the greeting workflow instead
     val result = testRule.kClient.executeWorkflow(
       GreetingWorkflow::greet,
+      "Kotlin",
       KWorkflowOptions(
         workflowId = "greeting-multi-${System.currentTimeMillis()}",
         taskQueue = testRule.taskQueue
-      ),
-      "Kotlin"
+      )
     )
     assertEquals("Hello, Kotlin!", result)
   }
@@ -229,11 +229,11 @@ class KSDKTestWorkflowRuleWithActivitiesTest {
   fun `workflow and activity implementations can be registered together`() = runBlocking {
     val result = testRule.kClient.executeWorkflow(
       EchoWorkflow::execute,
+      "test",
       KWorkflowOptions(
         workflowId = "echo-${System.currentTimeMillis()}",
         taskQueue = testRule.taskQueue
-      ),
-      "test"
+      )
     )
     assertEquals("Workflow: test", result)
   }

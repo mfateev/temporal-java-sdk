@@ -29,6 +29,11 @@ import io.temporal.common.SearchAttributeUpdate
 import io.temporal.common.SearchAttributes
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
+import io.temporal.kotlin.common.KArgs2
+import io.temporal.kotlin.common.KArgs3
+import io.temporal.kotlin.common.KArgs4
+import io.temporal.kotlin.common.KArgs5
+import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
@@ -803,14 +808,14 @@ public object KWorkflow {
    * @param A1 the type of the first argument
    * @param R the return type of the activity
    * @param activity the activity method reference
-   * @param options the activity options
    * @param arg1 the first argument
+   * @param options the activity options
    * @return the activity result
    */
   public suspend fun <T, A1, R> executeActivity(
     activity: KFunction2<T, A1, R>,
-    options: KActivityOptions,
-    arg1: A1
+    arg1: A1,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
@@ -825,20 +830,18 @@ public object KWorkflow {
    * @param A2 the type of the second argument
    * @param R the return type of the activity
    * @param activity the activity method reference
+   * @param args the arguments wrapped in KArgs2
    * @param options the activity options
-   * @param arg1 the first argument
-   * @param arg2 the second argument
    * @return the activity result
    */
   public suspend fun <T, A1, A2, R> executeActivity(
     activity: KFunction3<T, A1, A2, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -846,14 +849,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, R> executeActivity(
     activity: KFunction4<T, A1, A2, A3, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -861,15 +862,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, R> executeActivity(
     activity: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -877,16 +875,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeActivity(
     activity: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -894,17 +888,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeActivity(
     activity: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   // ==================== Typed Suspend Activity Execution (Method Reference) ====================
@@ -937,8 +926,8 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity1")
   public suspend fun <T, A1, R> executeActivity(
     activity: KSuspendFunction2<T, A1, R>,
-    options: KActivityOptions,
-    arg1: A1
+    arg1: A1,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
@@ -951,13 +940,12 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity2")
   public suspend fun <T, A1, A2, R> executeActivity(
     activity: KSuspendFunction3<T, A1, A2, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -966,14 +954,12 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity3")
   public suspend fun <T, A1, A2, A3, R> executeActivity(
     activity: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -982,15 +968,12 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity4")
   public suspend fun <T, A1, A2, A3, A4, R> executeActivity(
     activity: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -999,16 +982,12 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity5")
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeActivity(
     activity: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1017,17 +996,12 @@ public object KWorkflow {
   @JvmName("executeSuspendActivity6")
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeActivity(
     activity: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1170,8 +1144,8 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, R> executeLocalActivity(
     activity: KFunction2<T, A1, R>,
-    options: KLocalActivityOptions,
-    arg1: A1
+    arg1: A1,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
@@ -1183,13 +1157,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, R> executeLocalActivity(
     activity: KFunction3<T, A1, A2, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1197,14 +1170,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, R> executeLocalActivity(
     activity: KFunction4<T, A1, A2, A3, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1212,15 +1183,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, R> executeLocalActivity(
     activity: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1228,16 +1196,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeLocalActivity(
     activity: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1245,17 +1209,12 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeLocalActivity(
     activity: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   // ==================== Typed Suspend Local Activity Execution (Method Reference) ====================
@@ -1288,8 +1247,8 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity1")
   public suspend fun <T, A1, R> executeLocalActivity(
     activity: KSuspendFunction2<T, A1, R>,
-    options: KLocalActivityOptions,
-    arg1: A1
+    arg1: A1,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
@@ -1302,13 +1261,12 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity2")
   public suspend fun <T, A1, A2, R> executeLocalActivity(
     activity: KSuspendFunction3<T, A1, A2, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1317,14 +1275,12 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity3")
   public suspend fun <T, A1, A2, A3, R> executeLocalActivity(
     activity: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1333,15 +1289,12 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity4")
   public suspend fun <T, A1, A2, A3, A4, R> executeLocalActivity(
     activity: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1350,16 +1303,12 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity5")
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeLocalActivity(
     activity: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1368,17 +1317,12 @@ public object KWorkflow {
   @JvmName("executeSuspendLocalActivity6")
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeLocalActivity(
     activity: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KLocalActivityOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KLocalActivityOptions
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeLocalActivity(activityName, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    return executeLocalActivity(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   // ==================== Child Workflow Methods ====================
@@ -1469,8 +1413,8 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, R> executeChildWorkflow(
     workflow: KFunction2<T, A1, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1478,116 +1422,56 @@ public object KWorkflow {
   }
 
   /**
-   * Executes a child workflow using a method reference with 1 argument and default options.
-   */
-  public suspend fun <T, A1, R> executeChildWorkflow(
-    workflow: KFunction2<T, A1, R>,
-    arg1: A1
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1)
-
-  /**
    * Executes a child workflow using a method reference with 2 arguments.
    */
   public suspend fun <T, A1, A2, R> executeChildWorkflow(
     workflow: KFunction3<T, A1, A2, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a child workflow using a method reference with 2 arguments and default options.
-   */
-  public suspend fun <T, A1, A2, R> executeChildWorkflow(
-    workflow: KFunction3<T, A1, A2, R>,
-    arg1: A1,
-    arg2: A2
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2)
 
   /**
    * Executes a child workflow using a method reference with 3 arguments.
    */
   public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
     workflow: KFunction4<T, A1, A2, A3, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a child workflow using a method reference with 3 arguments and default options.
-   */
-  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
-    workflow: KFunction4<T, A1, A2, A3, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3)
 
   /**
    * Executes a child workflow using a method reference with 4 arguments.
    */
   public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
     workflow: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a child workflow using a method reference with 4 arguments and default options.
-   */
-  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
-    workflow: KFunction5<T, A1, A2, A3, A4, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4)
 
   /**
    * Executes a child workflow using a method reference with 5 arguments.
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a child workflow using a method reference with 5 arguments and default options.
-   */
-  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
-    workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4, arg5)
 
   // ==================== Typed Suspend Child Workflow Execution (Method Reference) ====================
   // These overloads support suspend child workflow methods (suspend fun in interfaces)
@@ -1619,8 +1503,8 @@ public object KWorkflow {
   @JvmName("executeSuspendChildWorkflow1")
   public suspend fun <T, A1, R> executeChildWorkflow(
     workflow: KSuspendFunction2<T, A1, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1628,38 +1512,18 @@ public object KWorkflow {
   }
 
   /**
-   * Executes a suspend child workflow using a method reference with 1 argument and default options.
-   */
-  @JvmName("executeSuspendChildWorkflow1NoOptions")
-  public suspend fun <T, A1, R> executeChildWorkflow(
-    workflow: KSuspendFunction2<T, A1, R>,
-    arg1: A1
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1)
-
-  /**
    * Executes a suspend child workflow using a method reference with 2 arguments.
    */
   @JvmName("executeSuspendChildWorkflow2")
   public suspend fun <T, A1, A2, R> executeChildWorkflow(
     workflow: KSuspendFunction3<T, A1, A2, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a suspend child workflow using a method reference with 2 arguments and default options.
-   */
-  @JvmName("executeSuspendChildWorkflow2NoOptions")
-  public suspend fun <T, A1, A2, R> executeChildWorkflow(
-    workflow: KSuspendFunction3<T, A1, A2, R>,
-    arg1: A1,
-    arg2: A2
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2)
 
   /**
    * Executes a suspend child workflow using a method reference with 3 arguments.
@@ -1667,26 +1531,13 @@ public object KWorkflow {
   @JvmName("executeSuspendChildWorkflow3")
   public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
     workflow: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a suspend child workflow using a method reference with 3 arguments and default options.
-   */
-  @JvmName("executeSuspendChildWorkflow3NoOptions")
-  public suspend fun <T, A1, A2, A3, R> executeChildWorkflow(
-    workflow: KSuspendFunction4<T, A1, A2, A3, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3)
 
   /**
    * Executes a suspend child workflow using a method reference with 4 arguments.
@@ -1694,28 +1545,13 @@ public object KWorkflow {
   @JvmName("executeSuspendChildWorkflow4")
   public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
     workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a suspend child workflow using a method reference with 4 arguments and default options.
-   */
-  @JvmName("executeSuspendChildWorkflow4NoOptions")
-  public suspend fun <T, A1, A2, A3, A4, R> executeChildWorkflow(
-    workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4)
 
   /**
    * Executes a suspend child workflow using a method reference with 5 arguments.
@@ -1723,30 +1559,13 @@ public object KWorkflow {
   @JvmName("executeSuspendChildWorkflow5")
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
     workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, arg1, arg2, arg3, arg4, arg5)
+    return executeChildWorkflow(workflowType, resultClass as Class<R>, options, *args.toArray())
   }
-
-  /**
-   * Executes a suspend child workflow using a method reference with 5 arguments and default options.
-   */
-  @JvmName("executeSuspendChildWorkflow5NoOptions")
-  public suspend fun <T, A1, A2, A3, A4, A5, R> executeChildWorkflow(
-    workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
-  ): R = executeChildWorkflow(workflow, KChildWorkflowOptions(), arg1, arg2, arg3, arg4, arg5)
 
   // ==================== Child Workflow Handle Methods ====================
 
@@ -1761,8 +1580,8 @@ public object KWorkflow {
    * ```kotlin
    * val handle = KWorkflow.startChildWorkflow(
    *   ChildWorkflow::processOrder,
-   *   KChildWorkflowOptions(workflowId = "child-123"),
-   *   order
+   *   order,
+   *   KChildWorkflowOptions(workflowId = "child-123")
    * )
    * handle.signal(ChildWorkflow::updatePriority, Priority.HIGH)
    * val result = handle.result()
@@ -1776,7 +1595,7 @@ public object KWorkflow {
    */
   public suspend fun <T, R> startChildWorkflow(
     workflow: KFunction1<T, R>,
-    options: KChildWorkflowOptions
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): KChildWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     val context = currentContext.get()
@@ -1790,8 +1609,8 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, R> startChildWorkflow(
     workflow: KFunction2<T, A1, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): KChildWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     val context = currentContext.get()
@@ -1805,15 +1624,14 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, R> startChildWorkflow(
     workflow: KFunction3<T, A1, A2, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): KChildWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1, arg2)
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, *args.toArray())
   }
 
   /**
@@ -1821,16 +1639,14 @@ public object KWorkflow {
    */
   public suspend fun <T, A1, A2, A3, R> startChildWorkflow(
     workflow: KFunction4<T, A1, A2, A3, R>,
-    options: KChildWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KChildWorkflowOptions = KChildWorkflowOptions()
   ): KChildWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1, arg2, arg3)
+    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, *args.toArray())
   }
 
   /**

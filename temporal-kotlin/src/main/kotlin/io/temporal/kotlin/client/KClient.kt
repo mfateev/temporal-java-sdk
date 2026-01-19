@@ -31,6 +31,11 @@ import io.temporal.kotlin.client.schedules.KSchedule
 import io.temporal.kotlin.client.schedules.KScheduleHandle
 import io.temporal.kotlin.client.schedules.KScheduleListDescription
 import io.temporal.kotlin.client.schedules.KScheduleOptions
+import io.temporal.kotlin.common.KArgs2
+import io.temporal.kotlin.common.KArgs3
+import io.temporal.kotlin.common.KArgs4
+import io.temporal.kotlin.common.KArgs5
+import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
@@ -183,12 +188,12 @@ public class KClient(
    */
   public suspend fun <T, A1, R> startWorkflow(
     workflow: KFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg: A1,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg)
   }
 
   /**
@@ -196,13 +201,12 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, R> startWorkflow(
     workflow: KFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
   }
 
   /**
@@ -210,14 +214,12 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, R> startWorkflow(
     workflow: KFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
   }
 
   /**
@@ -225,15 +227,12 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, R> startWorkflow(
     workflow: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
   }
 
   /**
@@ -241,16 +240,12 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> startWorkflow(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
   }
 
   /**
@@ -258,17 +253,12 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> startWorkflow(
     workflow: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   // ========== Start Suspend Workflow (0-6 args) ==========
@@ -293,12 +283,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow1")
   public suspend fun <T, A1, R> startWorkflow(
     workflow: KSuspendFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg: A1,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg)
   }
 
   /**
@@ -307,13 +297,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow2")
   public suspend fun <T, A1, A2, R> startWorkflow(
     workflow: KSuspendFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
   }
 
   /**
@@ -322,14 +311,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow3")
   public suspend fun <T, A1, A2, A3, R> startWorkflow(
     workflow: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
   }
 
   /**
@@ -338,15 +325,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow4")
   public suspend fun <T, A1, A2, A3, A4, R> startWorkflow(
     workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
   }
 
   /**
@@ -355,16 +339,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow5")
   public suspend fun <T, A1, A2, A3, A4, A5, R> startWorkflow(
     workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
   }
 
   /**
@@ -373,17 +353,12 @@ public class KClient(
   @JvmName("startSuspendWorkflow6")
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> startWorkflow(
     workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   // ========== Execute Workflow (0-6 args) ==========
@@ -405,10 +380,10 @@ public class KClient(
    */
   public suspend fun <T, A1, R> executeWorkflow(
     workflow: KFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1)
+    val handle = startWorkflow(workflow, arg1, options)
     return handle.result()
   }
 
@@ -417,11 +392,10 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, R> executeWorkflow(
     workflow: KFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1, arg2)
+    val handle = startWorkflow(workflow, args, options)
     return handle.result()
   }
 
@@ -430,12 +404,10 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, R> executeWorkflow(
     workflow: KFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1, arg2, arg3)
+    val handle = startWorkflow(workflow, args, options)
     return handle.result()
   }
 
@@ -444,13 +416,10 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, R> executeWorkflow(
     workflow: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1, arg2, arg3, arg4)
+    val handle = startWorkflow(workflow, args, options)
     return handle.result()
   }
 
@@ -459,14 +428,10 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeWorkflow(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1, arg2, arg3, arg4, arg5)
+    val handle = startWorkflow(workflow, args, options)
     return handle.result()
   }
 
@@ -475,15 +440,10 @@ public class KClient(
    */
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeWorkflow(
     workflow: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): R {
-    val handle = startWorkflow(workflow, options, arg1, arg2, arg3, arg4, arg5, arg6)
+    val handle = startWorkflow(workflow, args, options)
     return handle.result()
   }
 
@@ -511,8 +471,8 @@ public class KClient(
   @JvmName("executeSuspendWorkflow1")
   public suspend fun <T, A1, R> executeWorkflow(
     workflow: KSuspendFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
@@ -527,14 +487,13 @@ public class KClient(
   @JvmName("executeSuspendWorkflow2")
   public suspend fun <T, A1, A2, R> executeWorkflow(
     workflow: KSuspendFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
     return handle.result()
   }
 
@@ -544,15 +503,13 @@ public class KClient(
   @JvmName("executeSuspendWorkflow3")
   public suspend fun <T, A1, A2, A3, R> executeWorkflow(
     workflow: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
     return handle.result()
   }
 
@@ -562,16 +519,13 @@ public class KClient(
   @JvmName("executeSuspendWorkflow4")
   public suspend fun <T, A1, A2, A3, A4, R> executeWorkflow(
     workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
     return handle.result()
   }
 
@@ -581,17 +535,13 @@ public class KClient(
   @JvmName("executeSuspendWorkflow5")
   public suspend fun <T, A1, A2, A3, A4, A5, R> executeWorkflow(
     workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
     return handle.result()
   }
 
@@ -601,18 +551,13 @@ public class KClient(
   @JvmName("executeSuspendWorkflow6")
   public suspend fun <T, A1, A2, A3, A4, A5, A6, R> executeWorkflow(
     workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): R {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1, arg2, arg3, arg4, arg5, arg6)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     return handle.result()
   }
 
@@ -669,13 +614,110 @@ public class KClient(
   // ========== Signal With Start ==========
 
   /**
-   * Atomically start a workflow and send a signal.
+   * Atomically start a workflow (no args) and send a signal (no args).
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, R> signalWithStart(
+    workflow: KFunction1<T, R>,
+    options: KWorkflowOptions,
+    signal: KFunction1<T, *>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), emptyArray())
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow (no args) and send a signal with one argument.
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, R, SA1> signalWithStart(
+    workflow: KFunction1<T, R>,
+    options: KWorkflowOptions,
+    signal: KFunction2<T, SA1, *>,
+    signalArg: SA1
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val signalArgs: Array<Any?> = arrayOf(signalArg)
+    val execution = stub.signalWithStart(signalName, signalArgs, emptyArray())
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow (no args) and send a signal with 2+ arguments.
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, R, SA1, SA2> signalWithStart(
+    workflow: KFunction1<T, R>,
+    options: KWorkflowOptions,
+    signal: KFunction3<T, SA1, SA2, *>,
+    signalArgs: KArgs2<SA1, SA2>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val execution = stub.signalWithStart(signalName, arrayOf<Any?>(signalArgs.a1, signalArgs.a2), emptyArray())
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow with one argument and send a signal (no args).
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, A1, R> signalWithStart(
+    workflow: KFunction2<T, A1, R>,
+    workflowArg: A1,
+    options: KWorkflowOptions,
+    signal: KFunction1<T, *>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val workflowArgs: Array<Any?> = arrayOf(workflowArg)
+    val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), workflowArgs)
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow with one argument and send a signal with one argument.
    * If the workflow already exists, only the signal is sent.
    */
   public suspend fun <T, A1, R, SA1> signalWithStart(
     workflow: KFunction2<T, A1, R>,
-    options: KWorkflowOptions,
     workflowArg: A1,
+    options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
     signalArg: SA1
   ): KTypedWorkflowHandle<T, R> {
@@ -696,10 +738,62 @@ public class KClient(
   }
 
   /**
-   * Atomically start a workflow (no args) and send a signal.
+   * Atomically start a workflow with one argument and send a signal with 2+ arguments.
+   * If the workflow already exists, only the signal is sent.
    */
-  public suspend fun <T, R, SA1> signalWithStart(
-    workflow: KFunction1<T, R>,
+  public suspend fun <T, A1, R, SA1, SA2> signalWithStart(
+    workflow: KFunction2<T, A1, R>,
+    workflowArg: A1,
+    options: KWorkflowOptions,
+    signal: KFunction3<T, SA1, SA2, *>,
+    signalArgs: KArgs2<SA1, SA2>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val workflowArgs: Array<Any?> = arrayOf(workflowArg)
+    val execution = stub.signalWithStart(signalName, arrayOf<Any?>(signalArgs.a1, signalArgs.a2), workflowArgs)
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow with 2+ arguments and send a signal (no args).
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, A1, A2, R> signalWithStart(
+    workflow: KFunction3<T, A1, A2, R>,
+    workflowArgs: KArgs2<A1, A2>,
+    options: KWorkflowOptions,
+    signal: KFunction1<T, *>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), arrayOf<Any?>(workflowArgs.a1, workflowArgs.a2))
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow with 2+ arguments and send a signal with one argument.
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, A1, A2, R, SA1> signalWithStart(
+    workflow: KFunction3<T, A1, A2, R>,
+    workflowArgs: KArgs2<A1, A2>,
     options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
     signalArg: SA1
@@ -709,7 +803,36 @@ public class KClient(
 
     val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
     val signalArgs: Array<Any?> = arrayOf(signalArg)
-    val execution = stub.signalWithStart(signalName, signalArgs, emptyArray())
+    val execution = stub.signalWithStart(signalName, signalArgs, arrayOf<Any?>(workflowArgs.a1, workflowArgs.a2))
+
+    @Suppress("UNCHECKED_CAST")
+    return KTypedWorkflowHandle(
+      workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()),
+      workflowClass as Class<T>,
+      resultClass as Class<R>
+    )
+  }
+
+  /**
+   * Atomically start a workflow with 2+ arguments and send a signal with 2+ arguments.
+   * If the workflow already exists, only the signal is sent.
+   */
+  public suspend fun <T, A1, A2, R, SA1, SA2> signalWithStart(
+    workflow: KFunction3<T, A1, A2, R>,
+    workflowArgs: KArgs2<A1, A2>,
+    options: KWorkflowOptions,
+    signal: KFunction3<T, SA1, SA2, *>,
+    signalArgs: KArgs2<SA1, SA2>
+  ): KTypedWorkflowHandle<T, R> {
+    val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
+    val signalName = extractSignalName(signal)
+
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val execution = stub.signalWithStart(
+      signalName,
+      arrayOf<Any?>(signalArgs.a1, signalArgs.a2),
+      arrayOf<Any?>(workflowArgs.a1, workflowArgs.a2)
+    )
 
     @Suppress("UNCHECKED_CAST")
     return KTypedWorkflowHandle(
@@ -751,8 +874,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, R> newWithStartWorkflowOperation(
     workflow: KFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -771,9 +894,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, R> newWithStartWorkflowOperation(
     workflow: KFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -782,7 +904,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2)
+      arrayOf<Any?>(args.a1, args.a2)
     )
   }
 
@@ -792,10 +914,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, R> newWithStartWorkflowOperation(
     workflow: KFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -804,7 +924,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3)
+      arrayOf<Any?>(args.a1, args.a2, args.a3)
     )
   }
 
@@ -814,11 +934,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, R> newWithStartWorkflowOperation(
     workflow: KFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -827,7 +944,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4)
     )
   }
 
@@ -837,12 +954,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, A5, R> newWithStartWorkflowOperation(
     workflow: KFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -851,7 +964,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5)
     )
   }
 
@@ -861,13 +974,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, A5, A6, R> newWithStartWorkflowOperation(
     workflow: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -876,7 +984,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5, arg6)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     )
   }
 
@@ -909,8 +1017,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction2<T, A1, R>,
-    options: KWorkflowOptions,
-    arg1: A1
+    arg1: A1,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -930,9 +1038,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction3<T, A1, A2, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2
+    args: KArgs2<A1, A2>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -941,7 +1048,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2)
+      arrayOf<Any?>(args.a1, args.a2)
     )
   }
 
@@ -952,10 +1059,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction4<T, A1, A2, A3, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3
+    args: KArgs3<A1, A2, A3>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -964,7 +1069,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3)
+      arrayOf<Any?>(args.a1, args.a2, args.a3)
     )
   }
 
@@ -975,11 +1080,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction5<T, A1, A2, A3, A4, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4
+    args: KArgs4<A1, A2, A3, A4>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -988,7 +1090,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4)
     )
   }
 
@@ -999,12 +1101,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, A5, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5
+    args: KArgs5<A1, A2, A3, A4, A5>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1013,7 +1111,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5)
     )
   }
 
@@ -1024,13 +1122,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public fun <T, A1, A2, A3, A4, A5, A6, R> newWithStartWorkflowOperation(
     workflow: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
-    options: KWorkflowOptions,
-    arg1: A1,
-    arg2: A2,
-    arg3: A3,
-    arg4: A4,
-    arg5: A5,
-    arg6: A6
+    args: KArgs6<A1, A2, A3, A4, A5, A6>,
+    options: KWorkflowOptions
   ): KWithStartWorkflowOperation<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
@@ -1039,7 +1132,7 @@ public class KClient(
       workflowClass as Class<T>,
       resultClass as Class<R>,
       options.toJavaOptions(),
-      arrayOf<Any?>(arg1, arg2, arg3, arg4, arg5, arg6)
+      arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     )
   }
 
@@ -1079,8 +1172,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UR> startUpdateWithStart(
     update: KSuspendFunction2<T, UA1, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1
+    updateArg1: UA1,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1098,9 +1191,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UR> startUpdateWithStart(
     update: KSuspendFunction3<T, UA1, UA2, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2
+    updateArgs: KArgs2<UA1, UA2>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1108,7 +1200,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2)
     )
   }
 
@@ -1118,10 +1210,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UR> startUpdateWithStart(
     update: KSuspendFunction4<T, UA1, UA2, UA3, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3
+    updateArgs: KArgs3<UA1, UA2, UA3>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1129,7 +1219,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3)
     )
   }
 
@@ -1139,11 +1229,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UR> startUpdateWithStart(
     update: KSuspendFunction5<T, UA1, UA2, UA3, UA4, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4
+    updateArgs: KArgs4<UA1, UA2, UA3, UA4>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1151,7 +1238,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4)
     )
   }
 
@@ -1161,12 +1248,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UR> startUpdateWithStart(
     update: KSuspendFunction6<T, UA1, UA2, UA3, UA4, UA5, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4,
-    updateArg5: UA5
+    updateArgs: KArgs5<UA1, UA2, UA3, UA4, UA5>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1174,7 +1257,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4, updateArgs.a5)
     )
   }
 
@@ -1184,13 +1267,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UA6, UR> startUpdateWithStart(
     update: KSuspendFunction7<T, UA1, UA2, UA3, UA4, UA5, UA6, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4,
-    updateArg5: UA5,
-    updateArg6: UA6
+    updateArgs: KArgs6<UA1, UA2, UA3, UA4, UA5, UA6>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): KUpdateHandle<UR> {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1198,7 +1276,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5, updateArg6)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4, updateArgs.a5, updateArgs.a6)
     )
   }
 
@@ -1233,8 +1311,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UR> executeUpdateWithStart(
     update: KSuspendFunction2<T, UA1, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1
+    updateArg1: UA1,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1252,9 +1330,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UR> executeUpdateWithStart(
     update: KSuspendFunction3<T, UA1, UA2, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2
+    updateArgs: KArgs2<UA1, UA2>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1262,7 +1339,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2)
     )
   }
 
@@ -1272,10 +1349,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UR> executeUpdateWithStart(
     update: KSuspendFunction4<T, UA1, UA2, UA3, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3
+    updateArgs: KArgs3<UA1, UA2, UA3>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1283,7 +1358,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3)
     )
   }
 
@@ -1293,11 +1368,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UR> executeUpdateWithStart(
     update: KSuspendFunction5<T, UA1, UA2, UA3, UA4, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4
+    updateArgs: KArgs4<UA1, UA2, UA3, UA4>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1305,7 +1377,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4)
     )
   }
 
@@ -1315,12 +1387,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UR> executeUpdateWithStart(
     update: KSuspendFunction6<T, UA1, UA2, UA3, UA4, UA5, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4,
-    updateArg5: UA5
+    updateArgs: KArgs5<UA1, UA2, UA3, UA4, UA5>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1328,7 +1396,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4, updateArgs.a5)
     )
   }
 
@@ -1338,13 +1406,8 @@ public class KClient(
   @OptIn(InternalTemporalApi::class)
   public suspend fun <T, R, UA1, UA2, UA3, UA4, UA5, UA6, UR> executeUpdateWithStart(
     update: KSuspendFunction7<T, UA1, UA2, UA3, UA4, UA5, UA6, UR>,
-    options: KUpdateWithStartOptions<T, R, UR>,
-    updateArg1: UA1,
-    updateArg2: UA2,
-    updateArg3: UA3,
-    updateArg4: UA4,
-    updateArg5: UA5,
-    updateArg6: UA6
+    updateArgs: KArgs6<UA1, UA2, UA3, UA4, UA5, UA6>,
+    options: KUpdateWithStartOptions<T, R, UR>
   ): UR {
     val (updateName, updateResultClass) = extractUpdateMetadata(update)
     @Suppress("UNCHECKED_CAST")
@@ -1352,7 +1415,7 @@ public class KClient(
       updateName,
       updateResultClass as Class<UR>,
       options,
-      arrayOf<Any?>(updateArg1, updateArg2, updateArg3, updateArg4, updateArg5, updateArg6)
+      arrayOf<Any?>(updateArgs.a1, updateArgs.a2, updateArgs.a3, updateArgs.a4, updateArgs.a5, updateArgs.a6)
     )
   }
 

@@ -85,11 +85,11 @@ import kotlin.reflect.KClass
  * fun `test workflow`() = runBlocking {
  *     val result = testRule.kWorkflowClient.executeWorkflow(
  *         GreetingWorkflow::greet,
+ *         "World",
  *         KWorkflowOptions(
  *             workflowId = "test-123",
  *             taskQueue = testRule.taskQueue
- *         ),
- *         "World"
+ *         )
  *     )
  *     assertEquals("Hello, World!", result)
  * }

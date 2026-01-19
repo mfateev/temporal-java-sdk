@@ -188,8 +188,8 @@ class KTestWorkflowExtensionIntegrationTest {
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
-            options.copy(workflowId = "greeting-${UUID.randomUUID()}"),
             "Kotlin",
+            options.copy(workflowId = "greeting-${UUID.randomUUID()}"),
         )
         assertEquals("Hello, Kotlin!", result)
     }
@@ -201,8 +201,8 @@ class KTestWorkflowExtensionIntegrationTest {
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
-            options.copy(workflowId = "greeting-world-${UUID.randomUUID()}"),
             "World",
+            options.copy(workflowId = "greeting-world-${UUID.randomUUID()}"),
         )
         assertEquals("Hello, World!", result)
     }
@@ -218,8 +218,8 @@ class KTestWorkflowExtensionIntegrationTest {
 
         val result = client.executeWorkflow(
             TimerWorkflow::waitAndReturn,
-            options.copy(workflowId = "timer-${UUID.randomUUID()}"),
             3600L, // 1 hour
+            options.copy(workflowId = "timer-${UUID.randomUUID()}"),
         )
 
         val elapsed = System.currentTimeMillis() - startTime
@@ -239,8 +239,8 @@ class KTestWorkflowExtensionIntegrationTest {
 
         val result = client.executeWorkflow(
             WorkflowWithActivity::process,
-            options.copy(workflowId = "activity-${UUID.randomUUID()}"),
             "Test Input",
+            options.copy(workflowId = "activity-${UUID.randomUUID()}"),
         )
 
         assertEquals("Formatted: Test Input", result)
@@ -282,8 +282,8 @@ class KTestWorkflowExtensionIntegrationTest {
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
-            options.copy(workflowId = "isolation-${UUID.randomUUID()}"),
             "Isolation",
+            options.copy(workflowId = "isolation-${UUID.randomUUID()}"),
         )
 
         assertEquals("Hello, Isolation!", result)
