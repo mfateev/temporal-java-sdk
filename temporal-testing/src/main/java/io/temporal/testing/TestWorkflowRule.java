@@ -16,6 +16,7 @@ import io.temporal.common.SearchAttributeKey;
 import io.temporal.common.interceptors.WorkerInterceptor;
 import io.temporal.internal.common.env.DebugModeUtils;
 import io.temporal.internal.docker.RegisterTestNamespace;
+import io.temporal.internal.docker.RegisterTestSearchAttributes;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.worker.*;
@@ -139,6 +140,12 @@ public class TestWorkflowRule implements TestRule {
 
     this.testEnvironment =
         TestWorkflowEnvironment.newInstance(createTestEnvOptions(builder.initialTimeMillis));
+
+    // Register default test search attributes when using external service
+    if (useExternalService) {
+      RegisterTestSearchAttributes.registerDefaultSearchAttributes(
+          testEnvironment.getOperatorServiceStubs(), namespace);
+    }
   }
 
   protected TestEnvironmentOptions createTestEnvOptions(long initialTimeMillis) {

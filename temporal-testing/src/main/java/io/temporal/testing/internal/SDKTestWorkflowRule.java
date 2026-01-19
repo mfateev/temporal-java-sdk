@@ -221,6 +221,8 @@ public class SDKTestWorkflowRule implements TestRule {
         testWorkflowRuleBuilder.setWorkerOptions(
             WorkerOptions.newBuilder().setUsingVirtualThreads(USE_VIRTUAL_THREADS).build());
       }
+      // Propagate useExternalService to TestWorkflowRule for search attribute registration
+      testWorkflowRuleBuilder.setUseExternalService(useExternalService);
       return new SDKTestWorkflowRule(this);
     }
   }
