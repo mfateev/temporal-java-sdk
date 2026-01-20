@@ -932,50 +932,46 @@ internal class KotlinWorkflowContext(
   /**
    * Awaits until the given condition evaluates to true or timeout expires.
    *
+   * This implementation follows the Java SDK pattern: create a single timer for the
+   * full timeout duration, then wait until either the timer fires or the condition
+   * becomes true. This works correctly with test environment time skipping.
+   *
    * @param timeout maximum time to wait
    * @param condition the condition to wait for
    * @return true if condition was satisfied, false if timeout expired
    */
   suspend fun awaitCondition(timeout: Duration, condition: () -> Boolean): Boolean {
-    // Check if condition is already true
+    // Check if condition is already true - skip timer creation entirely
     if (condition()) return true
 
-    val startTime = currentTimeMillis
-    val timeoutMillis = timeout.toMillis()
+    // Create a single timer for the full timeout duration
+    val timerFired = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    while (!condition()) {
-      val elapsed = currentTimeMillis - startTime
-      if (elapsed >= timeoutMillis) {
-        return false
+    val cancellationHandle = replayContext.newTimer(timeout, null) { exception ->
+      if (exception == null) {
+        timerFired.set(true)
+        // Wake up condition waiters to re-check
+        notifyConditionWaiters()
       }
+    }
 
-      // Wait for either the condition to be signaled or timeout
-      // Use the same conditionWaiters list but with Unit type
+    // Wait until either the timer fires OR the condition becomes true
+    while (!timerFired.get() && !condition()) {
       suspendCancellableCoroutine<Unit> { cont ->
         conditionWaiters.add(cont)
-
-        // Also set up a timer to wake us up for timeout check
-        val remaining = timeoutMillis - elapsed
-        val timerDuration = Duration.ofMillis(remaining.coerceAtMost(100)) // Check every 100ms at most
-        replayContext.newTimer(timerDuration, null) { exception ->
-          // When timer fires, resume to re-check the condition
-          if (cont.isActive) {
-            conditionWaiters.remove(cont)
-            if (exception != null) {
-              cont.resumeWithException(exception)
-            } else {
-              cont.resume(Unit)
-            }
-          }
-        }
-
         cont.invokeOnCancellation {
           conditionWaiters.remove(cont)
         }
       }
     }
 
-    return true
+    // If condition was satisfied before timer fired, cancel the timer
+    val conditionSatisfied = !timerFired.get()
+    if (conditionSatisfied) {
+      cancellationHandle.apply(RuntimeException("await condition satisfied"))
+    }
+
+    return conditionSatisfied || condition()
   }
 
   /**
