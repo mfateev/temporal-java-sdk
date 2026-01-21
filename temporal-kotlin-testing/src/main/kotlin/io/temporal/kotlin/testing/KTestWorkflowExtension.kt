@@ -18,15 +18,19 @@
  * limitations under the License.
  */
 
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 package io.temporal.kotlin.testing
 
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.client.WorkflowClientOptions
+import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.activity.KActivityRegistry
 import io.temporal.kotlin.activity.KDynamicActivityHandler
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.client.KWorkflowOptions
+import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.testing.TestWorkflowEnvironment
 import io.temporal.worker.WorkerFactoryOptions
@@ -258,8 +262,28 @@ public class KTestWorkflowExtension private constructor(
         // Create KWorker (note: for test mocking, activities are registered via the registry/dynamic handler)
         val kWorker = KWorker(worker)
 
-        // Register workflows
-        config.workflowTypes.forEach { (workflowType, options) ->
+        // Register workflows - use KotlinWorkflowImplementationFactory for suspend workflows
+        // to properly handle suspend update methods with non-suspend validators
+        val suspendWorkflows = config.workflowTypes.filter { (workflowType, _) ->
+            KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType)
+        }
+        val nonSuspendWorkflows = config.workflowTypes.filter { (workflowType, _) ->
+            !KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType)
+        }
+
+        // Register suspend workflows via KotlinWorkflowImplementationFactory
+        if (suspendWorkflows.isNotEmpty()) {
+            val kotlinFactory = KotlinWorkflowImplementationFactory(
+                DataConverter.getDefaultInstance(),
+            )
+            suspendWorkflows.forEach { (workflowType, _) ->
+                kotlinFactory.registerWorkflowImplementationType(workflowType)
+            }
+            worker.registerWorkflowImplementationFactory(kotlinFactory)
+        }
+
+        // Register non-suspend workflows via standard Java SDK registration
+        nonSuspendWorkflows.forEach { (workflowType, options) ->
             worker.registerWorkflowImplementationTypes(options, workflowType)
         }
 

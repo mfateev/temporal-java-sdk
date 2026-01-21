@@ -75,7 +75,12 @@ internal class KotlinWorkflowDefinition(
   /**
    * Update method handlers mapped by update name.
    */
-  val updateMethods: Map<String, KFunction<*>>
+  val updateMethods: Map<String, KFunction<*>>,
+
+  /**
+   * Update validator methods mapped by update name.
+   */
+  val updateValidatorMethods: Map<String, KFunction<*>>
 ) {
   companion object {
     /**
@@ -104,10 +109,11 @@ internal class KotlinWorkflowDefinition(
       // Check if it's a suspend function
       val isSuspendFunction = workflowMethod.isSuspend
 
-      // Find signal, query, and update methods
+      // Find signal, query, update, and validator methods
       val signalMethods = findSignalMethods(workflowInterface)
       val queryMethods = findQueryMethods(workflowInterface)
       val updateMethods = findUpdateMethods(workflowInterface)
+      val updateValidatorMethods = findUpdateValidatorMethods(workflowInterface)
 
       return KotlinWorkflowDefinition(
         workflowInterface = workflowInterface,
@@ -117,7 +123,8 @@ internal class KotlinWorkflowDefinition(
         isSuspendFunction = isSuspendFunction,
         signalMethods = signalMethods,
         queryMethods = queryMethods,
-        updateMethods = updateMethods
+        updateMethods = updateMethods,
+        updateValidatorMethods = updateValidatorMethods
       )
     }
 
@@ -206,6 +213,15 @@ internal class KotlinWorkflowDefinition(
         .associateBy { func ->
           val annotation = func.findAnnotation<io.temporal.workflow.UpdateMethod>()!!
           if (annotation.name.isNotEmpty()) annotation.name else func.name
+        }
+    }
+
+    private fun findUpdateValidatorMethods(workflowInterface: KClass<*>): Map<String, KFunction<*>> {
+      return workflowInterface.declaredFunctions
+        .filter { it.findAnnotation<io.temporal.workflow.UpdateValidatorMethod>() != null }
+        .associateBy { func ->
+          val annotation = func.findAnnotation<io.temporal.workflow.UpdateValidatorMethod>()!!
+          annotation.updateName
         }
     }
   }

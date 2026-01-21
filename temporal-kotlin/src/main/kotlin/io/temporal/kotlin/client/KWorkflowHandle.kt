@@ -45,6 +45,13 @@ import kotlin.reflect.KFunction4
 import kotlin.reflect.KFunction5
 import kotlin.reflect.KFunction6
 import kotlin.reflect.KFunction7
+import kotlin.reflect.KSuspendFunction1
+import kotlin.reflect.KSuspendFunction2
+import kotlin.reflect.KSuspendFunction3
+import kotlin.reflect.KSuspendFunction4
+import kotlin.reflect.KSuspendFunction5
+import kotlin.reflect.KSuspendFunction6
+import kotlin.reflect.KSuspendFunction7
 import kotlin.reflect.jvm.javaMethod
 
 // TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
@@ -478,6 +485,96 @@ public open class KWorkflowHandle<T>(
    */
   public suspend fun <A1, A2, A3, A4, A5, A6, R> executeUpdate(
     update: KFunction7<T, A1, A2, A3, A4, A5, A6, R>,
+    args: KArgs6<A1, A2, A3, A4, A5, A6>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+  }
+
+  // ==================== Suspend function overloads ====================
+
+  /**
+   * Executes a suspend update on the workflow and waits for the result.
+   *
+   * @param update the suspend update method reference
+   * @return the update result
+   */
+  @JvmName("executeSuspendUpdate0")
+  public suspend fun <R> executeUpdate(update: KSuspendFunction1<T, R>): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>)
+  }
+
+  /**
+   * Executes a suspend update with one argument and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate1")
+  public suspend fun <A, R> executeUpdate(update: KSuspendFunction2<T, A, R>, arg: A): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, arg)
+  }
+
+  /**
+   * Executes a suspend update with two arguments and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate2")
+  public suspend fun <A1, A2, R> executeUpdate(
+    update: KSuspendFunction3<T, A1, A2, R>,
+    args: KArgs2<A1, A2>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2)
+  }
+
+  /**
+   * Executes a suspend update with three arguments and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate3")
+  public suspend fun <A1, A2, A3, R> executeUpdate(
+    update: KSuspendFunction4<T, A1, A2, A3, R>,
+    args: KArgs3<A1, A2, A3>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3)
+  }
+
+  /**
+   * Executes a suspend update with four arguments and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate4")
+  public suspend fun <A1, A2, A3, A4, R> executeUpdate(
+    update: KSuspendFunction5<T, A1, A2, A3, A4, R>,
+    args: KArgs4<A1, A2, A3, A4>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4)
+  }
+
+  /**
+   * Executes a suspend update with five arguments and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate5")
+  public suspend fun <A1, A2, A3, A4, A5, R> executeUpdate(
+    update: KSuspendFunction6<T, A1, A2, A3, A4, A5, R>,
+    args: KArgs5<A1, A2, A3, A4, A5>
+  ): R {
+    val (updateName, resultClass) = extractUpdateMetadata(update)
+    @Suppress("UNCHECKED_CAST")
+    return executeUpdate(updateName, resultClass as Class<R>, args.a1, args.a2, args.a3, args.a4, args.a5)
+  }
+
+  /**
+   * Executes a suspend update with six arguments and waits for the result.
+   */
+  @JvmName("executeSuspendUpdate6")
+  public suspend fun <A1, A2, A3, A4, A5, A6, R> executeUpdate(
+    update: KSuspendFunction7<T, A1, A2, A3, A4, A5, A6, R>,
     args: KArgs6<A1, A2, A3, A4, A5, A6>
   ): R {
     val (updateName, resultClass) = extractUpdateMetadata(update)

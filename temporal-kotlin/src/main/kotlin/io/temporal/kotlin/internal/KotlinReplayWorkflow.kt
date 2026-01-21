@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.reflect.KClass
 import kotlin.reflect.full.callSuspend
+import kotlin.reflect.full.declaredFunctions
 
 /**
  * Implementation of [ReplayWorkflow] using Kotlin coroutines.
@@ -347,7 +348,9 @@ internal class KotlinReplayWorkflow(
         try {
           interceptor.validateUpdate(updateInput)
         } catch (e: Throwable) {
-          callbacks.reject(createFailure(e.message ?: "Update validation failed", e))
+          // Include exception type in message for debugging
+          val msg = e.message ?: "[${e.javaClass.name}] Update validation failed"
+          callbacks.reject(createFailure(msg, e))
           return@launch
         }
 
@@ -653,8 +656,29 @@ internal class KotlinReplayWorkflow(
     }
 
     override fun validateUpdate(input: KUpdateInput) {
+      val instance = workflowInstance.get()
+        ?: throw IllegalStateException("Workflow instance not initialized")
       val ctx = workflowContext
         ?: throw IllegalStateException("Workflow context not initialized")
+
+      // First check for annotation-based validator method
+      val interfaceValidatorMethod = workflowDefinition.updateValidatorMethods[input.updateName]
+      if (interfaceValidatorMethod != null) {
+        // Get the actual implementation method (interface method is abstract)
+        val implValidatorMethod = workflowDefinition.workflowImplementationClass.declaredFunctions
+          .find { it.name == interfaceValidatorMethod.name }
+          ?: throw IllegalStateException(
+            "Validator method ${interfaceValidatorMethod.name} not found in implementation class"
+          )
+        // Validators must NOT be suspend functions
+        try {
+          implValidatorMethod.call(instance, *input.arguments)
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+          // Unwrap the exception thrown by the validator
+          throw e.targetException ?: e
+        }
+        return
+      }
 
       // Check for dynamically registered validator (by update name)
       val dynamicValidator = ctx.updateValidators[input.updateName]

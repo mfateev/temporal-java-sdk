@@ -52,6 +52,20 @@ class KotlinWorkflowImplementationFactory(
 
   companion object {
     const val DEFAULT_DEADLOCK_DETECTION_TIMEOUT_MS = 1000L
+
+    /**
+     * Checks if a class is a suspend-based Kotlin workflow.
+     *
+     * A class is considered a suspend-based workflow if:
+     * 1. It implements an interface annotated with @WorkflowInterface
+     * 2. The workflow method is a Kotlin suspend function
+     *
+     * @param implementationClass the workflow implementation class to check
+     * @return true if the class is a suspend-based workflow
+     */
+    fun isSuspendWorkflow(implementationClass: Class<*>): Boolean {
+      return KotlinWorkflowDefinition.isSuspendWorkflow(implementationClass)
+    }
   }
 
   private val workflowDefinitions = ConcurrentHashMap<String, KotlinWorkflowDefinition>()
