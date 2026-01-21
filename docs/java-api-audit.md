@@ -24,11 +24,15 @@ The Kotlin SDK proposal aims to eliminate direct Java SDK usage for common opera
 
 | Java API | Current Usage | Proposed Alternative |
 |----------|---------------|---------------------|
-| `KWorkerFactory(client)` | All samples | `KWorker(client, KWorkerOptions(...))` |
-| `factory.newWorker(taskQueue)` | All samples | Constructor takes options |
-| `factory.start()` | All samples | `worker.run()` |
+| `KWorkerFactory(client)` | Legacy samples | `KWorker(client, KWorkerOptions(...))` |
+| `factory.newWorker(taskQueue)` | Legacy samples | Constructor takes options |
+| `factory.start()` | Legacy samples | `worker.run()` or `worker.start()` |
 
-**Status:** `KWorker` direct constructor with `KWorkerOptions` is **not implemented**.
+**Status:** ✅ **Implemented**. `KWorker(client, KWorkerOptions)` supports:
+- `workflows` - list of workflow implementation classes
+- `activities` - list of activity implementation instances
+- `worker.run()` - blocks until shutdown
+- `worker.start()` - non-blocking start
 
 ### 3. Exception Types
 
@@ -63,15 +67,19 @@ These annotations are required and have no Kotlin alternatives:
 ### Current (Samples)
 
 ```kotlin
-// No Java APIs needed for client connection!
+// No Java APIs needed!
 val client = KClient.connect()  // Uses env vars or localhost:7233 default
 
-// Still requires KWorkerFactory
-val factory = KWorkerFactory(client)
-val worker = factory.newWorker(TASK_QUEUE)
-worker.registerWorkflowImplementationTypes<GreetingWorkflowImpl>()
-worker.registerActivitiesImplementations(GreetingActivitiesImpl())
-factory.start()
+// Simplified worker setup (Python/.NET pattern)
+val worker = KWorker(
+    client,
+    KWorkerOptions(
+        taskQueue = TASK_QUEUE,
+        workflows = listOf(GreetingWorkflowImpl::class),
+        activities = listOf(GreetingActivitiesImpl())
+    )
+)
+worker.run()  // Blocks until shutdown
 ```
 
 ### Proposed (from kotlin-idioms proposal)
@@ -101,13 +109,13 @@ worker.run()
    - Zero-arg version loads from environment variables with localhost:7233 default
    - Hides `WorkflowServiceStubs` from users
 
-2. **`KWorker` direct constructor** - Takes client and options directly
-   - `KWorkerOptions` should include `workflows` and `activities` lists
-   - Should eliminate need for `KWorkerFactory` for simple cases
+2. ~~**`KWorker` direct constructor**~~ ✅ **IMPLEMENTED** - Takes client and options directly
+   - `KWorkerOptions` includes `workflows` and `activities` lists
+   - Eliminates need for `KWorkerFactory` for simple cases
 
-3. **`worker.run()`** - Blocking run method
-   - Should block until shutdown signal or fatal error
-   - Should propagate fatal errors (unlike `factory.start()`)
+3. ~~**`worker.run()`**~~ ✅ **IMPLEMENTED** - Blocking run method
+   - Blocks until shutdown signal or fatal error
+   - Also provides `start()` for non-blocking startup
 
 ### Medium Priority (Improves developer experience)
 
@@ -134,7 +142,7 @@ The following Java API usages in `KWorkflow.kt` and `KActivity.kt` are **interna
 ## Recommendations
 
 1. ~~Implement `KClient.connect()` to eliminate `WorkflowServiceStubs` from user code~~ ✅ **DONE**
-2. Implement `KWorker(client, options)` constructor to eliminate `KWorkerFactory` for simple cases
+2. ~~Implement `KWorker(client, options)` constructor to eliminate `KWorkerFactory` for simple cases~~ ✅ **DONE**
 3. Keep `KWorkerFactory` available for advanced use cases (multiple workers, dynamic registration)
 4. Consider keeping exception types as-is (low-frequency usage)
 5. Consider `kotlinx.datetime` for timestamp types in future version
