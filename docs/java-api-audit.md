@@ -12,10 +12,13 @@ The Kotlin SDK proposal aims to eliminate direct Java SDK usage for common opera
 
 | Java API | Current Usage | Proposed Alternative |
 |----------|---------------|---------------------|
-| `WorkflowServiceStubs.newLocalServiceStubs()` | All samples | `KClient.connect(KClientOptions(...))` |
+| `WorkflowServiceStubs.newLocalServiceStubs()` | All samples | `KClient.connect()` |
 | `WorkflowServiceStubs.newServiceStubs(options)` | Production apps | `KClient.connect(KClientOptions(...))` |
 
-**Status:** `KClient.connect()` factory method is **not implemented**.
+**Status:** ✅ **Implemented**. `KClient.connect()` supports:
+- `connect()` - loads from environment variables (TEMPORAL_ADDRESS, etc.) with localhost:7233 default
+- `connect(options: KClientOptions)` - explicit configuration
+- `connect(profile: ClientConfigProfile)` - uses Java envconfig profile
 
 ### 2. Worker Factory
 
@@ -60,11 +63,10 @@ These annotations are required and have no Kotlin alternatives:
 ### Current (Samples)
 
 ```kotlin
-// Requires Java WorkflowServiceStubs
-val service = WorkflowServiceStubs.newLocalServiceStubs()
-val client = KClient(service)
+// No Java APIs needed for client connection!
+val client = KClient.connect()  // Uses env vars or localhost:7233 default
 
-// Requires KWorkerFactory
+// Still requires KWorkerFactory
 val factory = KWorkerFactory(client)
 val worker = factory.newWorker(TASK_QUEUE)
 worker.registerWorkflowImplementationTypes<GreetingWorkflowImpl>()
@@ -94,9 +96,10 @@ worker.run()
 
 ### High Priority (Blocks Java-free experience)
 
-1. **`KClient.connect()`** - Factory method that creates `WorkflowServiceStubs` internally
-   - Should accept `KClientOptions` with `target`, `namespace`, etc.
-   - Should hide `WorkflowServiceStubs` from users
+1. ~~**`KClient.connect()`**~~ ✅ **IMPLEMENTED** - Factory method that creates `WorkflowServiceStubs` internally
+   - Accepts `KClientOptions` with `target`, `namespace`, etc.
+   - Zero-arg version loads from environment variables with localhost:7233 default
+   - Hides `WorkflowServiceStubs` from users
 
 2. **`KWorker` direct constructor** - Takes client and options directly
    - `KWorkerOptions` should include `workflows` and `activities` lists
@@ -130,7 +133,7 @@ The following Java API usages in `KWorkflow.kt` and `KActivity.kt` are **interna
 
 ## Recommendations
 
-1. Implement `KClient.connect()` to eliminate `WorkflowServiceStubs` from user code
+1. ~~Implement `KClient.connect()` to eliminate `WorkflowServiceStubs` from user code~~ ✅ **DONE**
 2. Implement `KWorker(client, options)` constructor to eliminate `KWorkerFactory` for simple cases
 3. Keep `KWorkerFactory` available for advanced use cases (multiple workers, dynamic registration)
 4. Consider keeping exception types as-is (low-frequency usage)

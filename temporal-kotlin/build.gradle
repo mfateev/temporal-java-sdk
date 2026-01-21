@@ -21,6 +21,7 @@ dependencies {
 
     // this module shouldn't carry temporal-sdk with it, especially for situations when users may be using a shaded artifact
     compileOnly project(':temporal-sdk')
+    compileOnly project(':temporal-envconfig')
 
     implementation "org.jetbrains.kotlin:kotlin-reflect"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"

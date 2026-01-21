@@ -133,10 +133,64 @@ public class KClient(
      * @return A new KClient instance
      */
     @JvmStatic
-    public suspend fun connect(options: KClientOptions = KClientOptions()): KClient {
+    public suspend fun connect(options: KClientOptions): KClient {
       return withContext(Dispatchers.IO) {
         val serviceStubs = WorkflowServiceStubs.newServiceStubs(options.toServiceStubsOptions())
         val client = WorkflowClient.newInstance(serviceStubs, options.toClientOptions())
+        KClient(client)
+      }
+    }
+
+    /**
+     * Connect to Temporal service using environment configuration.
+     *
+     * Loads configuration from environment variables and optional config file:
+     * - TEMPORAL_ADDRESS (default: localhost:7233)
+     * - TEMPORAL_NAMESPACE (default: "default")
+     * - TEMPORAL_API_KEY
+     * - TEMPORAL_TLS, TEMPORAL_TLS_CLIENT_CERT_PATH, etc.
+     * - TEMPORAL_PROFILE (selects profile from config file)
+     *
+     * Example:
+     * ```kotlin
+     * // Uses TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE env vars, or defaults to localhost
+     * val client = KClient.connect()
+     * ```
+     *
+     * @return A new KClient instance
+     * @throws java.io.IOException if config file cannot be read
+     */
+    @JvmStatic
+    public suspend fun connect(): KClient {
+      return withContext(Dispatchers.IO) {
+        val profile = io.temporal.envconfig.ClientConfigProfile.load()
+        val serviceStubs = WorkflowServiceStubs.newServiceStubs(profile.toWorkflowServiceStubsOptions())
+        val client = WorkflowClient.newInstance(serviceStubs, profile.toWorkflowClientOptions())
+        KClient(client)
+      }
+    }
+
+    /**
+     * Connect to Temporal service using a specific configuration profile.
+     *
+     * Example:
+     * ```kotlin
+     * val profile = ClientConfigProfile.load(
+     *     LoadClientConfigProfileOptions.newBuilder()
+     *         .setConfigFileProfile("staging")
+     *         .build()
+     * )
+     * val client = KClient.connect(profile)
+     * ```
+     *
+     * @param profile The loaded configuration profile
+     * @return A new KClient instance
+     */
+    @JvmStatic
+    public suspend fun connect(profile: io.temporal.envconfig.ClientConfigProfile): KClient {
+      return withContext(Dispatchers.IO) {
+        val serviceStubs = WorkflowServiceStubs.newServiceStubs(profile.toWorkflowServiceStubsOptions())
+        val client = WorkflowClient.newInstance(serviceStubs, profile.toWorkflowClientOptions())
         KClient(client)
       }
     }
