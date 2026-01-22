@@ -144,9 +144,8 @@ class KDynamicWorkflowTest {
       // Execute activity using KWorkflow API
       val activityResult = KWorkflow.executeActivity<String>(
         "testActivity",
-        KActivityOptions(startToCloseTimeout = 10.seconds),
-        greeting,
-        signalValue
+        listOf(greeting, signalValue),
+        KActivityOptions(startToCloseTimeout = 10.seconds)
       )
 
       return "workflowType=$workflowType, activity=$activityResult"

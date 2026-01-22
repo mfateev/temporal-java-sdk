@@ -725,37 +725,87 @@ public object KWorkflow {
   public const val DEFAULT_VERSION: Int = Workflow.DEFAULT_VERSION
 
   /**
-   * Executes an activity by name and waits for the result.
-   *
-   * This is a suspend function that will suspend the coroutine until
-   * the activity completes.
+   * Executes an activity by name with no arguments and waits for the result.
    *
    * Example:
    * ```kotlin
    * val result: String = KWorkflow.executeActivity(
    *   "myActivity",
-   *   options = KActivityOptions(startToCloseTimeout = 5.minutes),
-   *   "arg1", 42
+   *   KActivityOptions(startToCloseTimeout = 5.minutes)
    * )
    * ```
    *
    * @param R the expected return type of the activity
    * @param activityName the name of the activity to execute
    * @param options the activity options
-   * @param args arguments to pass to the activity
    * @return the activity result
    * @throws ActivityException if the activity fails
    */
   public suspend inline fun <reified R> executeActivity(
     activityName: String,
-    options: KActivityOptions,
-    vararg args: Any?
+    options: KActivityOptions
   ): R {
-    return executeActivity(activityName, R::class.java, options, *args)
+    return executeActivityByName(activityName, R::class.java, options)
+  }
+
+  /**
+   * Executes an activity by name with one argument and waits for the result.
+   *
+   * Example:
+   * ```kotlin
+   * val result: String = KWorkflow.executeActivity(
+   *   "myActivity",
+   *   "inputArg",
+   *   KActivityOptions(startToCloseTimeout = 5.minutes)
+   * )
+   * ```
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param arg the argument to pass to the activity
+   * @param options the activity options
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend inline fun <reified R> executeActivity(
+    activityName: String,
+    arg: Any?,
+    options: KActivityOptions
+  ): R {
+    return executeActivityByName(activityName, R::class.java, options, arg)
+  }
+
+  /**
+   * Executes an activity by name with multiple arguments and waits for the result.
+   *
+   * Example:
+   * ```kotlin
+   * val result: String = KWorkflow.executeActivity(
+   *   "myActivity",
+   *   listOf("arg1", 42),
+   *   KActivityOptions(startToCloseTimeout = 5.minutes)
+   * )
+   * ```
+   *
+   * @param R the expected return type of the activity
+   * @param activityName the name of the activity to execute
+   * @param args the arguments to pass to the activity
+   * @param options the activity options
+   * @return the activity result
+   * @throws ActivityException if the activity fails
+   */
+  public suspend inline fun <reified R> executeActivity(
+    activityName: String,
+    args: List<Any?>,
+    options: KActivityOptions
+  ): R {
+    return executeActivityByName(activityName, R::class.java, options, *args.toTypedArray())
   }
 
   /**
    * Executes an activity by name and waits for the result.
+   *
+   * Internal implementation that takes the result class explicitly.
    *
    * @param R the expected return type of the activity
    * @param activityName the name of the activity to execute
@@ -765,7 +815,8 @@ public object KWorkflow {
    * @return the activity result
    * @throws ActivityException if the activity fails
    */
-  public suspend fun <R> executeActivity(
+  @PublishedApi
+  internal suspend fun <R> executeActivityByName(
     activityName: String,
     resultClass: Class<R>,
     options: KActivityOptions,
@@ -804,7 +855,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options)
+    return executeActivityByName(activityName, resultClass as Class<R>, options)
   }
 
   /**
@@ -825,7 +876,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1)
+    return executeActivityByName(activityName, resultClass as Class<R>, options, arg1)
   }
 
   /**
@@ -847,7 +898,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -860,7 +911,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -873,7 +924,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -886,7 +937,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -899,7 +950,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   // ==================== Typed Suspend Activity Execution (Method Reference) ====================
@@ -923,7 +974,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options)
+    return executeActivityByName(activityName, resultClass as Class<R>, options)
   }
 
   /**
@@ -937,7 +988,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, arg1)
+    return executeActivityByName(activityName, resultClass as Class<R>, options, arg1)
   }
 
   /**
@@ -951,7 +1002,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -965,7 +1016,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -979,7 +1030,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -993,7 +1044,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
@@ -1007,7 +1058,7 @@ public object KWorkflow {
   ): R {
     val (activityName, resultClass) = extractActivityMetadata(activity)
     @Suppress("UNCHECKED_CAST")
-    return executeActivity(activityName, resultClass as Class<R>, options, *args.toArray())
+    return executeActivityByName(activityName, resultClass as Class<R>, options, *args.toArray())
   }
 
   /**
