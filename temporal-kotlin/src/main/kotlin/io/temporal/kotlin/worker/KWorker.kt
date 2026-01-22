@@ -32,9 +32,12 @@ import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkflowImplementationOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.reflect.KClass
 
 /**
@@ -203,15 +206,25 @@ public class KWorker private constructor(
   // ========== Lifecycle Methods ==========
 
   /**
-   * Starts the worker and blocks until shutdown or a fatal error occurs.
+   * Starts the worker and suspends until shutdown, cancellation, or a fatal error occurs.
    *
-   * This method starts the underlying worker factory and then awaits termination,
-   * propagating any fatal errors that occur during execution.
+   * This method starts the underlying worker factory and then awaits termination.
+   * It properly respects coroutine cancellation, making it suitable for use with
+   * shutdown hooks or structured concurrency.
    *
    * Example:
    * ```kotlin
-   * val worker = KWorker(client, options)
-   * worker.run()  // Blocks until shutdown
+   * fun main() = runBlocking {
+   *   val worker = KWorker(client, options)
+   *   val job = launch { worker.run() }
+   *
+   *   // Hook Ctrl+C to cancel the worker
+   *   Runtime.getRuntime().addShutdownHook(Thread {
+   *     runBlocking { job.cancelAndJoin() }
+   *   })
+   *
+   *   job.join()
+   * }
    * ```
    *
    * @throws IllegalStateException if called on a worker created via KWorkerFactory
@@ -225,9 +238,28 @@ public class KWorker private constructor(
 
     factory.start()
 
-    // Await termination indefinitely
-    withContext(Dispatchers.IO) {
-      factory.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+    // Block until cancelled or factory terminates
+    suspendCancellableCoroutine<Unit> { cont ->
+      // Start a thread that waits for factory termination
+      val waiterThread = thread(name = "kworker-termination-waiter") {
+        factory.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        if (cont.isActive) {
+          cont.resumeWith(Result.success(Unit))
+        }
+      }
+
+      cont.invokeOnCancellation {
+        // On cancellation, shutdown the factory which will cause awaitTermination to return
+        factory.shutdown()
+        // Wait briefly for the waiter thread to complete
+        waiterThread.join(5000)
+      }
+    }
+
+    // Ensure graceful shutdown completes
+    withContext(NonCancellable + Dispatchers.IO) {
+      factory.shutdown()
+      factory.awaitTermination(30, TimeUnit.SECONDS)
     }
   }
 
