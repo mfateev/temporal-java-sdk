@@ -69,8 +69,8 @@ import java.time.Instant
  *         @JvmField
  *         @RegisterExtension
  *         val testWorkflow = kTestWorkflowExtension {
- *             registerWorkflowImplementationTypes<MyWorkflowImpl>()
- *             setActivityImplementations(MyActivitiesImpl())
+ *             workflowImplementationTypes = listOf(MyWorkflowImpl::class)
+ *             activityImplementations = listOf(MyActivitiesImpl())
  *         }
  *     }
  *
@@ -108,9 +108,8 @@ public class KTestWorkflowExtension private constructor(
     private data class ExtensionConfig(
         val namespace: String?,
         val workflowTypes: Map<Class<*>, WorkflowImplementationOptions>,
-        val activityImplementations: Array<Any>,
-        val suspendActivityImplementations: Array<Any>,
-        val nexusServiceImplementations: Array<Any>,
+        val activityImplementations: List<Any>,
+        val nexusServiceImplementations: List<Any>,
         val workerOptions: WorkerOptions,
         val workerFactoryOptions: WorkerFactoryOptions?,
         val workflowClientOptions: WorkflowClientOptions?,
@@ -120,46 +119,7 @@ public class KTestWorkflowExtension private constructor(
         val initialTimeMillis: Long,
         val useTimeskipping: Boolean,
         val searchAttributes: Map<String, IndexedValueType>,
-    ) {
-        // Override equals/hashCode because arrays are compared by reference by default
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is ExtensionConfig) return false
-
-            return namespace == other.namespace &&
-                workflowTypes == other.workflowTypes &&
-                activityImplementations.contentEquals(other.activityImplementations) &&
-                suspendActivityImplementations.contentEquals(other.suspendActivityImplementations) &&
-                nexusServiceImplementations.contentEquals(other.nexusServiceImplementations) &&
-                workerOptions == other.workerOptions &&
-                workerFactoryOptions == other.workerFactoryOptions &&
-                workflowClientOptions == other.workflowClientOptions &&
-                useExternalService == other.useExternalService &&
-                target == other.target &&
-                doNotStart == other.doNotStart &&
-                initialTimeMillis == other.initialTimeMillis &&
-                useTimeskipping == other.useTimeskipping &&
-                searchAttributes == other.searchAttributes
-        }
-
-        override fun hashCode(): Int {
-            var result = namespace?.hashCode() ?: 0
-            result = 31 * result + workflowTypes.hashCode()
-            result = 31 * result + activityImplementations.contentHashCode()
-            result = 31 * result + suspendActivityImplementations.contentHashCode()
-            result = 31 * result + nexusServiceImplementations.contentHashCode()
-            result = 31 * result + workerOptions.hashCode()
-            result = 31 * result + (workerFactoryOptions?.hashCode() ?: 0)
-            result = 31 * result + (workflowClientOptions?.hashCode() ?: 0)
-            result = 31 * result + useExternalService.hashCode()
-            result = 31 * result + (target?.hashCode() ?: 0)
-            result = 31 * result + doNotStart.hashCode()
-            result = 31 * result + initialTimeMillis.hashCode()
-            result = 31 * result + useTimeskipping.hashCode()
-            result = 31 * result + searchAttributes.hashCode()
-            return result
-        }
-    }
+    )
 
     /**
      * Set of parameter types that can be resolved by this extension.
@@ -297,21 +257,9 @@ public class KTestWorkflowExtension private constructor(
         val dynamicHandler = KDynamicActivityHandler(activityRegistry)
         worker.registerActivitiesImplementations(dynamicHandler)
 
-        // Register regular activities via the unified registry
+        // Register activities via the unified registry
         // KDynamicActivity implementations are set as the fallback in the registry
-        if (config.activityImplementations.isNotEmpty()) {
-            config.activityImplementations.forEach { activity ->
-                if (activity is KDynamicActivity) {
-                    activityRegistry.dynamicActivityFallback = activity
-                } else {
-                    activityRegistry.register(activity)
-                }
-            }
-        }
-
-        // Register suspend activities via the unified registry
-        // KDynamicActivity implementations are set as the fallback in the registry
-        config.suspendActivityImplementations.forEach { activity ->
+        config.activityImplementations.forEach { activity ->
             if (activity is KDynamicActivity) {
                 activityRegistry.dynamicActivityFallback = activity
             } else {
@@ -321,7 +269,7 @@ public class KTestWorkflowExtension private constructor(
 
         // Register Nexus services
         if (config.nexusServiceImplementations.isNotEmpty()) {
-            worker.registerNexusServiceImplementation(*config.nexusServiceImplementations)
+            worker.registerNexusServiceImplementation(*config.nexusServiceImplementations.toTypedArray())
         }
 
         // Start unless doNotStart is set
@@ -422,10 +370,10 @@ public class KTestWorkflowExtension private constructor(
          *
          * Example:
          * ```kotlin
-         * val extension = KTestWorkflowExtension.newBuilder()
-         *     .registerWorkflowImplementationTypes<MyWorkflowImpl>()
-         *     .setActivityImplementations(MyActivitiesImpl())
-         *     .build()
+         * val extension = KTestWorkflowExtension.newBuilder().apply {
+         *     workflowImplementationTypes = listOf(MyWorkflowImpl::class)
+         *     activityImplementations = listOf(MyActivitiesImpl())
+         * }.build()
          * ```
          */
         @JvmStatic
@@ -437,19 +385,16 @@ public class KTestWorkflowExtension private constructor(
     /**
      * Builder for [KTestWorkflowExtension].
      *
-     * Provides a fluent API for configuring the test extension with workflow
+     * Provides a Kotlin-idiomatic DSL for configuring the test extension with workflow
      * implementations, activity implementations, and test environment options.
      */
     @TemporalDsl
     public class Builder internal constructor() {
-        // Commit 13: Basic properties
         private var _namespace: String? = null
 
-        @PublishedApi
-        internal val workflowTypes = mutableMapOf<Class<*>, WorkflowImplementationOptions>()
-        private var activityImplementations: Array<Any> = emptyArray()
-        private var suspendActivityImplementations: Array<Any> = emptyArray()
-        private var nexusServiceImplementations: Array<Any> = emptyArray()
+        private val _workflowTypes = mutableMapOf<Class<*>, WorkflowImplementationOptions>()
+        private var _activityImplementations: List<Any> = emptyList()
+        private var _nexusServiceImplementations: List<Any> = emptyList()
 
         // Commit 14: Service configuration
         private var workerOptions: WorkerOptions = WorkerOptions.getDefaultInstance()
@@ -511,114 +456,52 @@ public class KTestWorkflowExtension private constructor(
                 _doNotStart = value
             }
 
-        // ========== Commit 13: Workflow registration ==========
+        // ========== Workflow registration ==========
 
         /**
-         * Register workflow implementation types using reified generics.
+         * Workflow implementation types to register.
          *
          * Example:
          * ```kotlin
-         * registerWorkflowImplementationTypes<MyWorkflowImpl>()
+         * workflowImplementationTypes = listOf(MyWorkflowImpl::class)
          * ```
          */
-        public inline fun <reified T : Any> registerWorkflowImplementationTypes() {
-            workflowTypes[T::class.java] = WorkflowImplementationOptions.newBuilder().build()
-        }
+        public var workflowImplementationTypes: List<kotlin.reflect.KClass<*>>
+            get() = _workflowTypes.keys.map { it.kotlin }
+            set(value) {
+                val defaultOptions = WorkflowImplementationOptions.newBuilder().build()
+                value.forEach { _workflowTypes[it.java] = defaultOptions }
+            }
+
+        // ========== Activity registration ==========
 
         /**
-         * Register workflow implementation types with options DSL.
+         * Activity implementations to register.
          *
          * Example:
          * ```kotlin
-         * registerWorkflowImplementationTypes<MyWorkflowImpl> {
-         *     setFailWorkflowExceptionTypes(IllegalArgumentException::class.java)
-         * }
+         * activityImplementations = listOf(MyActivitiesImpl(), AnotherActivitiesImpl())
          * ```
          */
-        public inline fun <reified T : Any> registerWorkflowImplementationTypes(
-            options: WorkflowImplementationOptions.Builder.() -> Unit,
-        ) {
-            workflowTypes[T::class.java] = WorkflowImplementationOptions.newBuilder()
-                .apply(options)
-                .build()
-        }
+        public var activityImplementations: List<Any>
+            get() = _activityImplementations
+            set(value) {
+                _activityImplementations = value
+            }
 
         /**
-         * Register workflow implementation types from Java Class objects.
+         * Nexus service implementations to register.
          *
          * Example:
          * ```kotlin
-         * registerWorkflowImplementationTypes(
-         *     MyWorkflowImpl::class.java,
-         *     AnotherWorkflowImpl::class.java
-         * )
+         * nexusServiceImplementations = listOf(MyNexusServiceImpl())
          * ```
          */
-        public fun registerWorkflowImplementationTypes(vararg classes: Class<*>) {
-            val defaultOptions = WorkflowImplementationOptions.newBuilder().build()
-            classes.forEach { workflowTypes[it] = defaultOptions }
-        }
-
-        /**
-         * Register workflow implementation types with options.
-         *
-         * Example:
-         * ```kotlin
-         * val options = WorkflowImplementationOptions.newBuilder()
-         *     .setFailWorkflowExceptionTypes(IllegalArgumentException::class.java)
-         *     .build()
-         * registerWorkflowImplementationTypes(options, MyWorkflowImpl::class.java)
-         * ```
-         */
-        public fun registerWorkflowImplementationTypes(
-            options: WorkflowImplementationOptions,
-            vararg classes: Class<*>,
-        ) {
-            classes.forEach { workflowTypes[it] = options }
-        }
-
-        // ========== Commit 13: Activity registration ==========
-
-        /**
-         * Set regular activity implementations.
-         *
-         * Example:
-         * ```kotlin
-         * setActivityImplementations(
-         *     MyActivitiesImpl(),
-         *     AnotherActivitiesImpl()
-         * )
-         * ```
-         */
-        public fun setActivityImplementations(vararg activities: Any) {
-            activityImplementations = arrayOf(*activities)
-        }
-
-        /**
-         * Set suspend activity implementations.
-         *
-         * Suspend activities are automatically wrapped for Temporal execution.
-         *
-         * Example:
-         * ```kotlin
-         * setSuspendActivityImplementations(MySuspendActivitiesImpl())
-         * ```
-         */
-        public fun setSuspendActivityImplementations(vararg activities: Any) {
-            suspendActivityImplementations = arrayOf(*activities)
-        }
-
-        /**
-         * Set Nexus service implementations.
-         *
-         * Example:
-         * ```kotlin
-         * setNexusServiceImplementations(MyNexusServiceImpl())
-         * ```
-         */
-        public fun setNexusServiceImplementations(vararg services: Any) {
-            nexusServiceImplementations = arrayOf(*services)
-        }
+        public var nexusServiceImplementations: List<Any>
+            get() = _nexusServiceImplementations
+            set(value) {
+                _nexusServiceImplementations = value
+            }
 
         // ========== Commit 14: Service configuration ==========
 
@@ -745,10 +628,9 @@ public class KTestWorkflowExtension private constructor(
             return KTestWorkflowExtension(
                 ExtensionConfig(
                     namespace = _namespace,
-                    workflowTypes = workflowTypes.toMap(),
-                    activityImplementations = activityImplementations,
-                    suspendActivityImplementations = suspendActivityImplementations,
-                    nexusServiceImplementations = nexusServiceImplementations,
+                    workflowTypes = _workflowTypes.toMap(),
+                    activityImplementations = _activityImplementations,
+                    nexusServiceImplementations = _nexusServiceImplementations,
                     workerOptions = workerOptions,
                     workerFactoryOptions = workerFactoryOptions,
                     workflowClientOptions = workflowClientOptions,
@@ -777,8 +659,8 @@ public class KTestWorkflowExtension private constructor(
  *         @JvmField
  *         @RegisterExtension
  *         val testWorkflow = kTestWorkflowExtension {
- *             registerWorkflowImplementationTypes<MyWorkflowImpl>()
- *             setActivityImplementations(MyActivitiesImpl())
+ *             workflowImplementationTypes = listOf(MyWorkflowImpl::class)
+ *             activityImplementations = listOf(MyActivitiesImpl())
  *
  *             workerOptions {
  *                 maxConcurrentActivityExecutionSize = 100

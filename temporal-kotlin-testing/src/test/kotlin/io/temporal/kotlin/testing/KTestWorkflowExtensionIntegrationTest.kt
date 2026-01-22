@@ -129,10 +129,12 @@ class KTestWorkflowExtensionIntegrationTest {
         @JvmField
         @RegisterExtension
         val extension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<GreetingWorkflowImpl>()
-            registerWorkflowImplementationTypes<TimerWorkflowImpl>()
-            registerWorkflowImplementationTypes<WorkflowWithActivityImpl>()
-            setActivityImplementations(GreetingActivitiesImpl())
+            workflowImplementationTypes = listOf(
+                GreetingWorkflowImpl::class,
+                TimerWorkflowImpl::class,
+                WorkflowWithActivityImpl::class,
+            )
+            activityImplementations = listOf(GreetingActivitiesImpl())
             useTimeskipping = true
             searchAttributes {
                 register("CustomKeyword", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD)
@@ -324,7 +326,7 @@ class KTestWorkflowExtensionNamespaceTest {
         @RegisterExtension
         val extension = kTestWorkflowExtension {
             namespace = "custom-test-namespace"
-            registerWorkflowImplementationTypes<SimpleWorkflowImpl>()
+            workflowImplementationTypes = listOf(SimpleWorkflowImpl::class)
         }
     }
 
@@ -367,7 +369,7 @@ class KTestWorkflowExtensionInitialTimeTest {
         @RegisterExtension
         val extension = kTestWorkflowExtension {
             initialTime = Instant.parse("2024-06-15T12:00:00Z")
-            registerWorkflowImplementationTypes<SimpleWorkflowImpl>()
+            workflowImplementationTypes = listOf(SimpleWorkflowImpl::class)
         }
     }
 

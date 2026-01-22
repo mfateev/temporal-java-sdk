@@ -746,9 +746,9 @@ public class KClient(
    * ```kotlin
    * val handle = client.signalWithStart(
    *     workflowType = "DynamicWF",
+   *     workflowArgs = arrayOf("Hello"),
    *     signalName = "greetingSignal",
    *     signalArgs = arrayOf("John"),
-   *     workflowArgs = arrayOf("Hello"),
    *     options = KWorkflowOptions(
    *         workflowId = "dynamic-123",
    *         taskQueue = "dynamic-queue"
@@ -757,17 +757,17 @@ public class KClient(
    * ```
    *
    * @param workflowType the workflow type name
+   * @param workflowArgs arguments for the workflow
    * @param signalName the signal name
    * @param signalArgs arguments for the signal
-   * @param workflowArgs arguments for the workflow
    * @param options workflow options
    * @return a handle for the started workflow
    */
   public suspend fun signalWithStart(
     workflowType: String,
+    workflowArgs: Array<out Any?> = emptyArray(),
     signalName: String,
     signalArgs: Array<out Any?> = emptyArray(),
-    workflowArgs: Array<out Any?> = emptyArray(),
     options: KWorkflowOptions
   ): WorkflowHandle {
     return withContext(Dispatchers.IO) {
@@ -785,8 +785,8 @@ public class KClient(
    */
   public suspend fun <T, R> signalWithStart(
     workflow: KFunction1<T, R>,
-    options: KWorkflowOptions,
-    signal: KFunction1<T, *>
+    signal: KFunction1<T, *>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -808,9 +808,9 @@ public class KClient(
    */
   public suspend fun <T, R, SA1> signalWithStart(
     workflow: KFunction1<T, R>,
-    options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
-    signalArg: SA1
+    signalArg: SA1,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -833,9 +833,9 @@ public class KClient(
    */
   public suspend fun <T, R, SA1, SA2> signalWithStart(
     workflow: KFunction1<T, R>,
-    options: KWorkflowOptions,
     signal: KFunction3<T, SA1, SA2, *>,
-    signalArgs: KArgs2<SA1, SA2>
+    signalArgs: KArgs2<SA1, SA2>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -858,8 +858,8 @@ public class KClient(
   public suspend fun <T, A1, R> signalWithStart(
     workflow: KFunction2<T, A1, R>,
     workflowArg: A1,
-    options: KWorkflowOptions,
-    signal: KFunction1<T, *>
+    signal: KFunction1<T, *>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -883,9 +883,9 @@ public class KClient(
   public suspend fun <T, A1, R, SA1> signalWithStart(
     workflow: KFunction2<T, A1, R>,
     workflowArg: A1,
-    options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
-    signalArg: SA1
+    signalArg: SA1,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -910,9 +910,9 @@ public class KClient(
   public suspend fun <T, A1, R, SA1, SA2> signalWithStart(
     workflow: KFunction2<T, A1, R>,
     workflowArg: A1,
-    options: KWorkflowOptions,
     signal: KFunction3<T, SA1, SA2, *>,
-    signalArgs: KArgs2<SA1, SA2>
+    signalArgs: KArgs2<SA1, SA2>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -936,8 +936,8 @@ public class KClient(
   public suspend fun <T, A1, A2, R> signalWithStart(
     workflow: KFunction3<T, A1, A2, R>,
     workflowArgs: KArgs2<A1, A2>,
-    options: KWorkflowOptions,
-    signal: KFunction1<T, *>
+    signal: KFunction1<T, *>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -960,9 +960,9 @@ public class KClient(
   public suspend fun <T, A1, A2, R, SA1> signalWithStart(
     workflow: KFunction3<T, A1, A2, R>,
     workflowArgs: KArgs2<A1, A2>,
-    options: KWorkflowOptions,
     signal: KFunction2<T, SA1, *>,
-    signalArg: SA1
+    signalArg: SA1,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
@@ -986,9 +986,9 @@ public class KClient(
   public suspend fun <T, A1, A2, R, SA1, SA2> signalWithStart(
     workflow: KFunction3<T, A1, A2, R>,
     workflowArgs: KArgs2<A1, A2>,
-    options: KWorkflowOptions,
     signal: KFunction3<T, SA1, SA2, *>,
-    signalArgs: KArgs2<SA1, SA2>
+    signalArgs: KArgs2<SA1, SA2>,
+    options: KWorkflowOptions
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)

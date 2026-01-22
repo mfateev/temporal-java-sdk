@@ -51,7 +51,7 @@ class KSimpleDynamicWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<SimpleDynamicWorkflow>()
+            workflowImplementationTypes = listOf(SimpleDynamicWorkflow::class)
         }
     }
 

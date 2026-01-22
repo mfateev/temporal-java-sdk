@@ -126,8 +126,10 @@ class KActivityMockingIntegrationTest {
         @JvmField
         @RegisterExtension
         val extension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<WorkflowWithActivityImpl>()
-            registerWorkflowImplementationTypes<WorkflowWithMultipleActivitiesImpl>()
+            workflowImplementationTypes = listOf(
+                WorkflowWithActivityImpl::class,
+                WorkflowWithMultipleActivitiesImpl::class,
+            )
             // Note: No activity implementations are registered here
             // They will be mocked via testEnv.registerActivitiesImplementations()
         }
@@ -356,7 +358,7 @@ class KRealActivityRegistrationTest {
         @JvmField
         @RegisterExtension
         val extension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<CalculatorWorkflowImpl>()
+            workflowImplementationTypes = listOf(CalculatorWorkflowImpl::class)
         }
     }
 

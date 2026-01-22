@@ -65,7 +65,7 @@ class KMultipleSignalBufferingWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<MultipleSignalBufferingWorkflow>()
+            workflowImplementationTypes = listOf(MultipleSignalBufferingWorkflow::class)
         }
     }
 

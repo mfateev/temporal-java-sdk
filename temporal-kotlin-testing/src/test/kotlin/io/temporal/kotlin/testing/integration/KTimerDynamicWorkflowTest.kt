@@ -54,7 +54,7 @@ class KTimerDynamicWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<TimerDynamicWorkflow>()
+            workflowImplementationTypes = listOf(TimerDynamicWorkflow::class)
         }
     }
 

@@ -62,7 +62,7 @@ class KSignalAfterRegistrationWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<SignalAfterRegistrationWorkflow>()
+            workflowImplementationTypes = listOf(SignalAfterRegistrationWorkflow::class)
         }
     }
 

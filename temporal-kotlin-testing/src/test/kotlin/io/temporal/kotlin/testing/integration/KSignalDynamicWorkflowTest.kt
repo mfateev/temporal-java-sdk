@@ -89,8 +89,8 @@ class KSignalDynamicWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<SignalDynamicWorkflow>()
-            setActivityImplementations(TestDynamicActivity())
+            workflowImplementationTypes = listOf(SignalDynamicWorkflow::class)
+            activityImplementations = listOf(TestDynamicActivity())
         }
     }
 

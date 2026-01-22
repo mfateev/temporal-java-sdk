@@ -69,7 +69,7 @@ class KSpecificHandlerPrecedenceWorkflowTest {
         @JvmField
         @RegisterExtension
         val testExtension = kTestWorkflowExtension {
-            registerWorkflowImplementationTypes<SpecificHandlerPrecedenceWorkflow>()
+            workflowImplementationTypes = listOf(SpecificHandlerPrecedenceWorkflow::class)
         }
     }
 
