@@ -170,6 +170,12 @@ internal class KotlinWorkflowContext(
   internal var dynamicSignalHandler: DynamicSignalHandler? = null
 
   /**
+   * Buffer for signals that arrive before a dynamic handler is registered.
+   * These will be replayed when registerDynamicSignalHandler is called.
+   */
+  internal val bufferedSignals = mutableListOf<Pair<String, KEncodedValues>>()
+
+  /**
    * Registered query handlers by query name.
    */
   internal val queryHandlers = ConcurrentHashMap<String, QueryHandler<*>>()
@@ -1017,13 +1023,23 @@ internal class KotlinWorkflowContext(
   /**
    * Registers a dynamic signal handler for all unhandled signals.
    *
+   * Any signals that were buffered before this handler was registered will be
+   * replayed to the handler.
+   *
    * @param handler the handler function to invoke for unhandled signals
    */
-  fun registerDynamicSignalHandler(handler: DynamicSignalHandler) {
+  suspend fun registerDynamicSignalHandler(handler: DynamicSignalHandler) {
     if (dynamicSignalHandler != null) {
       throw IllegalArgumentException("Dynamic signal handler already registered")
     }
     dynamicSignalHandler = handler
+
+    // Replay any buffered signals that arrived before the handler was registered
+    val signalsToReplay = bufferedSignals.toList()
+    bufferedSignals.clear()
+    for ((signalName, encodedValues) in signalsToReplay) {
+      handler(signalName, encodedValues)
+    }
   }
 
   // ==================== Query Handler Registration ====================

@@ -26,7 +26,9 @@ import io.temporal.common.converter.DataConverter
 import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.worker.WorkflowImplementationFactory
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.workflow.KDynamicWorkflow
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.reflect.KClass
 
 /**
  * Factory for creating Kotlin coroutine-based workflow implementations.
@@ -69,6 +71,7 @@ class KotlinWorkflowImplementationFactory(
   }
 
   private val workflowDefinitions = ConcurrentHashMap<String, KotlinWorkflowDefinition>()
+  private var dynamicWorkflowClass: KClass<out KDynamicWorkflow>? = null
 
   /**
    * Registers a workflow implementation type with this factory.
@@ -107,18 +110,52 @@ class KotlinWorkflowImplementationFactory(
     implementationClasses.forEach { registerWorkflowImplementationType(it) }
   }
 
+  /**
+   * Registers a dynamic workflow implementation class.
+   *
+   * The dynamic workflow handles any workflow type that doesn't have
+   * a specifically registered implementation. Only one dynamic workflow
+   * can be registered per factory.
+   *
+   * @param dynamicWorkflowClass the dynamic workflow implementation class
+   * @throws IllegalStateException if a dynamic workflow is already registered
+   */
+  fun registerDynamicWorkflow(dynamicWorkflowClass: KClass<out KDynamicWorkflow>) {
+    if (this.dynamicWorkflowClass != null) {
+      throw IllegalStateException(
+        "Dynamic workflow is already registered: ${this.dynamicWorkflowClass!!.qualifiedName}"
+      )
+    }
+    this.dynamicWorkflowClass = dynamicWorkflowClass
+  }
+
   override fun getWorkflow(
     workflowType: WorkflowType,
     workflowExecution: WorkflowExecution
   ): ReplayWorkflow? {
-    val definition = workflowDefinitions[workflowType.name] ?: return null
+    // First try to find a registered workflow definition
+    val definition = workflowDefinitions[workflowType.name]
+    if (definition != null) {
+      return KotlinReplayWorkflow(
+        workflowDefinition = definition,
+        dataConverter = dataConverter,
+        deadlockDetectionTimeoutMs = deadlockDetectionTimeoutMs,
+        workerInterceptors = workerInterceptors
+      )
+    }
 
-    return KotlinReplayWorkflow(
-      workflowDefinition = definition,
-      dataConverter = dataConverter,
-      deadlockDetectionTimeoutMs = deadlockDetectionTimeoutMs,
-      workerInterceptors = workerInterceptors
-    )
+    // Fall back to dynamic workflow if registered
+    val dynamicClass = dynamicWorkflowClass
+    if (dynamicClass != null) {
+      return KotlinDynamicReplayWorkflow(
+        dynamicWorkflowClass = dynamicClass,
+        dataConverter = dataConverter,
+        deadlockDetectionTimeoutMs = deadlockDetectionTimeoutMs,
+        workerInterceptors = workerInterceptors
+      )
+    }
+
+    return null
   }
 
   override fun getRegisteredWorkflowTypes(): Set<String> {
@@ -126,6 +163,6 @@ class KotlinWorkflowImplementationFactory(
   }
 
   override fun isAnyTypeSupported(): Boolean {
-    return workflowDefinitions.isNotEmpty()
+    return workflowDefinitions.isNotEmpty() || dynamicWorkflowClass != null
   }
 }

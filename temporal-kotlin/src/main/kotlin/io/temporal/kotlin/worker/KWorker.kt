@@ -25,6 +25,7 @@ import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KotlinActivityWrapper
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.internal.KDynamicActivityWrapper
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
 import io.temporal.worker.WorkerFactoryOptions
@@ -181,6 +182,18 @@ public class KWorker private constructor(
       // Register activities
       if (options.activities.isNotEmpty()) {
         kWorker.registerActivitiesImplementations(*options.activities.toTypedArray())
+      }
+
+      // Register dynamic workflow with the Kotlin plugin for coroutine support
+      options.dynamicWorkflow?.let { dynamicWorkflowClass ->
+        kotlinPlugin.registerDynamicWorkflow(dynamicWorkflowClass)
+      }
+
+      // Register dynamic activity
+      options.dynamicActivity?.let { dynamicActivity ->
+        worker.registerActivitiesImplementations(
+          KDynamicActivityWrapper(dynamicActivity)
+        )
       }
 
       return kWorker

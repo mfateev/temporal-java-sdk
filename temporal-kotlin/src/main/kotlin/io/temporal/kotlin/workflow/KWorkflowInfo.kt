@@ -24,6 +24,10 @@ package io.temporal.kotlin.workflow
 
 import io.temporal.common.Priority
 import io.temporal.common.RetryOptions
+import io.temporal.internal.common.ProtoConverters
+import io.temporal.internal.replay.ReplayWorkflowContext
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toKotlin
 import io.temporal.workflow.WorkflowInfo
 import java.time.Instant
@@ -235,4 +239,86 @@ internal class KWorkflowInfoImpl(private val javaInfo: WorkflowInfo) : KWorkflow
 
   override val priority: Priority
     get() = javaInfo.priority
+}
+
+/**
+ * Internal implementation of [KWorkflowInfo] that gets data from [KotlinWorkflowContext].
+ *
+ * This implementation is used for Kotlin coroutine-based workflows and does not rely
+ * on Java SDK thread-local context.
+ */
+@InternalTemporalApi
+internal class KWorkflowInfoFromContext(private val context: KotlinWorkflowContext) : KWorkflowInfo {
+
+  private val replayContext: ReplayWorkflowContext
+    get() = context.replayContext
+
+  override val namespace: String
+    get() = replayContext.namespace
+
+  override val workflowId: String
+    get() = replayContext.workflowId
+
+  override val workflowType: String
+    get() = replayContext.workflowType.name
+
+  override val runId: String
+    get() = replayContext.runId
+
+  override val firstExecutionRunId: String
+    get() = replayContext.firstExecutionRunId
+
+  override val continuedExecutionRunId: String?
+    get() = replayContext.continuedExecutionRunId.orElse(null)
+
+  override val originalExecutionRunId: String
+    get() = replayContext.originalExecutionRunId
+
+  override val taskQueue: String
+    get() = replayContext.taskQueue
+
+  override val retryOptions: RetryOptions?
+    get() = replayContext.retryOptions
+
+  override val workflowRunTimeout: Duration
+    get() = replayContext.workflowRunTimeout.toKotlin()
+
+  override val workflowExecutionTimeout: Duration
+    get() = replayContext.workflowExecutionTimeout.toKotlin()
+
+  override val runStartedTimestamp: Instant
+    get() = Instant.ofEpochMilli(replayContext.runStartedTimestampMillis)
+
+  override val parentWorkflowId: String?
+    get() = replayContext.parentWorkflowExecution?.workflowId
+
+  override val parentRunId: String?
+    get() = replayContext.parentWorkflowExecution?.runId
+
+  override val rootWorkflowId: String?
+    get() = replayContext.rootWorkflowExecution?.workflowId
+
+  override val rootRunId: String?
+    get() = replayContext.rootWorkflowExecution?.runId
+
+  override val attempt: Int
+    get() = replayContext.attempt
+
+  override val cronSchedule: String
+    get() = replayContext.cronSchedule
+
+  override val historyLength: Long
+    get() = replayContext.lastWorkflowTaskStartedEventId
+
+  override val historySize: Long
+    get() = replayContext.historySize
+
+  override val isContinueAsNewSuggested: Boolean
+    get() = replayContext.isContinueAsNewSuggested
+
+  override val currentBuildId: String?
+    get() = replayContext.currentBuildId.orElse(null)
+
+  override val priority: Priority
+    get() = ProtoConverters.fromProto(replayContext.priority)
 }

@@ -20,6 +20,8 @@
 
 package io.temporal.kotlin.worker
 
+import io.temporal.kotlin.activity.KDynamicActivity
+import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.worker.WorkerOptions
 import io.temporal.worker.WorkflowImplementationOptions
 import io.temporal.worker.tuning.WorkerTuner
@@ -80,6 +82,18 @@ public data class KWorkerOptions(
   val taskQueue: String,
   val workflows: List<KClass<*>> = emptyList(),
   val activities: List<Any> = emptyList(),
+  /**
+   * Dynamic workflow implementation class.
+   * Handles any workflow type not matched by registered workflows.
+   * Only one dynamic workflow can be registered per worker.
+   */
+  val dynamicWorkflow: KClass<out KDynamicWorkflow>? = null,
+  /**
+   * Dynamic activity implementation.
+   * Handles any activity type not matched by registered activities.
+   * Only one dynamic activity can be registered per worker.
+   */
+  val dynamicActivity: KDynamicActivity? = null,
   val workflowImplementationOptions: WorkflowImplementationOptions? = null,
   val maxConcurrentActivityExecutionSize: Int? = null,
   val maxConcurrentWorkflowTaskExecutionSize: Int? = null,

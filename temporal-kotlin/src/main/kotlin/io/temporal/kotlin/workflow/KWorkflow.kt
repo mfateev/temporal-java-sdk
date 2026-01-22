@@ -119,6 +119,12 @@ public object KWorkflow {
   public val info: KWorkflowInfo
     @JvmName("info")
     get() {
+      // First try the Kotlin coroutine context (for Kotlin workflows)
+      val context = currentContext.get()
+      if (context != null) {
+        return KWorkflowInfoFromContext(context)
+      }
+      // Fall back to Java SDK context (for Java workflows calling Kotlin code)
       val javaInfo: WorkflowInfo = Workflow.getInfo()
       return KWorkflowInfoImpl(javaInfo)
     }
@@ -1737,6 +1743,9 @@ public object KWorkflow {
    * The dynamic handler is invoked for any signal that doesn't have a specific
    * handler registered. Only one dynamic handler can be registered per workflow.
    *
+   * Any signals that were buffered before this handler was registered (e.g., from
+   * signalWithStart) will be replayed to the handler.
+   *
    * Example:
    * ```kotlin
    * KWorkflow.registerDynamicSignalHandler { signalName, args ->
@@ -1748,7 +1757,7 @@ public object KWorkflow {
    * @throws IllegalArgumentException if a dynamic handler is already registered
    * @throws IllegalStateException if called outside of workflow code
    */
-  public fun registerDynamicSignalHandler(
+  public suspend fun registerDynamicSignalHandler(
     handler: suspend (signalName: String, args: KEncodedValues) -> Unit
   ) {
     val context = currentContext.get()

@@ -29,8 +29,10 @@ import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KotlinWorkflowDefinition
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.plugin.WorkerPlugin
 import io.temporal.worker.WorkerOptions
+import kotlin.reflect.KClass
 
 /**
  * Plugin for enabling Kotlin coroutine support in Temporal workflows.
@@ -70,6 +72,9 @@ public class KotlinPlugin private constructor(
   /** Lazily created factory - shared across all workflow types handled by this plugin. */
   private var factory: KotlinWorkflowImplementationFactory? = null
 
+  /** Dynamic workflow class set after plugin creation (from KWorker). */
+  private var dynamicWorkflowClass: KClass<out KDynamicWorkflow>? = null
+
   /**
    * Configures worker options before worker creation.
    * Sets deadlock detection timeout if configured.
@@ -107,6 +112,8 @@ public class KotlinPlugin private constructor(
         deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout,
         workerInterceptors = options.workerInterceptors
       )
+      // Register dynamic workflow if one was set before factory creation
+      dynamicWorkflowClass?.let { factory!!.registerDynamicWorkflow(it) }
     }
 
     // Register the workflow type with our factory
@@ -119,6 +126,21 @@ public class KotlinPlugin private constructor(
    */
   public val deadlockDetectionTimeout: Long
     get() = options.deadlockDetectionTimeout
+
+  /**
+   * Registers a dynamic workflow class with this plugin.
+   *
+   * The dynamic workflow will handle any workflow type that doesn't have
+   * a specifically registered implementation. This allows dynamic workflows
+   * to use Kotlin coroutines (suspend functions).
+   *
+   * @param dynamicWorkflowClass The dynamic workflow implementation class
+   */
+  public fun registerDynamicWorkflow(dynamicWorkflowClass: KClass<out KDynamicWorkflow>) {
+    this.dynamicWorkflowClass = dynamicWorkflowClass
+    // If factory already exists, register the dynamic workflow with it
+    factory?.registerDynamicWorkflow(dynamicWorkflowClass)
+  }
 
   public companion object {
     /**
