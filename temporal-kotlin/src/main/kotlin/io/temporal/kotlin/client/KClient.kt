@@ -665,17 +665,17 @@ public class KClient(
     return WorkflowHandle(stub)
   }
 
-  // ========== Untyped Workflow Execution ==========
+  // ========== Workflow Execution by Type Name ==========
 
   /**
-   * Start an untyped workflow by type name and return a handle.
+   * Start a workflow by type name and return a handle.
    *
    * Use this for dynamic workflow scenarios where the workflow type
    * is determined at runtime.
    *
    * Example:
    * ```kotlin
-   * val handle = client.startUntypedWorkflow(
+   * val handle = client.startWorkflow(
    *     workflowType = "DynamicGreetingWorkflow",
    *     options = KWorkflowOptions(
    *         workflowId = "greeting-123",
@@ -691,7 +691,7 @@ public class KClient(
    * @param args workflow arguments
    * @return a handle for the started workflow
    */
-  public suspend fun startUntypedWorkflow(
+  public suspend fun startWorkflow(
     workflowType: String,
     options: KWorkflowOptions,
     vararg args: Any?
@@ -704,13 +704,13 @@ public class KClient(
   }
 
   /**
-   * Execute an untyped workflow by type name and wait for the result.
+   * Execute a workflow by type name and wait for the result.
    *
-   * Convenience method that combines [startUntypedWorkflow] with waiting for the result.
+   * Convenience method that combines [startWorkflow] with waiting for the result.
    *
    * Example:
    * ```kotlin
-   * val result = client.executeUntypedWorkflow<String>(
+   * val result = client.executeWorkflow<String>(
    *     workflowType = "DynamicGreetingWorkflow",
    *     options = KWorkflowOptions(
    *         workflowId = "greeting-123",
@@ -726,17 +726,17 @@ public class KClient(
    * @param args workflow arguments
    * @return the workflow result
    */
-  public suspend inline fun <reified R> executeUntypedWorkflow(
+  public suspend inline fun <reified R> executeWorkflow(
     workflowType: String,
     options: KWorkflowOptions,
     vararg args: Any?
   ): R {
-    val handle = startUntypedWorkflow(workflowType, options, *args)
+    val handle = startWorkflow(workflowType, options, *args)
     return handle.getResult()
   }
 
   /**
-   * Atomically start an untyped workflow and send a signal.
+   * Atomically start a workflow by type name and send a signal.
    *
    * If the workflow already exists, only the signal is sent.
    * Use this for dynamic workflow scenarios where the workflow type
@@ -744,7 +744,7 @@ public class KClient(
    *
    * Example:
    * ```kotlin
-   * val handle = client.signalWithStartUntypedWorkflow(
+   * val handle = client.signalWithStart(
    *     workflowType = "DynamicWF",
    *     signalName = "greetingSignal",
    *     signalArgs = arrayOf("John"),
@@ -763,7 +763,7 @@ public class KClient(
    * @param options workflow options
    * @return a handle for the started workflow
    */
-  public suspend fun signalWithStartUntypedWorkflow(
+  public suspend fun signalWithStart(
     workflowType: String,
     signalName: String,
     signalArgs: Array<out Any?> = emptyArray(),

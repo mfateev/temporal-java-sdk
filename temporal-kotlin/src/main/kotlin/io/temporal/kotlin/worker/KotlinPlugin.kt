@@ -32,7 +32,6 @@ import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.plugin.WorkerPlugin
 import io.temporal.worker.WorkerOptions
-import kotlin.reflect.KClass
 
 /**
  * Plugin for enabling Kotlin coroutine support in Temporal workflows.
@@ -72,9 +71,6 @@ public class KotlinPlugin private constructor(
   /** Lazily created factory - shared across all workflow types handled by this plugin. */
   private var factory: KotlinWorkflowImplementationFactory? = null
 
-  /** Dynamic workflow class set after plugin creation (from KWorker). */
-  private var dynamicWorkflowClass: KClass<out KDynamicWorkflow>? = null
-
   /**
    * Configures worker options before worker creation.
    * Sets deadlock detection timeout if configured.
@@ -89,20 +85,22 @@ public class KotlinPlugin private constructor(
   /**
    * Called for each workflow type during registration.
    *
-   * If the workflow uses Kotlin suspend functions, this plugin handles it by:
-   * 1. Creating/reusing a KotlinWorkflowImplementationFactory
-   * 2. Registering the type with that factory
-   * 3. Returning the factory
+   * This plugin handles:
+   * - Kotlin suspend workflows (workflow method is a suspend function)
+   * - Dynamic workflows (implements [KDynamicWorkflow])
    *
-   * For non-suspend workflows, returns null to let the default POJO factory handle them.
+   * For non-suspend, non-dynamic workflows, returns null to let the default POJO factory handle them.
    */
   override fun getFactoryForType(
     workflowImplementationType: Class<*>,
     dataConverter: DataConverter
   ): WorkflowImplementationFactory? {
-    // Check if this is a Kotlin suspend workflow
-    if (!KotlinWorkflowDefinition.isSuspendWorkflow(workflowImplementationType)) {
-      return null // Not a suspend workflow, let default factory handle it
+    // Check if this is a Kotlin suspend workflow or a dynamic workflow
+    val isSuspendWorkflow = KotlinWorkflowDefinition.isSuspendWorkflow(workflowImplementationType)
+    val isDynamicWorkflow = KDynamicWorkflow::class.java.isAssignableFrom(workflowImplementationType)
+
+    if (!isSuspendWorkflow && !isDynamicWorkflow) {
+      return null // Not a suspend or dynamic workflow, let default factory handle it
     }
 
     // Lazily create the factory
@@ -112,11 +110,9 @@ public class KotlinPlugin private constructor(
         deadlockDetectionTimeoutMs = options.deadlockDetectionTimeout,
         workerInterceptors = options.workerInterceptors
       )
-      // Register dynamic workflow if one was set before factory creation
-      dynamicWorkflowClass?.let { factory!!.registerDynamicWorkflow(it) }
     }
 
-    // Register the workflow type with our factory
+    // Register the workflow type with our factory (handles both regular and dynamic)
     factory!!.registerWorkflowImplementationType(workflowImplementationType)
     return factory
   }
@@ -126,21 +122,6 @@ public class KotlinPlugin private constructor(
    */
   public val deadlockDetectionTimeout: Long
     get() = options.deadlockDetectionTimeout
-
-  /**
-   * Registers a dynamic workflow class with this plugin.
-   *
-   * The dynamic workflow will handle any workflow type that doesn't have
-   * a specifically registered implementation. This allows dynamic workflows
-   * to use Kotlin coroutines (suspend functions).
-   *
-   * @param dynamicWorkflowClass The dynamic workflow implementation class
-   */
-  public fun registerDynamicWorkflow(dynamicWorkflowClass: KClass<out KDynamicWorkflow>) {
-    this.dynamicWorkflowClass = dynamicWorkflowClass
-    // If factory already exists, register the dynamic workflow with it
-    factory?.registerDynamicWorkflow(dynamicWorkflowClass)
-  }
 
   public companion object {
     /**

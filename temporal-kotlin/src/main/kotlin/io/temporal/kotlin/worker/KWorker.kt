@@ -22,6 +22,7 @@ package io.temporal.kotlin.worker
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.common.metadata.POJOActivityInterfaceMetadata
+import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.activity.KotlinActivityWrapper
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
@@ -94,7 +95,9 @@ public class KWorker private constructor(
   /** Coroutine dispatcher for suspend activities */
   private val activityDispatcher: CoroutineDispatcher,
   /** The internal WorkerFactory (null when created via KWorkerFactory) */
-  private val internalWorkerFactory: WorkerFactory?
+  private val internalWorkerFactory: WorkerFactory?,
+  /** KotlinPlugin for dynamic workflow registration */
+  private val kotlinPlugin: KotlinPlugin?
 ) {
 
   /**
@@ -116,7 +119,25 @@ public class KWorker private constructor(
     worker: Worker,
     workerInterceptors: List<KWorkerInterceptor> = emptyList(),
     activityDispatcher: CoroutineDispatcher = Dispatchers.Default
-  ) : this(worker, workerInterceptors, activityDispatcher, null)
+  ) : this(worker, workerInterceptors, activityDispatcher, null, null)
+
+  /**
+   * Creates a KWorker wrapping an existing Java Worker with KotlinPlugin support.
+   *
+   * This constructor is used by test environments to create workers that can
+   * register dynamic workflows via the KotlinPlugin.
+   *
+   * @param worker The underlying Java Worker to wrap
+   * @param kotlinPlugin The KotlinPlugin for dynamic workflow registration
+   * @param workerInterceptors Optional Kotlin worker interceptors
+   * @param activityDispatcher Optional coroutine dispatcher for suspend activities
+   */
+  public constructor(
+    worker: Worker,
+    kotlinPlugin: KotlinPlugin,
+    workerInterceptors: List<KWorkerInterceptor> = emptyList(),
+    activityDispatcher: CoroutineDispatcher = Dispatchers.Default
+  ) : this(worker, workerInterceptors, activityDispatcher, null, kotlinPlugin)
 
   companion object {
     /**
@@ -170,26 +191,23 @@ public class KWorker private constructor(
         worker = worker,
         workerInterceptors = emptyList(),
         activityDispatcher = Dispatchers.Default,
-        internalWorkerFactory = workerFactory
+        internalWorkerFactory = workerFactory,
+        kotlinPlugin = kotlinPlugin
       )
 
-      // Register workflows
-      if (options.workflows.isNotEmpty()) {
+      // Register workflows (including dynamic workflow if specified)
+      val allWorkflows = options.workflows + listOfNotNull(options.dynamicWorkflow)
+      if (allWorkflows.isNotEmpty()) {
         if (options.workflowImplementationOptions != null) {
-          kWorker.registerWorkflowImplementationTypes(options.workflowImplementationOptions, *options.workflows.toTypedArray())
+          kWorker.registerWorkflowImplementationTypes(options.workflowImplementationOptions, *allWorkflows.toTypedArray())
         } else {
-          kWorker.registerWorkflowImplementationTypes(*options.workflows.toTypedArray())
+          kWorker.registerWorkflowImplementationTypes(*allWorkflows.toTypedArray())
         }
       }
 
       // Register activities
       if (options.activities.isNotEmpty()) {
         kWorker.registerActivitiesImplementations(*options.activities.toTypedArray())
-      }
-
-      // Register dynamic workflow with the Kotlin plugin for coroutine support
-      options.dynamicWorkflow?.let { dynamicWorkflowClass ->
-        kotlinPlugin.registerDynamicWorkflow(dynamicWorkflowClass)
       }
 
       // Register dynamic activity
@@ -480,10 +498,16 @@ public class KWorker private constructor(
   /**
    * Register a single activity implementation.
    *
-   * Extracts activity interfaces, creates a [KotlinActivityWrapper] for each method,
-   * and registers them with the Java worker.
+   * Handles both regular activities (with @ActivityInterface) and dynamic activities
+   * (implementing KDynamicActivity). Dynamic activities are wrapped with KDynamicActivityWrapper.
    */
   private fun registerActivityImplementation(activity: Any) {
+    // Check if this is a dynamic activity
+    if (activity is KDynamicActivity) {
+      worker.registerActivitiesImplementations(KDynamicActivityWrapper(activity))
+      return
+    }
+
     val implClass = activity::class.java
 
     // Find all activity interfaces implemented by this class

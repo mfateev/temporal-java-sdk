@@ -27,11 +27,14 @@ import io.temporal.client.WorkflowClientOptions
 import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.activity.KActivityRegistry
+import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.activity.KDynamicActivityHandler
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.worker.KWorker
+import io.temporal.kotlin.worker.KotlinPlugin
+import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.testing.TestWorkflowEnvironment
 import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkerOptions
@@ -263,27 +266,29 @@ public class KTestWorkflowExtension private constructor(
         val kWorker = KWorker(worker)
 
         // Register workflows - use KotlinWorkflowImplementationFactory for suspend workflows
-        // to properly handle suspend update methods with non-suspend validators
-        val suspendWorkflows = config.workflowTypes.filter { (workflowType, _) ->
-            KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType)
+        // and dynamic workflows (KDynamicWorkflow implementations)
+        val kotlinWorkflows = config.workflowTypes.filter { (workflowType, _) ->
+            KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType) ||
+                KDynamicWorkflow::class.java.isAssignableFrom(workflowType)
         }
-        val nonSuspendWorkflows = config.workflowTypes.filter { (workflowType, _) ->
-            !KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType)
+        val nonKotlinWorkflows = config.workflowTypes.filter { (workflowType, _) ->
+            !KotlinWorkflowImplementationFactory.isSuspendWorkflow(workflowType) &&
+                !KDynamicWorkflow::class.java.isAssignableFrom(workflowType)
         }
 
-        // Register suspend workflows via KotlinWorkflowImplementationFactory
-        if (suspendWorkflows.isNotEmpty()) {
+        // Register Kotlin workflows (suspend and dynamic) via KotlinWorkflowImplementationFactory
+        if (kotlinWorkflows.isNotEmpty()) {
             val kotlinFactory = KotlinWorkflowImplementationFactory(
                 DataConverter.getDefaultInstance(),
             )
-            suspendWorkflows.forEach { (workflowType, _) ->
+            kotlinWorkflows.forEach { (workflowType, _) ->
                 kotlinFactory.registerWorkflowImplementationType(workflowType)
             }
             worker.registerWorkflowImplementationFactory(kotlinFactory)
         }
 
-        // Register non-suspend workflows via standard Java SDK registration
-        nonSuspendWorkflows.forEach { (workflowType, options) ->
+        // Register non-Kotlin workflows via standard Java SDK registration
+        nonKotlinWorkflows.forEach { (workflowType, options) ->
             worker.registerWorkflowImplementationTypes(options, workflowType)
         }
 
@@ -293,15 +298,25 @@ public class KTestWorkflowExtension private constructor(
         worker.registerActivitiesImplementations(dynamicHandler)
 
         // Register regular activities via the unified registry
+        // KDynamicActivity implementations are set as the fallback in the registry
         if (config.activityImplementations.isNotEmpty()) {
             config.activityImplementations.forEach { activity ->
-                activityRegistry.register(activity)
+                if (activity is KDynamicActivity) {
+                    activityRegistry.dynamicActivityFallback = activity
+                } else {
+                    activityRegistry.register(activity)
+                }
             }
         }
 
         // Register suspend activities via the unified registry
+        // KDynamicActivity implementations are set as the fallback in the registry
         config.suspendActivityImplementations.forEach { activity ->
-            activityRegistry.register(activity)
+            if (activity is KDynamicActivity) {
+                activityRegistry.dynamicActivityFallback = activity
+            } else {
+                activityRegistry.register(activity)
+            }
         }
 
         // Register Nexus services
@@ -392,13 +407,7 @@ public class KTestWorkflowExtension private constructor(
         javaTestEnv: TestWorkflowEnvironment,
         activityRegistry: KActivityRegistry,
     ): KTestWorkflowEnvironment {
-        // Use reflection to access the private constructor
-        val constructor = KTestWorkflowEnvironment::class.java.getDeclaredConstructor(
-            TestWorkflowEnvironment::class.java,
-            KActivityRegistry::class.java,
-        )
-        constructor.isAccessible = true
-        return constructor.newInstance(javaTestEnv, activityRegistry)
+        return KTestWorkflowEnvironment.create(javaTestEnv, activityRegistry, KotlinPlugin.create())
     }
 
     // ========== Commit 13: Companion object with factory ==========

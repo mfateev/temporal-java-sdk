@@ -51,6 +51,14 @@ public class KActivityRegistry {
   private val activities = ConcurrentHashMap<String, ActivityEntry>()
 
   /**
+   * A fallback dynamic activity handler that will be used when an activity type
+   * is not found in the registry. This allows combining registry-based activities
+   * with a catch-all KDynamicActivity.
+   */
+  @Volatile
+  public var dynamicActivityFallback: KDynamicActivity? = null
+
+  /**
    * Register an activity implementation (for real implementations).
    *
    * Scans all @ActivityInterface interfaces implemented by the object and registers

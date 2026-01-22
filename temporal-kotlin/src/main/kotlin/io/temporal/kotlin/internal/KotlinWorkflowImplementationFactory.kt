@@ -76,14 +76,31 @@ class KotlinWorkflowImplementationFactory(
   /**
    * Registers a workflow implementation type with this factory.
    *
-   * The implementation class must:
-   * - Implement an interface annotated with @WorkflowInterface
-   * - Have a workflow method that is a Kotlin suspend function
+   * This method handles both regular workflows and dynamic workflows:
+   * - If the class implements [KDynamicWorkflow], it's registered as the dynamic workflow
+   *   (handles any workflow type without a specific registration)
+   * - Otherwise, the class must implement an interface annotated with @WorkflowInterface
+   *   and have a workflow method that is a Kotlin suspend function
    *
    * @param implementationClass the workflow implementation class
    * @throws IllegalArgumentException if the class is not a valid suspend workflow
+   * @throws IllegalStateException if a dynamic workflow is already registered
    */
   fun registerWorkflowImplementationType(implementationClass: Class<*>) {
+    // Check if this is a dynamic workflow
+    if (KDynamicWorkflow::class.java.isAssignableFrom(implementationClass)) {
+      @Suppress("UNCHECKED_CAST")
+      val dynamicClass = implementationClass.kotlin as KClass<out KDynamicWorkflow>
+      if (this.dynamicWorkflowClass != null) {
+        throw IllegalStateException(
+          "Dynamic workflow is already registered: ${this.dynamicWorkflowClass!!.qualifiedName}"
+        )
+      }
+      this.dynamicWorkflowClass = dynamicClass
+      return
+    }
+
+    // Regular workflow registration
     if (!KotlinWorkflowDefinition.isSuspendWorkflow(implementationClass)) {
       throw IllegalArgumentException(
         "Class ${implementationClass.name} is not a suspend-based Kotlin workflow. " +
@@ -104,29 +121,13 @@ class KotlinWorkflowImplementationFactory(
   /**
    * Registers multiple workflow implementation types.
    *
+   * This method handles both regular workflows and dynamic workflows.
+   * See [registerWorkflowImplementationType] for details.
+   *
    * @param implementationClasses the workflow implementation classes
    */
   fun registerWorkflowImplementationTypes(vararg implementationClasses: Class<*>) {
     implementationClasses.forEach { registerWorkflowImplementationType(it) }
-  }
-
-  /**
-   * Registers a dynamic workflow implementation class.
-   *
-   * The dynamic workflow handles any workflow type that doesn't have
-   * a specifically registered implementation. Only one dynamic workflow
-   * can be registered per factory.
-   *
-   * @param dynamicWorkflowClass the dynamic workflow implementation class
-   * @throws IllegalStateException if a dynamic workflow is already registered
-   */
-  fun registerDynamicWorkflow(dynamicWorkflowClass: KClass<out KDynamicWorkflow>) {
-    if (this.dynamicWorkflowClass != null) {
-      throw IllegalStateException(
-        "Dynamic workflow is already registered: ${this.dynamicWorkflowClass!!.qualifiedName}"
-      )
-    }
-    this.dynamicWorkflowClass = dynamicWorkflowClass
   }
 
   override fun getWorkflow(

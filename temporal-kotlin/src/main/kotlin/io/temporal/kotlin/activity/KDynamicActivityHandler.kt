@@ -24,6 +24,7 @@ import io.temporal.activity.Activity
 import io.temporal.activity.DynamicActivity
 import io.temporal.common.converter.EncodedValues
 import io.temporal.failure.ApplicationFailure
+import io.temporal.kotlin.common.KEncodedValues
 
 /**
  * Dynamic activity handler that routes activity calls to a [KActivityRegistry].
@@ -52,18 +53,24 @@ public class KDynamicActivityHandler(
   override fun execute(args: EncodedValues): Any? {
     val activityType = Activity.getExecutionContext().info.activityType
 
-    if (!registry.hasActivity(activityType)) {
-      // Throw non-retryable failure for fast test feedback
-      throw ApplicationFailure.newNonRetryableFailure(
-        "Unknown activity type: $activityType. Known types: ${registry.getRegisteredTypes()}",
-        "UNKNOWN_ACTIVITY_TYPE"
-      )
+    // First check if the activity is registered in the registry
+    if (registry.hasActivity(activityType)) {
+      // Decode arguments based on registered method signature
+      val decodedArgs = decodeArguments(activityType, args)
+      return registry.execute(activityType, decodedArgs)
     }
 
-    // Decode arguments based on registered method signature
-    val decodedArgs = decodeArguments(activityType, args)
+    // Check if there's a dynamic fallback handler
+    val fallback = registry.dynamicActivityFallback
+    if (fallback != null) {
+      return fallback.execute(KEncodedValues(args))
+    }
 
-    return registry.execute(activityType, decodedArgs)
+    // No handler found - throw non-retryable failure for fast test feedback
+    throw ApplicationFailure.newNonRetryableFailure(
+      "Unknown activity type: $activityType. Known types: ${registry.getRegisteredTypes()}",
+      "UNKNOWN_ACTIVITY_TYPE"
+    )
   }
 
   private fun decodeArguments(activityType: String, args: EncodedValues): Array<Any?> {

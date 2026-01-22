@@ -28,6 +28,7 @@ import io.temporal.kotlin.activity.KActivityRegistry
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorker
+import io.temporal.kotlin.worker.KotlinPlugin
 import io.temporal.serviceclient.OperatorServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.testing.TestWorkflowEnvironment
@@ -71,6 +72,7 @@ import kotlin.time.Duration as KotlinDuration
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
     internal val activityRegistry: KActivityRegistry = KActivityRegistry(),
+    private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create(),
 ) : Closeable {
 
     // ========== Commit 7: Basic structure with worker creation ==========
@@ -84,17 +86,22 @@ public class KTestWorkflowEnvironment private constructor(
     /**
      * Create a new Kotlin worker for the specified task queue.
      *
+     * The returned worker supports registering dynamic workflows via
+     * [KWorker.registerDynamicWorkflowImplementationType] and dynamic activities
+     * via [KWorker.registerDynamicActivityImplementation].
+     *
      * Example:
      * ```kotlin
      * val worker = testEnv.newWorker("task-queue")
      * worker.registerWorkflowImplementationTypes<MyWorkflowImpl>()
+     * worker.registerDynamicWorkflowImplementationType<MyDynamicWorkflow>()
      * ```
      *
      * @param taskQueue The task queue name
-     * @return A KWorker instance
+     * @return A KWorker instance with dynamic workflow/activity support
      */
     public fun newWorker(taskQueue: String): KWorker {
-        return KWorker(testEnvironment.newWorker(taskQueue))
+        return KWorker(testEnvironment.newWorker(taskQueue), kotlinPlugin)
     }
 
     /**
@@ -110,14 +117,14 @@ public class KTestWorkflowEnvironment private constructor(
      *
      * @param taskQueue The task queue name
      * @param options DSL builder for WorkerOptions
-     * @return A KWorker instance
+     * @return A KWorker instance with dynamic workflow/activity support
      */
     public fun newWorker(
         taskQueue: String,
         options: WorkerOptions.Builder.() -> Unit,
     ): KWorker {
         val workerOptions = WorkerOptions.newBuilder().apply(options).build()
-        return KWorker(testEnvironment.newWorker(taskQueue, workerOptions))
+        return KWorker(testEnvironment.newWorker(taskQueue, workerOptions), kotlinPlugin)
     }
 
     /**
@@ -133,10 +140,10 @@ public class KTestWorkflowEnvironment private constructor(
      *
      * @param taskQueue The task queue name
      * @param options WorkerOptions instance
-     * @return A KWorker instance
+     * @return A KWorker instance with dynamic workflow/activity support
      */
     public fun newWorker(taskQueue: String, options: WorkerOptions): KWorker {
-        return KWorker(testEnvironment.newWorker(taskQueue, options))
+        return KWorker(testEnvironment.newWorker(taskQueue, options), kotlinPlugin)
     }
 
     // ========== Commit 8: Client access ==========
@@ -483,6 +490,18 @@ public class KTestWorkflowEnvironment private constructor(
     // ========== Companion object: Factory methods ==========
 
     public companion object {
+        /**
+         * Internal factory for creating KTestWorkflowEnvironment with explicit parameters.
+         * Used by KTestWorkflowExtension to create instances with shared registry and plugin.
+         */
+        internal fun create(
+            testEnvironment: TestWorkflowEnvironment,
+            activityRegistry: KActivityRegistry,
+            kotlinPlugin: KotlinPlugin,
+        ): KTestWorkflowEnvironment {
+            return KTestWorkflowEnvironment(testEnvironment, activityRegistry, kotlinPlugin)
+        }
+
         /**
          * Create a new test environment with default options.
          *
