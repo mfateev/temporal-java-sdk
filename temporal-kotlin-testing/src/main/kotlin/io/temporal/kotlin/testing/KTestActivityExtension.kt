@@ -72,7 +72,7 @@ import java.lang.reflect.Constructor
  * ```
  */
 public class KTestActivityExtension private constructor(
-    private val config: ExtensionConfig
+    private val config: ExtensionConfig,
 ) : ParameterResolver, BeforeEachCallback, AfterEachCallback {
 
     // ========== Commit 25: Configuration ==========
@@ -80,7 +80,7 @@ public class KTestActivityExtension private constructor(
     private data class ExtensionConfig(
         val testEnvironmentOptions: TestEnvironmentOptions,
         val activityImplementations: Array<Any>,
-        val suspendActivityImplementations: Array<Any>
+        val suspendActivityImplementations: Array<Any>,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -112,7 +112,7 @@ public class KTestActivityExtension private constructor(
      */
     override fun supportsParameter(
         parameterContext: ParameterContext,
-        extensionContext: ExtensionContext
+        extensionContext: ExtensionContext,
     ): Boolean {
         val parameter = parameterContext.parameter
         // Don't resolve constructor parameters
@@ -125,14 +125,14 @@ public class KTestActivityExtension private constructor(
      */
     override fun resolveParameter(
         parameterContext: ParameterContext,
-        extensionContext: ExtensionContext
+        extensionContext: ExtensionContext,
     ): Any {
         return getStore(extensionContext).get(
             TEST_ENVIRONMENT_KEY,
-            KTestActivityEnvironment::class.java
+            KTestActivityEnvironment::class.java,
         ) ?: throw IllegalStateException(
             "Activity environment not initialized. " +
-                "Ensure the extension is registered before the test runs."
+                "Ensure the extension is registered before the test runs.",
         )
     }
 
@@ -189,7 +189,7 @@ public class KTestActivityExtension private constructor(
     private fun getStore(context: ExtensionContext): ExtensionContext.Store {
         val namespace = ExtensionContext.Namespace.create(
             KTestActivityExtension::class.java,
-            context.requiredTestMethod
+            context.requiredTestMethod,
         )
         return context.getStore(namespace)
     }
@@ -229,20 +229,46 @@ public class KTestActivityExtension private constructor(
         private var suspendActivityImplementations: Array<Any> = emptyArray()
 
         /**
-         * Configure test environment options using DSL.
+         * Configure test environment options.
          *
          * Example:
          * ```kotlin
-         * testEnvironmentOptions {
-         *     namespace = "test-namespace"
-         *     useTimeskipping = false
-         * }
+         * testEnvironmentOptions(
+         *     KTestEnvironmentOptions(namespace = "test-namespace")
+         * )
          * ```
          *
-         * @param block Configuration block for [KTestEnvironmentOptionsBuilder]
+         * @param options Configuration options
          */
-        public fun testEnvironmentOptions(block: KTestEnvironmentOptionsBuilder.() -> Unit) {
-            testEnvironmentOptions = KTestEnvironmentOptionsBuilder().apply(block).build()
+        public fun testEnvironmentOptions(options: KTestEnvironmentOptions) {
+            testEnvironmentOptions = buildActivityJavaOptions(options)
+        }
+
+        private fun buildActivityJavaOptions(options: KTestEnvironmentOptions): TestEnvironmentOptions {
+            val builder = TestEnvironmentOptions.newBuilder()
+
+            if (options.namespace != null || options.workflowClientOptions != null) {
+                val clientOptionsBuilder = if (options.workflowClientOptions != null) {
+                    options.workflowClientOptions.toBuilder()
+                } else {
+                    io.temporal.client.WorkflowClientOptions.newBuilder()
+                }
+                options.namespace?.let { clientOptionsBuilder.setNamespace(it) }
+                builder.setWorkflowClientOptions(clientOptionsBuilder.build())
+            }
+
+            options.workerFactoryOptions?.let { builder.setWorkerFactoryOptions(it) }
+            options.workflowServiceStubsOptions?.let { builder.setWorkflowServiceStubsOptions(it) }
+            options.initialTime?.let { builder.setInitialTime(it) }
+            builder.setUseTimeskipping(options.useTimeskipping)
+            builder.setUseExternalService(options.useExternalService)
+            options.target?.let { builder.setTarget(it) }
+            options.metricsScope?.let { builder.setMetricsScope(it) }
+            options.searchAttributes.forEach { (name, type) ->
+                builder.registerSearchAttribute(name, type)
+            }
+
+            return builder.build()
         }
 
         /**
@@ -295,8 +321,8 @@ public class KTestActivityExtension private constructor(
                 ExtensionConfig(
                     testEnvironmentOptions = testEnvironmentOptions,
                     activityImplementations = activityImplementations,
-                    suspendActivityImplementations = suspendActivityImplementations
-                )
+                    suspendActivityImplementations = suspendActivityImplementations,
+                ),
             )
         }
     }
@@ -326,7 +352,7 @@ public class KTestActivityExtension private constructor(
  * @return A new [KTestActivityExtension] instance
  */
 public fun kTestActivityExtension(
-    block: KTestActivityExtension.Builder.() -> Unit
+    block: KTestActivityExtension.Builder.() -> Unit,
 ): KTestActivityExtension {
     return KTestActivityExtension.newBuilder().apply(block).build()
 }

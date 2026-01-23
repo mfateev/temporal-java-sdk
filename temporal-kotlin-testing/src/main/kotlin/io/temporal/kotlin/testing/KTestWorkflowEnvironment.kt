@@ -24,6 +24,7 @@ package io.temporal.kotlin.testing
 
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
+import io.temporal.client.WorkflowClientOptions
 import io.temporal.kotlin.activity.KActivityRegistry
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.toJava
@@ -31,7 +32,9 @@ import io.temporal.kotlin.worker.KWorker
 import io.temporal.kotlin.worker.KotlinPlugin
 import io.temporal.serviceclient.OperatorServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubs
+import io.temporal.testing.TestEnvironmentOptions
 import io.temporal.testing.TestWorkflowEnvironment
+import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.worker.WorkerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,10 +52,12 @@ import kotlin.time.Duration as KotlinDuration
  *
  * Example:
  * ```kotlin
- * val testEnv = KTestWorkflowEnvironment.newInstance {
- *     namespace = "test-namespace"
- *     initialTime = Instant.parse("2024-01-01T00:00:00Z")
- * }
+ * val testEnv = KTestWorkflowEnvironment.newInstance(
+ *     KTestEnvironmentOptions(
+ *         namespace = "test-namespace",
+ *         initialTime = Instant.parse("2024-01-01T00:00:00Z")
+ *     )
+ * )
  *
  * val worker = testEnv.newWorker("task-queue")
  * worker.registerWorkflowImplementationTypes<MyWorkflowImpl>()
@@ -72,7 +77,7 @@ import kotlin.time.Duration as KotlinDuration
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
     internal val activityRegistry: KActivityRegistry = KActivityRegistry(),
-    private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create()
+    private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create(),
 ) : Closeable {
 
     // ========== Commit 7: Basic structure with worker creation ==========
@@ -121,7 +126,7 @@ public class KTestWorkflowEnvironment private constructor(
      */
     public fun newWorker(
         taskQueue: String,
-        options: WorkerOptions.Builder.() -> Unit
+        options: WorkerOptions.Builder.() -> Unit,
     ): KWorker {
         val workerOptions = WorkerOptions.newBuilder().apply(options).build()
         return KWorker(testEnvironment.newWorker(taskQueue, workerOptions), kotlinPlugin)
@@ -343,7 +348,7 @@ public class KTestWorkflowEnvironment private constructor(
         withContext(Dispatchers.IO) {
             testEnvironment.awaitTermination(
                 timeout.inWholeMilliseconds,
-                TimeUnit.MILLISECONDS
+                TimeUnit.MILLISECONDS,
             )
         }
     }
@@ -357,7 +362,7 @@ public class KTestWorkflowEnvironment private constructor(
         withContext(Dispatchers.IO) {
             testEnvironment.awaitTermination(
                 timeout.toMillis(),
-                TimeUnit.MILLISECONDS
+                TimeUnit.MILLISECONDS,
             )
         }
     }
@@ -497,7 +502,7 @@ public class KTestWorkflowEnvironment private constructor(
         internal fun create(
             testEnvironment: TestWorkflowEnvironment,
             activityRegistry: KActivityRegistry,
-            kotlinPlugin: KotlinPlugin
+            kotlinPlugin: KotlinPlugin,
         ): KTestWorkflowEnvironment {
             return KTestWorkflowEnvironment(testEnvironment, activityRegistry, kotlinPlugin)
         }
@@ -505,65 +510,92 @@ public class KTestWorkflowEnvironment private constructor(
         /**
          * Create a new test environment with default options.
          *
-         * The default namespace is "UnitTest" to match Java SDK conventions.
-         *
          * Example:
          * ```kotlin
          * val testEnv = KTestWorkflowEnvironment.newInstance()
          * ```
          */
         public fun newInstance(): KTestWorkflowEnvironment {
-            return newInstance {}
+            return newInstance(KTestEnvironmentOptions())
         }
 
         /**
-         * Create a new test environment with DSL configuration.
+         * Create a new test environment with options.
          *
          * Example:
          * ```kotlin
-         * val testEnv = KTestWorkflowEnvironment.newInstance {
-         *     namespace = "test-namespace"
-         *     initialTime = Instant.parse("2024-01-01T00:00:00Z")
-         *     useTimeskipping = true
-         *
-         *     workerFactoryOptions {
-         *         maxWorkflowThreadCount = 800
-         *     }
-         *
-         *     searchAttributes {
-         *         register("CustomKeyword", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD)
-         *     }
-         * }
+         * val testEnv = KTestWorkflowEnvironment.newInstance(
+         *     KTestEnvironmentOptions(
+         *         namespace = "test-namespace",
+         *         initialTime = Instant.parse("2024-01-01T00:00:00Z"),
+         *         useTimeskipping = true,
+         *         searchAttributes = mapOf(
+         *             "CustomKeyword" to IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD
+         *         )
+         *     )
+         * )
          * ```
          *
-         * @param options DSL builder for test environment options
-         * @return A new KTestWorkflowEnvironment instance
-         */
-        public fun newInstance(
-            options: KTestEnvironmentOptionsBuilder.() -> Unit
-        ): KTestWorkflowEnvironment {
-            val javaOptions = KTestEnvironmentOptionsBuilder().apply(options).build()
-            return KTestWorkflowEnvironment(TestWorkflowEnvironment.newInstance(javaOptions))
-        }
-
-        /**
-         * Create a new test environment with pre-built options.
-         *
-         * Example:
-         * ```kotlin
-         * val options = KTestEnvironmentOptions.newBuilder {
-         *     namespace = "test-namespace"
-         * }
-         * val testEnv = KTestWorkflowEnvironment.newInstance(options)
-         * ```
-         *
-         * @param options Pre-built test environment options
+         * @param options Test environment options
          * @return A new KTestWorkflowEnvironment instance
          */
         public fun newInstance(options: KTestEnvironmentOptions): KTestWorkflowEnvironment {
+            val kotlinPlugin = KotlinPlugin.create()
+            val javaOptions = buildJavaOptions(options, kotlinPlugin)
             return KTestWorkflowEnvironment(
-                TestWorkflowEnvironment.newInstance(options.javaOptions)
+                TestWorkflowEnvironment.newInstance(javaOptions),
+                kotlinPlugin = kotlinPlugin,
             )
+        }
+
+        /**
+         * Builds Java SDK TestEnvironmentOptions from Kotlin options.
+         * Automatically adds KotlinPlugin to support suspend workflows.
+         */
+        private fun buildJavaOptions(
+            options: KTestEnvironmentOptions,
+            kotlinPlugin: KotlinPlugin,
+        ): TestEnvironmentOptions {
+            val builder = TestEnvironmentOptions.newBuilder()
+
+            // Build WorkflowClientOptions if namespace or custom options are configured
+            if (options.namespace != null || options.workflowClientOptions != null) {
+                val clientOptionsBuilder = if (options.workflowClientOptions != null) {
+                    // Start from provided options
+                    options.workflowClientOptions.toBuilder()
+                } else {
+                    WorkflowClientOptions.newBuilder()
+                }
+                // Override namespace if specified
+                options.namespace?.let { clientOptionsBuilder.setNamespace(it) }
+                builder.setWorkflowClientOptions(clientOptionsBuilder.build())
+            }
+
+            // Always add KotlinPlugin to support suspend workflows
+            val factoryOptionsBuilder = if (options.workerFactoryOptions != null) {
+                // Start from provided options and add KotlinPlugin
+                options.workerFactoryOptions.toBuilder().addPlugin(kotlinPlugin)
+            } else {
+                WorkerFactoryOptions.newBuilder().addPlugin(kotlinPlugin)
+            }
+            builder.setWorkerFactoryOptions(factoryOptionsBuilder.build())
+
+            // Apply WorkflowServiceStubsOptions if configured
+            options.workflowServiceStubsOptions?.let { builder.setWorkflowServiceStubsOptions(it) }
+
+            // Apply simple options
+            options.initialTime?.let { builder.setInitialTime(it) }
+            builder.setUseTimeskipping(options.useTimeskipping)
+            builder.setUseExternalService(options.useExternalService)
+            options.target?.let { builder.setTarget(it) }
+            options.metricsScope?.let { builder.setMetricsScope(it) }
+
+            // Register search attributes
+            options.searchAttributes.forEach { (name, type) ->
+                builder.registerSearchAttribute(name, type)
+            }
+
+            return builder.build()
         }
     }
 }

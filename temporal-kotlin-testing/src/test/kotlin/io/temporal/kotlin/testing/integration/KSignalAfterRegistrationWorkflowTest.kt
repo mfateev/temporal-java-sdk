@@ -69,12 +69,12 @@ class KSignalAfterRegistrationWorkflowTest {
     @Test
     fun testSignalAfterHandlerRegistration(
         client: KClient,
-        options: KWorkflowOptions
+        options: KWorkflowOptions,
     ) = runTest {
         // Start workflow normally (no signal with start)
         val handle = client.startWorkflow(
             "SignalAfterRegWorkflow",
-            options.copy(workflowId = "test-signal-after-reg")
+            options.copy(workflowId = "test-signal-after-reg"),
         )
 
         // Send signal after workflow has started

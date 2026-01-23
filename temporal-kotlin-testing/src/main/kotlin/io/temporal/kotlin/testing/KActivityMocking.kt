@@ -49,7 +49,7 @@ internal class KActivityMockRegistry {
     internal data class MockHandler(
         val mock: Any,
         val method: Method,
-        val isSuspend: Boolean
+        val isSuspend: Boolean,
     )
 
     /**
@@ -66,7 +66,7 @@ internal class KActivityMockRegistry {
         val activityInterfaces = findActivityInterfaces(mockClass)
         if (activityInterfaces.isEmpty()) {
             throw IllegalArgumentException(
-                "Mock does not implement any @ActivityInterface annotated interfaces: ${mockClass.name}"
+                "Mock does not implement any @ActivityInterface annotated interfaces: ${mockClass.name}",
             )
         }
 
@@ -81,7 +81,7 @@ internal class KActivityMockRegistry {
                 handlers[activityType] = MockHandler(
                     mock = mock,
                     method = interfaceMethod,
-                    isSuspend = isSuspend
+                    isSuspend = isSuspend,
                 )
             }
         }
@@ -146,7 +146,7 @@ internal class KActivityMockRegistry {
  * Supports both regular and suspend activity mocks.
  */
 internal class KMockDynamicActivityHandler(
-    private val registry: KActivityMockRegistry
+    private val registry: KActivityMockRegistry,
 ) : DynamicActivity {
 
     override fun execute(args: EncodedValues): Any? {
@@ -156,7 +156,7 @@ internal class KMockDynamicActivityHandler(
         val handler = registry.findHandler(activityType)
             ?: throw ApplicationFailure.newNonRetryableFailure(
                 buildErrorMessage(activityType),
-                "ActivityNotRegistered"
+                "ActivityNotRegistered",
             )
 
         // Decode arguments based on method signature
@@ -181,7 +181,7 @@ internal class KMockDynamicActivityHandler(
     private fun decodeArgs(
         encodedValues: EncodedValues,
         method: Method,
-        isSuspend: Boolean
+        isSuspend: Boolean,
     ): Array<Any?> {
         val paramTypes = method.parameterTypes
         // For suspend methods, exclude the Continuation parameter
@@ -202,14 +202,14 @@ internal class KMockDynamicActivityHandler(
         mock: Any,
         method: Method,
         isSuspend: Boolean,
-        args: Array<Any?>
+        args: Array<Any?>,
     ): Any? {
         return try {
             if (isSuspend) {
                 // For suspend methods, use Kotlin reflection with runBlocking
                 val kotlinFunction = method.kotlinFunction
                     ?: throw IllegalStateException(
-                        "Could not get Kotlin function for suspend method: ${method.name}"
+                        "Could not get Kotlin function for suspend method: ${method.name}",
                     )
 
                 runBlocking {

@@ -76,12 +76,12 @@ class KSpecificHandlerPrecedenceWorkflowTest {
     @Test
     fun testSpecificHandlerTakesPrecedence(
         client: KClient,
-        options: KWorkflowOptions
+        options: KWorkflowOptions,
     ) = runTest {
         // Start workflow normally
         val handle = client.startWorkflow(
             "SpecificHandlerWorkflow",
-            options.copy(workflowId = "test-specific-handler")
+            options.copy(workflowId = "test-specific-handler"),
         )
 
         // Send signal that has a specific handler

@@ -72,7 +72,7 @@ class KMultipleSignalBufferingWorkflowTest {
     @Test
     fun testSignalBufferedViaSignalWithStart(
         client: KClient,
-        options: KWorkflowOptions
+        options: KWorkflowOptions,
     ) = runTest {
         // Start workflow expecting 1 signal, sent atomically via signalWithStart
         // This signal MUST be buffered since it arrives before workflow code runs
@@ -81,7 +81,7 @@ class KMultipleSignalBufferingWorkflowTest {
             signalName = "bufferedSignal",
             signalArgs = arrayOf("buffered-value"),
             workflowArgs = arrayOf(1),
-            options = options.copy(workflowId = "test-buffered-signal")
+            options = options.copy(workflowId = "test-buffered-signal"),
         )
         val result = handle.getResult<String>()
 
