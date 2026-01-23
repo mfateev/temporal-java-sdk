@@ -20,6 +20,7 @@
 
 package io.temporal.kotlin.activity
 
+import io.temporal.activity.Activity
 import org.slf4j.Logger
 
 /**
@@ -77,7 +78,16 @@ public interface KActivityContext {
      */
     @JvmStatic
     public val current: KActivityContext
-      get() = KActivity.executionContext
+      get() {
+        // First try the suspend activity context (for suspend activities running on coroutine threads)
+        val suspendContext = CurrentSuspendActivityContext.get()
+        if (suspendContext != null) {
+          return SuspendActivityContextWrapper(suspendContext)
+        }
+
+        // Fall back to Java SDK's thread-local context (for regular activities)
+        return KActivityContextImpl(Activity.getExecutionContext())
+      }
   }
 
   /**

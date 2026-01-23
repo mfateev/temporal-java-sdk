@@ -119,7 +119,7 @@ internal class KotlinActivityWrapper(
       val suspendContext = SuspendActivityContext(context, completionClient, job)
 
       // Create thread context element to propagate context to coroutine threads
-      // This enables KActivity.heartbeat() to work correctly in suspend activities
+      // This enables KActivityContext.current.heartbeat() to work correctly in suspend activities
       val suspendExecutionContext = SuspendActivityExecutionContext(context, completionClient)
       val threadContextElement = SuspendActivityThreadContextElement(suspendExecutionContext)
 

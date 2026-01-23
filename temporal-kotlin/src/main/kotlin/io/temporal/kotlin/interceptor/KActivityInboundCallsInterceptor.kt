@@ -76,8 +76,9 @@ public data class KActivityExecutionOutput(val result: Any?)
  * ) : KActivityInboundCallsInterceptorBase(next) {
  *
  *     override suspend fun execute(input: KActivityExecutionInput): KActivityExecutionOutput {
- *         val info = KActivity.info
- *         val log = KActivity.logger()
+ *         val context = KActivityContext.current
+ *         val info = context.info
+ *         val log = context.logger()
  *
  *         log.info("Activity ${info.activityType} started")
  *         val startTime = System.currentTimeMillis()

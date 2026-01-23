@@ -29,7 +29,7 @@ import kotlin.coroutines.CoroutineContext
  * Holds the activity execution context and manual completion client for suspend activities.
  *
  * This context is stored in a thread-local and propagated to coroutine threads via
- * [SuspendActivityThreadContextElement], allowing [KActivity.heartbeat] to work
+ * [SuspendActivityThreadContextElement], allowing [KActivityContext.current.heartbeat] to work
  * correctly in suspend activities.
  */
 internal data class SuspendActivityExecutionContext(
@@ -40,7 +40,7 @@ internal data class SuspendActivityExecutionContext(
 /**
  * Thread-local storage for suspend activity context.
  *
- * This is used by [KActivity.heartbeat] to access the activity context from suspend activities
+ * This is used by [KActivityContext.current] to access the activity context from suspend activities
  * when the Java SDK's thread-local context is not available.
  */
 internal object CurrentSuspendActivityContext {
@@ -58,7 +58,7 @@ internal object CurrentSuspendActivityContext {
  *
  * This element implements [ThreadContextElement] to ensure the activity context is available
  * in the thread-local whenever a coroutine is executing on a thread. This allows
- * [KActivity.heartbeat] (a non-suspend function) to access the activity context
+ * [KActivityContext.current] to access the activity context
  * even when the coroutine switches threads.
  *
  * Thread model:

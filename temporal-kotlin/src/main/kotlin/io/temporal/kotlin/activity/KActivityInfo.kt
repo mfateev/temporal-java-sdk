@@ -32,7 +32,7 @@ import java.time.Instant
  *
  * Example:
  * ```kotlin
- * val info = KActivity.getInfo()
+ * val info = KActivityContext.current.info
  * println("Activity ${info.activityType} attempt ${info.attempt}")
  * ```
  */
