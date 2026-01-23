@@ -138,7 +138,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             TestActivities::class.java,
             ActivityOptions.newBuilder()
                 .setStartToCloseTimeout(Duration.ofMinutes(1))
-                .build(),
+                .build()
         )
 
         override fun execute(input: String): String {
@@ -294,7 +294,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - Java Direct")
@@ -316,7 +316,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - KWorker")
@@ -340,7 +340,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - Kotlin Options")
@@ -364,7 +364,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - KTestEnv Default")
@@ -386,7 +386,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - No Config Builder")
@@ -410,7 +410,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - Java Worker")
@@ -436,7 +436,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World - Pre-built Options")
@@ -457,7 +457,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("World")
@@ -479,7 +479,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val result = workflow.execute("test-input")
@@ -504,7 +504,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             TimerWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
 
         val startTime = System.currentTimeMillis()
@@ -577,7 +577,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
         testEnv!!.registerDelayedCallback(1.minutes) {
             val signalWorkflow = client.workflowClient.newWorkflowStub(
                 SignalWorkflow::class.java,
-                handle.execution!!.workflowId,
+                handle.execution!!.workflowId
             )
             signalWorkflow.signal("delayed-signal")
         }
@@ -678,7 +678,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
 
         val registered = testEnv!!.registerSearchAttribute(
             "TestAttribute",
-            IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+            IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD
         )
 
         assertTrue(registered)
@@ -691,7 +691,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
         testEnv!!.registerSearchAttribute("TestAttribute", IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD)
         val registered = testEnv!!.registerSearchAttribute(
             "TestAttribute",
-            IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+            IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD
         )
 
         assertFalse(registered)
@@ -713,7 +713,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
             SimpleWorkflow::class.java,
             WorkflowOptions.newBuilder()
                 .setTaskQueue("test-task-queue")
-                .build(),
+                .build()
         )
         workflow.execute("test")
 
@@ -740,7 +740,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
                 SimpleWorkflow::class.java,
                 WorkflowOptions.newBuilder()
                     .setTaskQueue("test-task-queue")
-                    .build(),
+                    .build()
             )
             val result = workflow.execute("test")
             assertEquals("Hello, test!", result)
@@ -763,7 +763,7 @@ class KTestWorkflowEnvironmentIntegrationTest {
                 SimpleWorkflow::class.java,
                 WorkflowOptions.newBuilder()
                     .setTaskQueue("test-task-queue")
-                    .build(),
+                    .build()
             )
             workflow.execute("World")
         }

@@ -142,7 +142,7 @@ public class KTestEnvironmentOptionsBuilder internal constructor() {
      */
     @TemporalDsl
     public class SearchAttributesBuilder internal constructor(
-        private val attributes: MutableMap<String, IndexedValueType>,
+        private val attributes: MutableMap<String, IndexedValueType>
     ) {
         /**
          * Register a search attribute with the given name and type.
@@ -172,14 +172,14 @@ public class KTestEnvironmentOptionsBuilder internal constructor() {
         // Apply WorkerFactoryOptions if configured
         workerFactoryOptionsBuilder?.let { block ->
             builder.setWorkerFactoryOptions(
-                WorkerFactoryOptions.newBuilder().apply(block).build(),
+                WorkerFactoryOptions.newBuilder().apply(block).build()
             )
         }
 
         // Apply WorkflowServiceStubsOptions if configured
         workflowServiceStubsOptionsBuilder?.let { block ->
             builder.setWorkflowServiceStubsOptions(
-                WorkflowServiceStubsOptions.newBuilder().apply(block).build(),
+                WorkflowServiceStubsOptions.newBuilder().apply(block).build()
             )
         }
 
@@ -216,7 +216,7 @@ public class KTestEnvironmentOptionsBuilder internal constructor() {
  * ```
  */
 public class KTestEnvironmentOptions private constructor(
-    internal val javaOptions: TestEnvironmentOptions,
+    internal val javaOptions: TestEnvironmentOptions
 ) {
 
     public companion object {
@@ -228,7 +228,7 @@ public class KTestEnvironmentOptions private constructor(
          */
         public fun newBuilder(block: KTestEnvironmentOptionsBuilder.() -> Unit = {}): KTestEnvironmentOptions {
             return KTestEnvironmentOptions(
-                KTestEnvironmentOptionsBuilder().apply(block).build(),
+                KTestEnvironmentOptionsBuilder().apply(block).build()
             )
         }
 

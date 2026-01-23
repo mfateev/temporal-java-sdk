@@ -67,7 +67,7 @@ import kotlin.reflect.jvm.javaMethod
  * ```
  */
 public class KTestActivityEnvironment private constructor(
-    private val testEnvironment: TestActivityEnvironment,
+    private val testEnvironment: TestActivityEnvironment
 ) : Closeable {
 
     // ========== Commit 19: Registration Methods ==========
@@ -117,7 +117,7 @@ public class KTestActivityEnvironment private constructor(
      */
     public fun <T, R> executeActivity(
         activity: KFunction1<T, R>,
-        options: KActivityOptions,
+        options: KActivityOptions
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -144,7 +144,7 @@ public class KTestActivityEnvironment private constructor(
     public fun <T, A1, R> executeActivity(
         activity: KFunction2<T, A1, R>,
         options: KActivityOptions,
-        arg1: A1,
+        arg1: A1
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -174,7 +174,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KFunction3<T, A1, A2, R>,
         options: KActivityOptions,
         arg1: A1,
-        arg2: A2,
+        arg2: A2
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -198,7 +198,7 @@ public class KTestActivityEnvironment private constructor(
         options: KActivityOptions,
         arg1: A1,
         arg2: A2,
-        arg3: A3,
+        arg3: A3
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -222,7 +222,7 @@ public class KTestActivityEnvironment private constructor(
         arg1: A1,
         arg2: A2,
         arg3: A3,
-        arg4: A4,
+        arg4: A4
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -249,7 +249,7 @@ public class KTestActivityEnvironment private constructor(
     @JvmName("executeSuspendActivity0")
     public suspend fun <T, R> executeActivity(
         activity: KSuspendFunction1<T, R>,
-        options: KActivityOptions,
+        options: KActivityOptions
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -277,7 +277,7 @@ public class KTestActivityEnvironment private constructor(
     public suspend fun <T, A1, R> executeActivity(
         activity: KSuspendFunction2<T, A1, R>,
         options: KActivityOptions,
-        arg1: A1,
+        arg1: A1
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -298,7 +298,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KSuspendFunction3<T, A1, A2, R>,
         options: KActivityOptions,
         arg1: A1,
-        arg2: A2,
+        arg2: A2
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -321,7 +321,7 @@ public class KTestActivityEnvironment private constructor(
         options: KActivityOptions,
         arg1: A1,
         arg2: A2,
-        arg3: A3,
+        arg3: A3
     ): R {
         val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -342,7 +342,7 @@ public class KTestActivityEnvironment private constructor(
      */
     public fun <T, R> executeLocalActivity(
         activity: KFunction1<T, R>,
-        options: KLocalActivityOptions,
+        options: KLocalActivityOptions
     ): R {
         val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -360,7 +360,7 @@ public class KTestActivityEnvironment private constructor(
     public fun <T, A1, R> executeLocalActivity(
         activity: KFunction2<T, A1, R>,
         options: KLocalActivityOptions,
-        arg1: A1,
+        arg1: A1
     ): R {
         val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -380,7 +380,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KFunction3<T, A1, A2, R>,
         options: KLocalActivityOptions,
         arg1: A1,
-        arg2: A2,
+        arg2: A2
     ): R {
         val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -402,7 +402,7 @@ public class KTestActivityEnvironment private constructor(
         options: KLocalActivityOptions,
         arg1: A1,
         arg2: A2,
-        arg3: A3,
+        arg3: A3
     ): R {
         val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
@@ -461,7 +461,7 @@ public class KTestActivityEnvironment private constructor(
      * @param listener Callback invoked for each heartbeat with the details
      */
     public inline fun <reified T> setActivityHeartbeatListener(
-        noinline listener: (T) -> Unit,
+        noinline listener: (T) -> Unit
     ) {
         setActivityHeartbeatListenerInternal(T::class.java, listener)
     }
@@ -469,11 +469,11 @@ public class KTestActivityEnvironment private constructor(
     @PublishedApi
     internal fun <T> setActivityHeartbeatListenerInternal(
         detailsClass: Class<T>,
-        listener: (T) -> Unit,
+        listener: (T) -> Unit
     ) {
         testEnvironment.setActivityHeartbeatListener(
             detailsClass,
-            Functions.Proc1 { listener(it) },
+            Functions.Proc1 { listener(it) }
         )
     }
 
@@ -490,12 +490,12 @@ public class KTestActivityEnvironment private constructor(
     public fun <T> setActivityHeartbeatListener(
         detailsClass: Class<T>,
         detailsType: Type,
-        listener: (T) -> Unit,
+        listener: (T) -> Unit
     ) {
         testEnvironment.setActivityHeartbeatListener(
             detailsClass,
             detailsType,
-            Functions.Proc1 { listener(it) },
+            Functions.Proc1 { listener(it) }
         )
     }
 
@@ -553,12 +553,12 @@ public class KTestActivityEnvironment private constructor(
     @Suppress("UNCHECKED_CAST")
     private fun <T> createActivityStub(
         activity: KFunction<*>,
-        options: ActivityOptions,
+        options: ActivityOptions
     ): T {
         val activityClass = activity.javaMethod?.declaringClass
             ?: throw IllegalArgumentException(
                 "Cannot determine activity interface from method reference. " +
-                    "Ensure you're using a method reference like MyActivities::methodName",
+                    "Ensure you're using a method reference like MyActivities::methodName"
             )
         return testEnvironment.newActivityStub(activityClass, options) as T
     }
@@ -572,12 +572,12 @@ public class KTestActivityEnvironment private constructor(
     @Suppress("UNCHECKED_CAST")
     private fun <T> createLocalActivityStub(
         activity: KFunction<*>,
-        options: LocalActivityOptions,
+        options: LocalActivityOptions
     ): T {
         val activityClass = activity.javaMethod?.declaringClass
             ?: throw IllegalArgumentException(
                 "Cannot determine activity interface from method reference. " +
-                    "Ensure you're using a method reference like MyActivities::methodName",
+                    "Ensure you're using a method reference like MyActivities::methodName"
             )
         return testEnvironment.newLocalActivityStub(activityClass, options, emptyMap()) as T
     }
@@ -609,7 +609,7 @@ public class KTestActivityEnvironment private constructor(
          * @param options DSL builder for configuring the test environment
          */
         public fun newInstance(
-            options: KTestEnvironmentOptionsBuilder.() -> Unit,
+            options: KTestEnvironmentOptionsBuilder.() -> Unit
         ): KTestActivityEnvironment {
             val javaOptions = KTestEnvironmentOptionsBuilder().apply(options).build()
             return KTestActivityEnvironment(TestActivityEnvironment.newInstance(javaOptions))
@@ -630,7 +630,7 @@ public class KTestActivityEnvironment private constructor(
          */
         public fun newInstance(options: KTestEnvironmentOptions): KTestActivityEnvironment {
             return KTestActivityEnvironment(
-                TestActivityEnvironment.newInstance(options.javaOptions),
+                TestActivityEnvironment.newInstance(options.javaOptions)
             )
         }
     }

@@ -193,7 +193,7 @@ class KTestActivityEnvironmentIntegrationTest {
         // Registration should succeed - verify by executing an activity
         val result = activityEnv!!.executeActivity(
             TestActivities::noArgs,
-            KActivityOptions(startToCloseTimeout = 1.minutes),
+            KActivityOptions(startToCloseTimeout = 1.minutes)
         )
 
         assertEquals("no-args-result", result)
@@ -208,7 +208,7 @@ class KTestActivityEnvironmentIntegrationTest {
         // Verify registration works
         val result1 = activityEnv!!.executeActivity(
             TestActivities::noArgs,
-            KActivityOptions(startToCloseTimeout = 1.minutes),
+            KActivityOptions(startToCloseTimeout = 1.minutes)
         )
         assertEquals("no-args-result", result1)
     }
@@ -222,7 +222,7 @@ class KTestActivityEnvironmentIntegrationTest {
 
         val result = activityEnv!!.executeActivity(
             TestActivities::noArgs,
-            KActivityOptions(startToCloseTimeout = 1.minutes),
+            KActivityOptions(startToCloseTimeout = 1.minutes)
         )
 
         assertEquals("no-args-result", result)
@@ -237,7 +237,7 @@ class KTestActivityEnvironmentIntegrationTest {
         val result = activityEnv!!.executeActivity(
             TestActivities::oneArg,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "test-input",
+            "test-input"
         )
 
         assertEquals("processed: test-input", result)
@@ -253,7 +253,7 @@ class KTestActivityEnvironmentIntegrationTest {
             TestActivities::twoArgs,
             KActivityOptions(startToCloseTimeout = 1.minutes),
             "hello",
-            42,
+            42
         )
 
         assertEquals("hello-42", result)
@@ -270,7 +270,7 @@ class KTestActivityEnvironmentIntegrationTest {
             KActivityOptions(startToCloseTimeout = 1.minutes),
             "test",
             123,
-            true,
+            true
         )
 
         assertEquals("test-123-true", result)
@@ -288,7 +288,7 @@ class KTestActivityEnvironmentIntegrationTest {
             "value",
             456,
             false,
-            3.14,
+            3.14
         )
 
         assertEquals("value-456-false-3.14", result)
@@ -304,7 +304,7 @@ class KTestActivityEnvironmentIntegrationTest {
 
         val result = activityEnv!!.executeLocalActivity(
             TestActivities::noArgs,
-            KLocalActivityOptions(startToCloseTimeout = 1.minutes),
+            KLocalActivityOptions(startToCloseTimeout = 1.minutes)
         )
 
         assertEquals("no-args-result", result)
@@ -318,7 +318,7 @@ class KTestActivityEnvironmentIntegrationTest {
         val result = activityEnv!!.executeLocalActivity(
             TestActivities::oneArg,
             KLocalActivityOptions(startToCloseTimeout = 1.minutes),
-            "local-input",
+            "local-input"
         )
 
         assertEquals("processed: local-input", result)
@@ -333,7 +333,7 @@ class KTestActivityEnvironmentIntegrationTest {
             TestActivities::twoArgs,
             KLocalActivityOptions(startToCloseTimeout = 1.minutes),
             "local",
-            100,
+            100
         )
 
         assertEquals("local-100", result)
@@ -349,7 +349,7 @@ class KTestActivityEnvironmentIntegrationTest {
             KLocalActivityOptions(startToCloseTimeout = 1.minutes),
             "local",
             200,
-            true,
+            true
         )
 
         assertEquals("local-200-true", result)
@@ -372,9 +372,9 @@ class KTestActivityEnvironmentIntegrationTest {
             KActivityOptions(
                 startToCloseTimeout = 1.minutes,
                 // Short heartbeat timeout reduces throttling (throttle = 0.8 * timeout)
-                heartbeatTimeout = 100.milliseconds,
+                heartbeatTimeout = 100.milliseconds
             ),
-            5,
+            5
         )
 
         assertEquals(5, result)
@@ -396,9 +396,9 @@ class KTestActivityEnvironmentIntegrationTest {
             TestActivities::processWithHeartbeat,
             KActivityOptions(
                 startToCloseTimeout = 1.minutes,
-                heartbeatTimeout = 30.seconds,
+                heartbeatTimeout = 30.seconds
             ),
-            5,
+            5
         )
 
         assertEquals(5, result)
@@ -426,9 +426,9 @@ class KTestActivityEnvironmentIntegrationTest {
                 KActivityOptions(
                     startToCloseTimeout = 1.minutes,
                     // Short heartbeat timeout reduces throttling (throttle = 0.8 * timeout)
-                    heartbeatTimeout = 100.milliseconds,
+                    heartbeatTimeout = 100.milliseconds
                 ),
-                100, // Would take 100 iterations, but will be cancelled after 2
+                100 // Would take 100 iterations, but will be cancelled after 2
             )
         }
 
@@ -451,7 +451,7 @@ class KTestActivityEnvironmentIntegrationTest {
         // Execute an activity to ensure environment is active
         activityEnv!!.executeActivity(
             TestActivities::noArgs,
-            KActivityOptions(startToCloseTimeout = 1.minutes),
+            KActivityOptions(startToCloseTimeout = 1.minutes)
         )
 
         // Close should not throw

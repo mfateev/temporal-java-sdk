@@ -72,7 +72,7 @@ import kotlin.time.Duration as KotlinDuration
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
     internal val activityRegistry: KActivityRegistry = KActivityRegistry(),
-    private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create(),
+    private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create()
 ) : Closeable {
 
     // ========== Commit 7: Basic structure with worker creation ==========
@@ -121,7 +121,7 @@ public class KTestWorkflowEnvironment private constructor(
      */
     public fun newWorker(
         taskQueue: String,
-        options: WorkerOptions.Builder.() -> Unit,
+        options: WorkerOptions.Builder.() -> Unit
     ): KWorker {
         val workerOptions = WorkerOptions.newBuilder().apply(options).build()
         return KWorker(testEnvironment.newWorker(taskQueue, workerOptions), kotlinPlugin)
@@ -343,7 +343,7 @@ public class KTestWorkflowEnvironment private constructor(
         withContext(Dispatchers.IO) {
             testEnvironment.awaitTermination(
                 timeout.inWholeMilliseconds,
-                TimeUnit.MILLISECONDS,
+                TimeUnit.MILLISECONDS
             )
         }
     }
@@ -357,7 +357,7 @@ public class KTestWorkflowEnvironment private constructor(
         withContext(Dispatchers.IO) {
             testEnvironment.awaitTermination(
                 timeout.toMillis(),
-                TimeUnit.MILLISECONDS,
+                TimeUnit.MILLISECONDS
             )
         }
     }
@@ -497,7 +497,7 @@ public class KTestWorkflowEnvironment private constructor(
         internal fun create(
             testEnvironment: TestWorkflowEnvironment,
             activityRegistry: KActivityRegistry,
-            kotlinPlugin: KotlinPlugin,
+            kotlinPlugin: KotlinPlugin
         ): KTestWorkflowEnvironment {
             return KTestWorkflowEnvironment(testEnvironment, activityRegistry, kotlinPlugin)
         }
@@ -540,7 +540,7 @@ public class KTestWorkflowEnvironment private constructor(
          * @return A new KTestWorkflowEnvironment instance
          */
         public fun newInstance(
-            options: KTestEnvironmentOptionsBuilder.() -> Unit,
+            options: KTestEnvironmentOptionsBuilder.() -> Unit
         ): KTestWorkflowEnvironment {
             val javaOptions = KTestEnvironmentOptionsBuilder().apply(options).build()
             return KTestWorkflowEnvironment(TestWorkflowEnvironment.newInstance(javaOptions))
@@ -562,7 +562,7 @@ public class KTestWorkflowEnvironment private constructor(
          */
         public fun newInstance(options: KTestEnvironmentOptions): KTestWorkflowEnvironment {
             return KTestWorkflowEnvironment(
-                TestWorkflowEnvironment.newInstance(options.javaOptions),
+                TestWorkflowEnvironment.newInstance(options.javaOptions)
             )
         }
     }

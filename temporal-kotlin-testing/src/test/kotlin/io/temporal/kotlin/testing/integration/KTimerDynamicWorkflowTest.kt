@@ -61,12 +61,12 @@ class KTimerDynamicWorkflowTest {
     @Test
     fun testDynamicWorkflowWithTimer(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow<String>(
             "TimerWorkflow",
             options.copy(workflowId = "test-timer-dynamic"),
-            "timer test",
+            "timer test"
         )
 
         assertEquals("Processed: timer test", result)

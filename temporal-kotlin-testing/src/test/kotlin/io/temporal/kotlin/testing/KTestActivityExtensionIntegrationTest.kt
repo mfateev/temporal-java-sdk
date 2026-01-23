@@ -117,7 +117,7 @@ class KTestActivityExtensionIntegrationTest {
         val activityExtension = kTestActivityExtension {
             setActivityImplementations(
                 SimpleActivitiesImpl(),
-                AnotherActivitiesImpl(),
+                AnotherActivitiesImpl()
             )
         }
     }
@@ -142,7 +142,7 @@ class KTestActivityExtensionIntegrationTest {
         val result = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "World",
+            "World"
         )
 
         assertEquals("Hello, World!", result)
@@ -155,7 +155,7 @@ class KTestActivityExtensionIntegrationTest {
             SimpleActivities::add,
             KActivityOptions(startToCloseTimeout = 1.minutes),
             10,
-            20,
+            20
         )
 
         assertEquals(30, result)
@@ -167,13 +167,13 @@ class KTestActivityExtensionIntegrationTest {
         val result1 = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "First",
+            "First"
         )
 
         val result2 = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Second",
+            "Second"
         )
 
         assertEquals("Hello, First!", result1)
@@ -188,13 +188,13 @@ class KTestActivityExtensionIntegrationTest {
         val result1 = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Test",
+            "Test"
         )
 
         val result2 = activityEnv.executeActivity(
             AnotherActivities::format,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Input",
+            "Input"
         )
 
         assertEquals("Hello, Test!", result1)
@@ -217,9 +217,9 @@ class KTestActivityExtensionIntegrationTest {
             KActivityOptions(
                 startToCloseTimeout = 1.minutes,
                 // Short heartbeat timeout reduces throttling (throttle = 0.8 * timeout)
-                heartbeatTimeout = 100.milliseconds,
+                heartbeatTimeout = 100.milliseconds
             ),
-            5,
+            5
         )
 
         assertEquals(5, result)
@@ -237,7 +237,7 @@ class KTestActivityExtensionIntegrationTest {
         val result = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Custom",
+            "Custom"
         )
 
         assertEquals("Hello, Custom!", result)
@@ -250,7 +250,7 @@ class KTestActivityExtensionIntegrationTest {
         val result = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Isolation1",
+            "Isolation1"
         )
 
         assertEquals("Hello, Isolation1!", result)
@@ -263,7 +263,7 @@ class KTestActivityExtensionIntegrationTest {
         val result = activityEnv.executeActivity(
             SimpleActivities::greet,
             KActivityOptions(startToCloseTimeout = 1.minutes),
-            "Isolation2",
+            "Isolation2"
         )
 
         assertEquals("Hello, Isolation2!", result)

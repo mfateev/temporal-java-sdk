@@ -100,7 +100,7 @@ import java.time.Instant
  * ```
  */
 public class KTestWorkflowExtension private constructor(
-    private val config: ExtensionConfig,
+    private val config: ExtensionConfig
 ) : ParameterResolver, TestWatcher, BeforeEachCallback, AfterEachCallback {
 
     // ========== Commit 13: Configuration data class ==========
@@ -118,7 +118,7 @@ public class KTestWorkflowExtension private constructor(
         val doNotStart: Boolean,
         val initialTimeMillis: Long,
         val useTimeskipping: Boolean,
-        val searchAttributes: Map<String, IndexedValueType>,
+        val searchAttributes: Map<String, IndexedValueType>
     )
 
     /**
@@ -131,14 +131,14 @@ public class KTestWorkflowExtension private constructor(
         KTestWorkflowEnvironment::class.java,
         KClient::class.java,
         KWorkflowOptions::class.java,
-        KWorker::class.java,
+        KWorker::class.java
     )
 
     // ========== Parameter resolution ==========
 
     override fun supportsParameter(
         parameterContext: ParameterContext,
-        extensionContext: ExtensionContext,
+        extensionContext: ExtensionContext
     ): Boolean {
         val parameter = parameterContext.parameter
 
@@ -150,7 +150,7 @@ public class KTestWorkflowExtension private constructor(
 
     override fun resolveParameter(
         parameterContext: ParameterContext,
-        extensionContext: ExtensionContext,
+        extensionContext: ExtensionContext
     ): Any {
         val parameterType = parameterContext.parameter.type
         val store = getStore(extensionContext)
@@ -162,7 +162,7 @@ public class KTestWorkflowExtension private constructor(
             KWorker::class.java -> getKWorker(store)
             else -> throw IllegalArgumentException(
                 "Unsupported parameter type: ${parameterType.name}. " +
-                    "Supported types: KTestWorkflowEnvironment, KClient, KWorkflowOptions, KWorker",
+                    "Supported types: KTestWorkflowEnvironment, KClient, KWorkflowOptions, KWorker"
             )
         }
     }
@@ -173,7 +173,7 @@ public class KTestWorkflowExtension private constructor(
         // Check for @WorkflowInitialTime annotation (Commit 18)
         val currentInitialTimeMillis = AnnotationSupport.findAnnotation(
             context.element,
-            WorkflowInitialTime::class.java,
+            WorkflowInitialTime::class.java
         ).map { annotation ->
             Instant.parse(annotation.value).toEpochMilli()
         }.orElse(config.initialTimeMillis)
@@ -239,7 +239,7 @@ public class KTestWorkflowExtension private constructor(
         // Register Kotlin workflows (suspend and dynamic) via KotlinWorkflowImplementationFactory
         if (kotlinWorkflows.isNotEmpty()) {
             val kotlinFactory = KotlinWorkflowImplementationFactory(
-                DataConverter.getDefaultInstance(),
+                DataConverter.getDefaultInstance()
             )
             kotlinWorkflows.forEach { (workflowType, _) ->
                 kotlinFactory.registerWorkflowImplementationType(workflowType)
@@ -307,7 +307,7 @@ public class KTestWorkflowExtension private constructor(
     private fun getStore(context: ExtensionContext): ExtensionContext.Store {
         val namespace = ExtensionContext.Namespace.create(
             KTestWorkflowExtension::class.java,
-            context.requiredTestMethod,
+            context.requiredTestMethod
         )
         return context.getStore(namespace)
     }
@@ -316,7 +316,7 @@ public class KTestWorkflowExtension private constructor(
         return store.get(TEST_ENVIRONMENT_KEY, KTestWorkflowEnvironment::class.java)
             ?: throw IllegalStateException(
                 "Test environment not initialized. " +
-                    "Ensure the extension is properly registered.",
+                    "Ensure the extension is properly registered."
             )
     }
 
@@ -324,7 +324,7 @@ public class KTestWorkflowExtension private constructor(
         return store.get(KWORKER_KEY, KWorker::class.java)
             ?: throw IllegalStateException(
                 "Worker not initialized. " +
-                    "Ensure the extension is properly registered.",
+                    "Ensure the extension is properly registered."
             )
     }
 
@@ -332,7 +332,7 @@ public class KTestWorkflowExtension private constructor(
         return store.get(WORKFLOW_OPTIONS_KEY, KWorkflowOptions::class.java)
             ?: throw IllegalStateException(
                 "Workflow options not initialized. " +
-                    "Ensure the extension is properly registered.",
+                    "Ensure the extension is properly registered."
             )
     }
 
@@ -353,7 +353,7 @@ public class KTestWorkflowExtension private constructor(
      */
     private fun createKTestWorkflowEnvironment(
         javaTestEnv: TestWorkflowEnvironment,
-        activityRegistry: KActivityRegistry,
+        activityRegistry: KActivityRegistry
     ): KTestWorkflowEnvironment {
         return KTestWorkflowEnvironment.create(javaTestEnv, activityRegistry, KotlinPlugin.create())
     }
@@ -604,7 +604,7 @@ public class KTestWorkflowExtension private constructor(
          */
         @TemporalDsl
         public class SearchAttributesBuilder internal constructor(
-            private val attributes: MutableMap<String, IndexedValueType>,
+            private val attributes: MutableMap<String, IndexedValueType>
         ) {
             /**
              * Register a search attribute with the given name and type.
@@ -639,8 +639,8 @@ public class KTestWorkflowExtension private constructor(
                     doNotStart = _doNotStart,
                     initialTimeMillis = _initialTime?.toEpochMilli() ?: 0,
                     useTimeskipping = _useTimeskipping,
-                    searchAttributes = searchAttributes.toMap(),
-                ),
+                    searchAttributes = searchAttributes.toMap()
+                )
             )
         }
     }
@@ -691,7 +691,7 @@ public class KTestWorkflowExtension private constructor(
  * @return A new [KTestWorkflowExtension] instance
  */
 public fun kTestWorkflowExtension(
-    block: KTestWorkflowExtension.Builder.() -> Unit,
+    block: KTestWorkflowExtension.Builder.() -> Unit
 ): KTestWorkflowExtension {
     return KTestWorkflowExtension.newBuilder().apply(block).build()
 }

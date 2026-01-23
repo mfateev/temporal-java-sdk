@@ -104,7 +104,7 @@ class KTestWorkflowExtensionIntegrationTest {
             GreetingActivities::class.java,
             ActivityOptions.newBuilder()
                 .setStartToCloseTimeout(java.time.Duration.ofMinutes(1))
-                .build(),
+                .build()
         )
 
         override suspend fun process(input: String): String {
@@ -132,7 +132,7 @@ class KTestWorkflowExtensionIntegrationTest {
             workflowImplementationTypes = listOf(
                 GreetingWorkflowImpl::class,
                 TimerWorkflowImpl::class,
-                WorkflowWithActivityImpl::class,
+                WorkflowWithActivityImpl::class
             )
             activityImplementations = listOf(GreetingActivitiesImpl())
             useTimeskipping = true
@@ -174,7 +174,7 @@ class KTestWorkflowExtensionIntegrationTest {
     fun `inject multiple parameters`(
         testEnv: KTestWorkflowEnvironment,
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) {
         assertNotNull(testEnv)
         assertNotNull(client)
@@ -186,12 +186,12 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `execute simple workflow via method reference`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
             "Kotlin",
-            options.copy(workflowId = "greeting-${UUID.randomUUID()}"),
+            options.copy(workflowId = "greeting-${UUID.randomUUID()}")
         )
         assertEquals("Hello, Kotlin!", result)
     }
@@ -199,12 +199,12 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `execute workflow with different input`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
             "World",
-            options.copy(workflowId = "greeting-world-${UUID.randomUUID()}"),
+            options.copy(workflowId = "greeting-world-${UUID.randomUUID()}")
         )
         assertEquals("Hello, World!", result)
     }
@@ -214,14 +214,14 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `timer workflow completes quickly with time skipping`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val startTime = System.currentTimeMillis()
 
         val result = client.executeWorkflow(
             TimerWorkflow::waitAndReturn,
             3600L, // 1 hour
-            options.copy(workflowId = "timer-${UUID.randomUUID()}"),
+            options.copy(workflowId = "timer-${UUID.randomUUID()}")
         )
 
         val elapsed = System.currentTimeMillis() - startTime
@@ -235,14 +235,14 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `workflow with activity executes correctly`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         GreetingActivitiesImpl.executionCount.set(0)
 
         val result = client.executeWorkflow(
             WorkflowWithActivity::process,
             "Test Input",
-            options.copy(workflowId = "activity-${UUID.randomUUID()}"),
+            options.copy(workflowId = "activity-${UUID.randomUUID()}")
         )
 
         assertEquals("Formatted: Test Input", result)
@@ -280,12 +280,12 @@ class KTestWorkflowExtensionIntegrationTest {
     @Test
     fun `each test gets isolated environment`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow(
             GreetingWorkflow::greet,
             "Isolation",
-            options.copy(workflowId = "isolation-${UUID.randomUUID()}"),
+            options.copy(workflowId = "isolation-${UUID.randomUUID()}")
         )
 
         assertEquals("Hello, Isolation!", result)
@@ -300,7 +300,7 @@ class KTestWorkflowExtensionIntegrationTest {
         val expectedMinTime = Instant.parse("2024-01-01T00:00:00Z").toEpochMilli()
         assertTrue(
             testEnv.currentTimeMillis >= expectedMinTime,
-            "Current time should be at or after annotation initial time",
+            "Current time should be at or after annotation initial time"
         )
     }
 }
@@ -338,11 +338,11 @@ class KTestWorkflowExtensionNamespaceTest {
     @Test
     fun `workflow executes in custom namespace`(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow(
             SimpleWorkflow::execute,
-            options.copy(workflowId = "namespace-test-${UUID.randomUUID()}"),
+            options.copy(workflowId = "namespace-test-${UUID.randomUUID()}")
         )
         assertEquals("done", result)
     }
@@ -378,7 +378,7 @@ class KTestWorkflowExtensionInitialTimeTest {
         val expectedMinTime = Instant.parse("2024-06-15T12:00:00Z").toEpochMilli()
         assertTrue(
             testEnv.currentTimeMillis >= expectedMinTime,
-            "Current time should be at or after configured initial time",
+            "Current time should be at or after configured initial time"
         )
     }
 }

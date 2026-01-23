@@ -58,12 +58,12 @@ class KSimpleDynamicWorkflowTest {
     @Test
     fun testSimpleDynamicWorkflow(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val result = client.executeWorkflow<String>(
             "AnyWorkflowType",
             options.copy(workflowId = "test-simple-dynamic"),
-            "test input",
+            "test input"
         )
 
         assertEquals("AnyWorkflowType received: test input", result)

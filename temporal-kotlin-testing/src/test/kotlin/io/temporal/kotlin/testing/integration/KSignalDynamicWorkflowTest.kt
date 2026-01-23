@@ -66,7 +66,7 @@ class KSignalDynamicWorkflowTest {
             val activityResult = KWorkflow.executeActivity<String>(
                 "testActivity",
                 listOf(greeting, signalValue),
-                KActivityOptions(startToCloseTimeout = 10.seconds),
+                KActivityOptions(startToCloseTimeout = 10.seconds)
             )
 
             return "workflowType=$workflowType, activity=$activityResult"
@@ -97,14 +97,14 @@ class KSignalDynamicWorkflowTest {
     @Test
     fun testDynamicWorkflowWithSignalAndActivity(
         client: KClient,
-        options: KWorkflowOptions,
+        options: KWorkflowOptions
     ) = runTest {
         val handle = client.signalWithStart(
             workflowType = "MyDynamicType",
             signalName = "testSignal",
             signalArgs = arrayOf("World"),
             workflowArgs = arrayOf("Hello"),
-            options = options.copy(workflowId = "test-signal-dynamic"),
+            options = options.copy(workflowId = "test-signal-dynamic")
         )
         val result = handle.getResult<String>()
 
