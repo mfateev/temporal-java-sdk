@@ -74,11 +74,10 @@ public data class KActivityExecutionOutput(val result: Any?)
  * class LoggingActivityInterceptor(
  *     next: KActivityInboundCallsInterceptor
  * ) : KActivityInboundCallsInterceptorBase(next) {
+ *     private val log = LoggerFactory.getLogger(LoggingActivityInterceptor::class.java)
  *
  *     override suspend fun execute(input: KActivityExecutionInput): KActivityExecutionOutput {
- *         val context = KActivityContext.current
- *         val info = context.info
- *         val log = context.logger()
+ *         val info = KActivityContext.current.info
  *
  *         log.info("Activity ${info.activityType} started")
  *         val startTime = System.currentTimeMillis()

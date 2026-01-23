@@ -21,7 +21,6 @@
 package io.temporal.kotlin.activity
 
 import io.temporal.activity.Activity
-import org.slf4j.Logger
 
 /**
  * Context object passed to an Activity implementation.
@@ -141,31 +140,6 @@ public interface KActivityContext {
    * Returns true if [doNotCompleteOnReturn] was called.
    */
   public val isDoNotCompleteOnReturn: Boolean
-
-  /**
-   * Returns a logger for this activity.
-   *
-   * Uses the activity type as the logger name.
-   *
-   * @return SLF4J logger for activity logging
-   */
-  public fun logger(): Logger
-
-  /**
-   * Returns a logger with the specified name.
-   *
-   * @param name the logger name
-   * @return SLF4J logger for activity logging
-   */
-  public fun logger(name: String): Logger
-
-  /**
-   * Returns a logger for the specified class.
-   *
-   * @param clazz the class to use as the logger name
-   * @return SLF4J logger for activity logging
-   */
-  public fun logger(clazz: Class<*>): Logger
 }
 
 /**

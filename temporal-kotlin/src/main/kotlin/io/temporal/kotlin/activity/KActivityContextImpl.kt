@@ -21,8 +21,6 @@
 package io.temporal.kotlin.activity
 
 import io.temporal.activity.ActivityExecutionContext
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
 /**
  * Implementation of [KActivityContext] that wraps Java SDK's [ActivityExecutionContext].
@@ -55,16 +53,4 @@ internal class KActivityContextImpl(
 
   override val isDoNotCompleteOnReturn: Boolean
     get() = javaContext.isDoNotCompleteOnReturn
-
-  override fun logger(): Logger {
-    return LoggerFactory.getLogger(javaContext.info.activityType)
-  }
-
-  override fun logger(name: String): Logger {
-    return LoggerFactory.getLogger(name)
-  }
-
-  override fun logger(clazz: Class<*>): Logger {
-    return LoggerFactory.getLogger(clazz)
-  }
 }
