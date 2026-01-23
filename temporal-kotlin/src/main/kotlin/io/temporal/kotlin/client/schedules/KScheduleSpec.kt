@@ -75,22 +75,6 @@ public data class KScheduleSpec(
   val jitter: Duration? = null,
   val timeZoneName: String? = null
 ) {
-  /**
-   * Converts this KScheduleSpec to a Java SDK ScheduleSpec.
-   */
-  internal fun toJava(): ScheduleSpec {
-    val builder = ScheduleSpec.newBuilder()
-    if (calendars.isNotEmpty()) builder.setCalendars(calendars.map { it.toJava() })
-    if (intervals.isNotEmpty()) builder.setIntervals(intervals.map { it.toJava() })
-    if (cronExpressions.isNotEmpty()) builder.setCronExpressions(cronExpressions)
-    if (skip.isNotEmpty()) builder.setSkip(skip.map { it.toJava() })
-    startAt?.let { builder.setStartAt(it) }
-    endAt?.let { builder.setEndAt(it) }
-    jitter?.let { builder.setJitter(it) }
-    timeZoneName?.let { builder.setTimeZoneName(it) }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Create a KScheduleSpec from a Java SDK ScheduleSpec.

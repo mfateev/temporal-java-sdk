@@ -47,17 +47,6 @@ public data class KSchedulePolicy(
   val catchupWindow: Duration? = null,
   val pauseOnFailure: Boolean = false
 ) {
-  /**
-   * Converts this KSchedulePolicy to a Java SDK SchedulePolicy.
-   */
-  internal fun toJava(): SchedulePolicy {
-    val builder = SchedulePolicy.newBuilder()
-      .setOverlap(overlap)
-      .setPauseOnFailure(pauseOnFailure)
-    catchupWindow?.let { builder.setCatchupWindow(it) }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Create a KSchedulePolicy from a Java SDK SchedulePolicy.

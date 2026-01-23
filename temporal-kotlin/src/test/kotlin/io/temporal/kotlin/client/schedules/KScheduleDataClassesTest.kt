@@ -22,6 +22,8 @@ package io.temporal.kotlin.client.schedules
 
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
 import io.temporal.client.WorkflowOptions
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KScheduleConverters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -34,12 +36,13 @@ import java.time.Instant
  * Unit tests for Kotlin schedule data classes.
  * Tests conversion between Kotlin and Java SDK types.
  */
+@OptIn(InternalTemporalApi::class)
 class KScheduleDataClassesTest {
 
   @Test
   fun `KScheduleRange converts to and from Java correctly`() {
     val kotlinRange = KScheduleRange(start = 1, end = 10, step = 2)
-    val javaRange = kotlinRange.toJava()
+    val javaRange = kotlinRange.let { KScheduleConverters.toJava(it) }
 
     assertEquals(1, javaRange.start)
     assertEquals(10, javaRange.end)
@@ -52,7 +55,7 @@ class KScheduleDataClassesTest {
   @Test
   fun `KScheduleRange with defaults converts correctly`() {
     val kotlinRange = KScheduleRange(start = 5)
-    val javaRange = kotlinRange.toJava()
+    val javaRange = kotlinRange.let { KScheduleConverters.toJava(it) }
 
     assertEquals(5, javaRange.start)
     assertEquals(0, javaRange.end)
@@ -72,7 +75,7 @@ class KScheduleDataClassesTest {
       comment = "Test calendar spec"
     )
 
-    val javaSpec = kotlinSpec.toJava()
+    val javaSpec = kotlinSpec.let { KScheduleConverters.toJava(it) }
     assertEquals("Test calendar spec", javaSpec.comment)
     assertEquals(1, javaSpec.seconds.size)
     assertEquals(0, javaSpec.seconds[0].start)
@@ -90,7 +93,7 @@ class KScheduleDataClassesTest {
       offset = Duration.ofMinutes(5)
     )
 
-    val javaSpec = kotlinSpec.toJava()
+    val javaSpec = kotlinSpec.let { KScheduleConverters.toJava(it) }
     assertEquals(Duration.ofHours(1), javaSpec.every)
     assertEquals(Duration.ofMinutes(5), javaSpec.offset)
 
@@ -101,7 +104,7 @@ class KScheduleDataClassesTest {
   @Test
   fun `KScheduleIntervalSpec with null offset converts correctly`() {
     val kotlinSpec = KScheduleIntervalSpec(every = Duration.ofMinutes(30))
-    val javaSpec = kotlinSpec.toJava()
+    val javaSpec = kotlinSpec.let { KScheduleConverters.toJava(it) }
 
     assertEquals(Duration.ofMinutes(30), javaSpec.every)
     assertEquals(Duration.ZERO, javaSpec.offset)
@@ -126,7 +129,7 @@ class KScheduleDataClassesTest {
       timeZoneName = "America/New_York"
     )
 
-    val javaSpec = kotlinSpec.toJava()
+    val javaSpec = kotlinSpec.let { KScheduleConverters.toJava(it) }
     assertEquals(1, javaSpec.calendars.size)
     assertEquals(1, javaSpec.intervals.size)
     assertEquals(Duration.ofHours(2), javaSpec.intervals[0].every)
@@ -155,7 +158,7 @@ class KScheduleDataClassesTest {
       remainingActions = 5
     )
 
-    val javaState = kotlinState.toJava()
+    val javaState = kotlinState.let { KScheduleConverters.toJava(it) }
     assertEquals("Test note", javaState.note)
     assertTrue(javaState.isPaused)
     assertTrue(javaState.isLimitedAction)
@@ -168,7 +171,7 @@ class KScheduleDataClassesTest {
   @Test
   fun `KScheduleState with defaults converts correctly`() {
     val kotlinState = KScheduleState()
-    val javaState = kotlinState.toJava()
+    val javaState = kotlinState.let { KScheduleConverters.toJava(it) }
 
     assertNull(javaState.note)
     assertFalse(javaState.isPaused)
@@ -184,7 +187,7 @@ class KScheduleDataClassesTest {
       pauseOnFailure = true
     )
 
-    val javaPolicy = kotlinPolicy.toJava()
+    val javaPolicy = kotlinPolicy.let { KScheduleConverters.toJava(it) }
     assertEquals(ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ONE, javaPolicy.overlap)
     assertEquals(Duration.ofMinutes(10), javaPolicy.catchupWindow)
     assertTrue(javaPolicy.isPauseOnFailure)
@@ -203,7 +206,7 @@ class KScheduleDataClassesTest {
       overlapPolicy = ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL
     )
 
-    val javaBackfill = kotlinBackfill.toJava()
+    val javaBackfill = kotlinBackfill.let { KScheduleConverters.toJava(it) }
     assertEquals(start, javaBackfill.startAt)
     assertEquals(end, javaBackfill.endAt)
     assertEquals(ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL, javaBackfill.overlapPolicy)
@@ -222,7 +225,7 @@ class KScheduleDataClassesTest {
       memo = mapOf("key" to "value")
     )
 
-    val javaOptions = kotlinOptions.toJava()
+    val javaOptions = kotlinOptions.let { KScheduleConverters.toJava(it) }
     assertTrue(javaOptions.isTriggerImmediately)
     assertEquals(1, javaOptions.backfills.size)
   }
@@ -240,7 +243,7 @@ class KScheduleDataClassesTest {
       arguments = listOf("arg1", 42)
     )
 
-    val javaAction = kotlinAction.toJava() as io.temporal.client.schedules.ScheduleActionStartWorkflow
+    val javaAction = kotlinAction.let { KScheduleConverters.toJava(it) } as io.temporal.client.schedules.ScheduleActionStartWorkflow
     assertEquals("TestWorkflow", javaAction.workflowType)
     assertEquals("test-queue", javaAction.options.taskQueue)
 
@@ -273,7 +276,7 @@ class KScheduleDataClassesTest {
       )
     )
 
-    val javaSchedule = kotlinSchedule.toJava()
+    val javaSchedule = kotlinSchedule.let { KScheduleConverters.toJava(it) }
     assertEquals("TestWorkflow", (javaSchedule.action as io.temporal.client.schedules.ScheduleActionStartWorkflow).workflowType)
     assertEquals(1, javaSchedule.spec.intervals.size)
     assertEquals(Duration.ofHours(1), javaSchedule.spec.intervals[0].every)
@@ -315,7 +318,7 @@ class KScheduleDataClassesTest {
     )
 
     val kotlinUpdate = KScheduleUpdate(schedule = kotlinSchedule)
-    val javaUpdate = kotlinUpdate.toJava()
+    val javaUpdate = kotlinUpdate.let { KScheduleConverters.toJava(it) }
 
     assertEquals("TestWorkflow", (javaUpdate.schedule.action as io.temporal.client.schedules.ScheduleActionStartWorkflow).workflowType)
     assertEquals(Duration.ofHours(2), javaUpdate.schedule.spec.intervals[0].every)

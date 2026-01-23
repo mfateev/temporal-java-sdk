@@ -33,8 +33,10 @@ import io.temporal.kotlin.client.KOnConflictOptions
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.toJava
+import io.temporal.kotlin.worker.KWorkerFactoryOptions
 import io.temporal.kotlin.workflow.KChildWorkflowOptions
 import io.temporal.kotlin.workflow.KContinueAsNewOptions
+import io.temporal.worker.WorkerFactoryOptions
 import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.ContinueAsNewOptions
 
@@ -207,4 +209,15 @@ public object KOptionsConverters {
     .setAttachCompletionCallbacks(options.attachCompletionCallbacks)
     .setAttachLinks(options.attachLinks)
     .build()
+
+  /**
+   * Converts [KWorkerFactoryOptions] to [WorkerFactoryOptions].
+   */
+  fun toJava(options: KWorkerFactoryOptions): WorkerFactoryOptions {
+    val builder = WorkerFactoryOptions.newBuilder()
+    options.maxWorkflowThreadCount?.let { builder.setMaxWorkflowThreadCount(it) }
+    options.enableLoggingInReplay?.let { builder.setEnableLoggingInReplay(it) }
+    options.workflowCacheSize?.let { builder.setWorkflowCacheSize(it) }
+    return builder.build()
+  }
 }

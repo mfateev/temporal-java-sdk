@@ -40,6 +40,7 @@ import io.temporal.kotlin.common.KArgs5
 import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.KOptionsConverters
+import io.temporal.kotlin.internal.KScheduleConverters
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
@@ -1792,8 +1793,8 @@ public class KClient(
     return withContext(Dispatchers.IO) {
       val javaHandle = scheduleClient.createSchedule(
         scheduleId,
-        schedule.toJava(),
-        options.toJava()
+        KScheduleConverters.toJava(schedule),
+        KScheduleConverters.toJava(options)
       )
       KScheduleHandle(javaHandle)
     }

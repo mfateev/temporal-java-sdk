@@ -58,18 +58,6 @@ public data class KSchedule(
   val policy: KSchedulePolicy? = null,
   val state: KScheduleState? = null
 ) {
-  /**
-   * Converts this KSchedule to a Java SDK Schedule.
-   */
-  internal fun toJava(): Schedule {
-    val builder = Schedule.newBuilder()
-      .setAction(action.toJava())
-      .setSpec(spec.toJava())
-    policy?.let { builder.setPolicy(it.toJava()) }
-    state?.let { builder.setState(it.toJava()) }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Create a KSchedule from a Java SDK Schedule.

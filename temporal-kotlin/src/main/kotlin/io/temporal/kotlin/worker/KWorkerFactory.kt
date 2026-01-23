@@ -22,6 +22,8 @@ package io.temporal.kotlin.worker
 
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KOptionsConverters
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
 import io.temporal.worker.WorkerFactoryOptions
@@ -76,6 +78,7 @@ import kotlin.reflect.KClass
  * @param client The KClient to use for workflow interactions
  * @param options DSL builder for KWorkerFactoryOptionsBuilder
  */
+@OptIn(InternalTemporalApi::class)
 public class KWorkerFactory(
   client: KClient,
   options: KWorkerFactoryOptionsBuilder.() -> Unit = {}
@@ -92,10 +95,10 @@ public class KWorkerFactory(
   internal val workerInterceptors: List<KWorkerInterceptor>
 
   init {
-    val optionsBuilder = KWorkerFactoryOptionsBuilder().apply(options)
-    workerInterceptors = optionsBuilder.workerInterceptors
+    val kOptions = KWorkerFactoryOptionsBuilder().apply(options).build()
+    workerInterceptors = kOptions.workerInterceptors
 
-    val factoryOptions = optionsBuilder.build()
+    val factoryOptions = KOptionsConverters.toJava(kOptions)
 
     // Create WorkerFactory with KotlinPlugin added (including interceptors)
     val kotlinPlugin = KotlinPlugin.create(

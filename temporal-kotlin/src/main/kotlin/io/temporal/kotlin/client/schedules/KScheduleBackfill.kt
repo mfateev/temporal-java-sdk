@@ -54,11 +54,6 @@ public data class KScheduleBackfill(
   val endAt: Instant,
   val overlapPolicy: ScheduleOverlapPolicy = ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
 ) {
-  /**
-   * Converts this KScheduleBackfill to a Java SDK ScheduleBackfill.
-   */
-  internal fun toJava(): ScheduleBackfill = ScheduleBackfill(startAt, endAt, overlapPolicy)
-
   public companion object {
     /**
      * Create a KScheduleBackfill from a Java SDK ScheduleBackfill.

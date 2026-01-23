@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleOptions
 import io.temporal.common.SearchAttributes
 
 /**
@@ -48,20 +47,6 @@ public data class KScheduleOptions(
   val memo: Map<String, Any>? = null,
   val searchAttributes: SearchAttributes? = null
 ) {
-  /**
-   * Converts this KScheduleOptions to a Java SDK ScheduleOptions.
-   */
-  internal fun toJava(): ScheduleOptions {
-    val builder = ScheduleOptions.newBuilder()
-      .setTriggerImmediately(triggerImmediately)
-    if (backfills.isNotEmpty()) {
-      builder.setBackfills(backfills.map { it.toJava() })
-    }
-    memo?.let { builder.setMemo(it) }
-    searchAttributes?.let { builder.setTypedSearchAttributes(it) }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Default schedule options.

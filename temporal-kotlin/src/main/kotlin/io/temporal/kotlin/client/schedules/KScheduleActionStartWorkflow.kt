@@ -21,7 +21,6 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.client.WorkflowOptions
-import io.temporal.client.schedules.ScheduleAction
 import io.temporal.client.schedules.ScheduleActionStartWorkflow
 import io.temporal.common.interceptors.Header
 import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata
@@ -64,18 +63,6 @@ public data class KScheduleActionStartWorkflow(
   val arguments: List<Any?> = emptyList(),
   val header: Header = Header.empty()
 ) : KScheduleAction() {
-
-  override fun toJava(): ScheduleAction {
-    val builder = ScheduleActionStartWorkflow.newBuilder()
-      .setWorkflowType(workflowType)
-      .setOptions(options)
-      .setHeader(header)
-    if (arguments.isNotEmpty()) {
-      builder.setArguments(*arguments.toTypedArray())
-    }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Create a KScheduleActionStartWorkflow from a workflow interface class.

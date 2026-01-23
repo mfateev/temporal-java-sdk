@@ -23,6 +23,8 @@ package io.temporal.kotlin.client.schedules
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
 import io.temporal.client.schedules.ScheduleHandle
 import io.temporal.client.schedules.ScheduleUpdateInput
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KScheduleConverters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -60,6 +62,7 @@ import kotlinx.coroutines.withContext
  * handle.delete()
  * ```
  */
+@OptIn(InternalTemporalApi::class)
 public class KScheduleHandle internal constructor(
   private val javaHandle: ScheduleHandle
 ) {
@@ -76,7 +79,7 @@ public class KScheduleHandle internal constructor(
    */
   public suspend fun backfill(backfills: List<KScheduleBackfill>) {
     withContext(Dispatchers.IO) {
-      javaHandle.backfill(backfills.map { it.toJava() })
+      javaHandle.backfill(backfills.map { KScheduleConverters.toJava(it) })
     }
   }
 
@@ -175,7 +178,7 @@ public class KScheduleHandle internal constructor(
         val kotlinInput = KScheduleUpdateInput(
           description = KScheduleDescription.fromJava(javaInput.description)
         )
-        updater(kotlinInput)?.toJava()
+        updater(kotlinInput)?.let { KScheduleConverters.toJava(it) }
       }
     }
   }

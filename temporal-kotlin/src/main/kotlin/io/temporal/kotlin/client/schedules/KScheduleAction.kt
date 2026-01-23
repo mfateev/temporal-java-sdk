@@ -28,11 +28,6 @@ import io.temporal.client.schedules.ScheduleAction
  * @see KScheduleActionStartWorkflow
  */
 public sealed class KScheduleAction {
-  /**
-   * Converts this KScheduleAction to a Java SDK ScheduleAction.
-   */
-  internal abstract fun toJava(): ScheduleAction
-
   public companion object {
     /**
      * Create a KScheduleAction from a Java SDK ScheduleAction.

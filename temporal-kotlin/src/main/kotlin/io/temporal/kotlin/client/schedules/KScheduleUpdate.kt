@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleUpdate
 import io.temporal.common.SearchAttributes
 
 /**
@@ -33,16 +32,7 @@ import io.temporal.common.SearchAttributes
 public data class KScheduleUpdate(
   val schedule: KSchedule,
   val searchAttributes: SearchAttributes? = null
-) {
-  /**
-   * Converts this KScheduleUpdate to a Java SDK ScheduleUpdate.
-   */
-  internal fun toJava(): ScheduleUpdate = if (searchAttributes != null) {
-    ScheduleUpdate(schedule.toJava(), searchAttributes)
-  } else {
-    ScheduleUpdate(schedule.toJava())
-  }
-}
+)
 
 /**
  * Parameter passed to a schedule updater.

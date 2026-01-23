@@ -52,18 +52,6 @@ public data class KScheduleState(
   val limitedActions: Boolean = false,
   val remainingActions: Long = 0
 ) {
-  /**
-   * Converts this KScheduleState to a Java SDK ScheduleState.
-   */
-  internal fun toJava(): ScheduleState {
-    val builder = ScheduleState.newBuilder()
-      .setPaused(paused)
-      .setLimitedAction(limitedActions)
-      .setRemainingActions(remainingActions)
-    note?.let { builder.setNote(it) }
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Create a KScheduleState from a Java SDK ScheduleState.

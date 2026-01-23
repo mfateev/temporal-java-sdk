@@ -21,12 +21,11 @@
 package io.temporal.kotlin.worker
 
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
-import io.temporal.worker.WorkerFactoryOptions
 
 /**
  * DSL builder for configuring Kotlin worker factory options.
  *
- * This builder wraps [WorkerFactoryOptions.Builder] and adds support for
+ * This builder creates a [KWorkerFactoryOptions] data class with support for
  * Kotlin-specific interceptors.
  *
  * Example:
@@ -70,17 +69,16 @@ public class KWorkerFactoryOptionsBuilder internal constructor() {
   public var workflowCacheSize: Int? = null
 
   /**
-   * Builds the underlying WorkerFactoryOptions.
+   * Builds the KWorkerFactoryOptions data class.
    *
-   * @return configured WorkerFactoryOptions
+   * @return configured KWorkerFactoryOptions
    */
-  internal fun build(): WorkerFactoryOptions {
-    val builder = WorkerFactoryOptions.newBuilder()
-
-    maxWorkflowThreadCount?.let { builder.setMaxWorkflowThreadCount(it) }
-    enableLoggingInReplay?.let { builder.setEnableLoggingInReplay(it) }
-    workflowCacheSize?.let { builder.setWorkflowCacheSize(it) }
-
-    return builder.build()
+  internal fun build(): KWorkerFactoryOptions {
+    return KWorkerFactoryOptions(
+      workerInterceptors = workerInterceptors,
+      maxWorkflowThreadCount = maxWorkflowThreadCount,
+      enableLoggingInReplay = enableLoggingInReplay,
+      workflowCacheSize = workflowCacheSize
+    )
   }
 }

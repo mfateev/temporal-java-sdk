@@ -67,20 +67,6 @@ public data class KScheduleCalendarSpec(
   val dayOfWeek: List<KScheduleRange> = ALL_WEEK_DAYS,
   val comment: String = ""
 ) {
-  /**
-   * Converts this KScheduleCalendarSpec to a Java SDK ScheduleCalendarSpec.
-   */
-  internal fun toJava(): ScheduleCalendarSpec = ScheduleCalendarSpec.newBuilder()
-    .setSeconds(seconds.map { it.toJava() })
-    .setMinutes(minutes.map { it.toJava() })
-    .setHour(hour.map { it.toJava() })
-    .setDayOfMonth(dayOfMonth.map { it.toJava() })
-    .setMonth(month.map { it.toJava() })
-    .setYear(year.map { it.toJava() })
-    .setDayOfWeek(dayOfWeek.map { it.toJava() })
-    .setComment(comment)
-    .build()
-
   public companion object {
     /** Default range set for zero. */
     public val BEGINNING: List<KScheduleRange> = listOf(KScheduleRange(0))

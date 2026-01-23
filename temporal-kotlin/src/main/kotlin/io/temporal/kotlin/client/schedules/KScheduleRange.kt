@@ -52,11 +52,6 @@ public data class KScheduleRange(
     require(step >= 0) { "step must be non-negative" }
   }
 
-  /**
-   * Converts this KScheduleRange to a Java SDK ScheduleRange.
-   */
-  internal fun toJava(): ScheduleRange = ScheduleRange(start, end, step)
-
   public companion object {
     /**
      * Create a KScheduleRange from a Java SDK ScheduleRange.

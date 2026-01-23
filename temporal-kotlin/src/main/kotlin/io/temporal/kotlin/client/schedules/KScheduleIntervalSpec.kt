@@ -55,11 +55,6 @@ public data class KScheduleIntervalSpec(
     require(!offset.isNegative) { "offset must not be negative" }
   }
 
-  /**
-   * Converts this KScheduleIntervalSpec to a Java SDK ScheduleIntervalSpec.
-   */
-  internal fun toJava(): ScheduleIntervalSpec = ScheduleIntervalSpec(every, offset)
-
   public companion object {
     /**
      * Create a KScheduleIntervalSpec from a Java SDK ScheduleIntervalSpec.
