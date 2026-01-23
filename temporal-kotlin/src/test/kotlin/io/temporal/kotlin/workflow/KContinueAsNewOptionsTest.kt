@@ -1,3 +1,5 @@
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 /*
  * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
  *
@@ -21,6 +23,7 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.KOptionsConverters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -34,7 +37,7 @@ class KContinueAsNewOptionsTest {
   @Test
   fun `default options should produce empty builder result`() {
     val options = KContinueAsNewOptions()
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     // All optional fields should remain unset
     assertNull(javaOptions.workflowRunTimeout)
@@ -64,7 +67,7 @@ class KContinueAsNewOptionsTest {
     val options = KContinueAsNewOptions(
       workflowRunTimeout = 1.hours
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertNotNull(javaOptions.workflowRunTimeout)
     assertEquals(java.time.Duration.ofHours(1), javaOptions.workflowRunTimeout)
@@ -75,7 +78,7 @@ class KContinueAsNewOptionsTest {
     val options = KContinueAsNewOptions(
       taskQueue = "new-task-queue"
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertEquals("new-task-queue", javaOptions.taskQueue)
   }
@@ -90,7 +93,7 @@ class KContinueAsNewOptionsTest {
     val options = KContinueAsNewOptions(
       retryOptions = retryOptions
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertNotNull(javaOptions.retryOptions)
     assertEquals(5, javaOptions.retryOptions!!.maximumAttempts)
@@ -103,7 +106,7 @@ class KContinueAsNewOptionsTest {
     val options = KContinueAsNewOptions(
       workflowTaskTimeout = 30.seconds
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertNotNull(javaOptions.workflowTaskTimeout)
     assertEquals(java.time.Duration.ofSeconds(30), javaOptions.workflowTaskTimeout)
@@ -118,7 +121,7 @@ class KContinueAsNewOptionsTest {
     val options = KContinueAsNewOptions(
       memo = memoData
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertNotNull(javaOptions.memo)
     assertEquals(memoData, javaOptions.memo)
@@ -133,7 +136,7 @@ class KContinueAsNewOptionsTest {
       workflowTaskTimeout = 15.minutes,
       memo = mapOf("key" to "value")
     )
-    val javaOptions = options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(options)
 
     assertEquals(java.time.Duration.ofHours(2), javaOptions.workflowRunTimeout)
     assertEquals("my-queue", javaOptions.taskQueue)

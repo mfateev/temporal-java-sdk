@@ -29,9 +29,7 @@ import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningIntent
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.toJava
 import io.temporal.workflow.ChildWorkflowCancellationType
-import io.temporal.workflow.ChildWorkflowOptions
 import kotlin.time.Duration
 
 /**
@@ -90,34 +88,4 @@ public data class KChildWorkflowOptions(
   val staticSummary: String? = null,
   val staticDetails: String? = null,
   val priority: Priority? = null
-) {
-  /**
-   * Converts this [KChildWorkflowOptions] to the Java SDK [ChildWorkflowOptions].
-   *
-   * This conversion happens once when the child workflow is scheduled,
-   * so there's no runtime overhead during workflow execution.
-   */
-  public fun toJavaOptions(): ChildWorkflowOptions {
-    return ChildWorkflowOptions.newBuilder().apply {
-      namespace?.let { setNamespace(it) }
-      workflowId?.let { setWorkflowId(it) }
-      workflowIdReusePolicy?.let { setWorkflowIdReusePolicy(it) }
-      workflowRunTimeout?.let { setWorkflowRunTimeout(it.toJava()) }
-      workflowExecutionTimeout?.let { setWorkflowExecutionTimeout(it.toJava()) }
-      workflowTaskTimeout?.let { setWorkflowTaskTimeout(it.toJava()) }
-      taskQueue?.let { setTaskQueue(it) }
-      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-      cronSchedule?.let { setCronSchedule(it) }
-      parentClosePolicy?.let { setParentClosePolicy(it) }
-      memo?.let { setMemo(it) }
-      typedSearchAttributes?.let { setTypedSearchAttributes(it) }
-      contextPropagators?.let { setContextPropagators(it) }
-      cancellationType?.let { setCancellationType(it) }
-      @Suppress("DEPRECATION")
-      versioningIntent?.let { setVersioningIntent(it) }
-      staticSummary?.let { setStaticSummary(it) }
-      staticDetails?.let { setStaticDetails(it) }
-      priority?.let { setPriority(it) }
-    }.build()
-  }
-}
+)

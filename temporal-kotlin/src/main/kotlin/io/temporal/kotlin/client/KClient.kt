@@ -1,3 +1,5 @@
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 /*
  * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
  *
@@ -37,6 +39,7 @@ import io.temporal.kotlin.common.KArgs4
 import io.temporal.kotlin.common.KArgs5
 import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KOptionsConverters
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
@@ -234,7 +237,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions())
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options))
   }
 
   /**
@@ -247,7 +250,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), arg)
   }
 
   /**
@@ -260,7 +263,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2)
   }
 
   /**
@@ -273,7 +276,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3)
   }
 
   /**
@@ -286,7 +289,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4)
   }
 
   /**
@@ -299,7 +302,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5)
   }
 
   /**
@@ -312,7 +315,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   // ========== Start Suspend Workflow (0-6 args) ==========
@@ -328,7 +331,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions())
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options))
   }
 
   /**
@@ -342,7 +345,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), arg)
   }
 
   /**
@@ -356,7 +359,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2)
   }
 
   /**
@@ -370,7 +373,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3)
   }
 
   /**
@@ -384,7 +387,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4)
   }
 
   /**
@@ -398,7 +401,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5)
   }
 
   /**
@@ -412,7 +415,7 @@ public class KClient(
   ): KTypedWorkflowHandle<T, R> {
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
     @Suppress("UNCHECKED_CAST")
-    return startWorkflowInternal(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+    return startWorkflowInternal(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
   }
 
   // ========== Execute Workflow (0-6 args) ==========
@@ -515,7 +518,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions())
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options))
     return handle.result()
   }
 
@@ -531,7 +534,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), arg1)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), arg1)
     return handle.result()
   }
 
@@ -547,7 +550,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2)
     return handle.result()
   }
 
@@ -563,7 +566,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3)
     return handle.result()
   }
 
@@ -579,7 +582,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4)
     return handle.result()
   }
 
@@ -595,7 +598,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5)
     return handle.result()
   }
 
@@ -611,7 +614,7 @@ public class KClient(
     val (workflowType, resultClass) = extractWorkflowMetadata(workflow)
 
     @Suppress("UNCHECKED_CAST")
-    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, options.toJavaOptions(), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
+    val handle = startWorkflowInternal<T, R>(workflowType, resultClass as Class<R>, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     return handle.result()
   }
 
@@ -697,7 +700,7 @@ public class KClient(
     vararg args: Any?
   ): WorkflowHandle {
     return withContext(Dispatchers.IO) {
-      val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+      val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
       val execution = stub.start(*args)
       WorkflowHandle(workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()))
     }
@@ -771,7 +774,7 @@ public class KClient(
     options: KWorkflowOptions
   ): WorkflowHandle {
     return withContext(Dispatchers.IO) {
-      val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+      val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
       val execution = stub.signalWithStart(signalName, signalArgs, workflowArgs)
       WorkflowHandle(workflowClient.newUntypedWorkflowStub(execution, java.util.Optional.empty()))
     }
@@ -791,7 +794,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), emptyArray())
 
     @Suppress("UNCHECKED_CAST")
@@ -815,7 +818,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val signalArgs: Array<Any?> = arrayOf(signalArg)
     val execution = stub.signalWithStart(signalName, signalArgs, emptyArray())
 
@@ -840,7 +843,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val execution = stub.signalWithStart(signalName, arrayOf<Any?>(signalArgs.a1, signalArgs.a2), emptyArray())
 
     @Suppress("UNCHECKED_CAST")
@@ -864,7 +867,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val workflowArgs: Array<Any?> = arrayOf(workflowArg)
     val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), workflowArgs)
 
@@ -890,7 +893,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val signalArgs: Array<Any?> = arrayOf(signalArg)
     val workflowArgs: Array<Any?> = arrayOf(workflowArg)
     val execution = stub.signalWithStart(signalName, signalArgs, workflowArgs)
@@ -917,7 +920,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val workflowArgs: Array<Any?> = arrayOf(workflowArg)
     val execution = stub.signalWithStart(signalName, arrayOf<Any?>(signalArgs.a1, signalArgs.a2), workflowArgs)
 
@@ -942,7 +945,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val execution = stub.signalWithStart(signalName, emptyArray<Any?>(), arrayOf<Any?>(workflowArgs.a1, workflowArgs.a2))
 
     @Suppress("UNCHECKED_CAST")
@@ -967,7 +970,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val signalArgs: Array<Any?> = arrayOf(signalArg)
     val execution = stub.signalWithStart(signalName, signalArgs, arrayOf<Any?>(workflowArgs.a1, workflowArgs.a2))
 
@@ -993,7 +996,7 @@ public class KClient(
     val (workflowType, workflowClass, resultClass) = extractFullWorkflowMetadata(workflow)
     val signalName = extractSignalName(signal)
 
-    val stub = workflowClient.newUntypedWorkflowStub(workflowType, options.toJavaOptions())
+    val stub = workflowClient.newUntypedWorkflowStub(workflowType, KOptionsConverters.toJava(options))
     val execution = stub.signalWithStart(
       signalName,
       arrayOf<Any?>(signalArgs.a1, signalArgs.a2),
@@ -1029,7 +1032,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       emptyArray()
     )
   }
@@ -1049,7 +1052,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(arg1)
     )
   }
@@ -1069,7 +1072,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2)
     )
   }
@@ -1089,7 +1092,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3)
     )
   }
@@ -1109,7 +1112,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4)
     )
   }
@@ -1129,7 +1132,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5)
     )
   }
@@ -1149,7 +1152,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     )
   }
@@ -1171,7 +1174,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       emptyArray()
     )
   }
@@ -1192,7 +1195,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(arg1)
     )
   }
@@ -1213,7 +1216,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2)
     )
   }
@@ -1234,7 +1237,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3)
     )
   }
@@ -1255,7 +1258,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4)
     )
   }
@@ -1276,7 +1279,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5)
     )
   }
@@ -1297,7 +1300,7 @@ public class KClient(
       workflowType,
       workflowClass as Class<T>,
       resultClass as Class<R>,
-      options.toJavaOptions(),
+      KOptionsConverters.toJava(options),
       arrayOf<Any?>(args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)
     )
   }

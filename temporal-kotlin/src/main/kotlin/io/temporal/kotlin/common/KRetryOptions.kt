@@ -22,8 +22,6 @@
 
 package io.temporal.kotlin.common
 
-import io.temporal.common.RetryOptions
-import io.temporal.kotlin.toJava
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -60,24 +58,4 @@ public data class KRetryOptions(
   val maximumInterval: Duration? = null,
   val maximumAttempts: Int = 0,
   val doNotRetry: List<String> = emptyList()
-) {
-  /**
-   * Converts this [KRetryOptions] to the Java SDK [RetryOptions].
-   *
-   * This conversion happens once when the activity/workflow is scheduled,
-   * so there's no runtime overhead during workflow execution.
-   */
-  public fun toJavaOptions(): RetryOptions {
-    return RetryOptions.newBuilder().apply {
-      setInitialInterval(initialInterval.toJava())
-      setBackoffCoefficient(backoffCoefficient)
-      maximumInterval?.let { setMaximumInterval(it.toJava()) }
-      if (maximumAttempts > 0) {
-        setMaximumAttempts(maximumAttempts)
-      }
-      if (doNotRetry.isNotEmpty()) {
-        setDoNotRetry(*doNotRetry.toTypedArray())
-      }
-    }.build()
-  }
-}
+)

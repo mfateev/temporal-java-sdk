@@ -37,6 +37,7 @@ import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KOptionsConverters
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
 import io.temporal.workflow.Promise
@@ -824,7 +825,7 @@ public object KWorkflow {
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeActivity must be called from within workflow code")
-    return context.executeActivityByName(activityName, options.toJavaOptions(), resultClass, *args)
+    return context.executeActivityByName(activityName, KOptionsConverters.toJava(options), resultClass, *args)
   }
 
   // ==================== Typed Activity Execution (Method Reference) ====================
@@ -1173,7 +1174,7 @@ public object KWorkflow {
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeLocalActivity must be called from within workflow code")
-    return context.executeLocalActivityByName(activityName, options.toJavaOptions(), resultClass, *args)
+    return context.executeLocalActivityByName(activityName, KOptionsConverters.toJava(options), resultClass, *args)
   }
 
   // ==================== Typed Local Activity Execution (Method Reference) ====================
@@ -1433,7 +1434,7 @@ public object KWorkflow {
   ): R {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.executeChildWorkflow must be called from within workflow code")
-    return context.executeChildWorkflowByName(workflowType, options.toJavaOptions(), resultClass, *args)
+    return context.executeChildWorkflowByName(workflowType, KOptionsConverters.toJava(options), resultClass, *args)
   }
 
   // ==================== Typed Child Workflow Execution (Method Reference) ====================
@@ -1658,7 +1659,7 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>)
+    return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class<R>)
   }
 
   /**
@@ -1673,7 +1674,7 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, arg1)
+    return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class<R>, arg1)
   }
 
   /**
@@ -1688,7 +1689,7 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, *args.toArray())
+    return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class<R>, *args.toArray())
   }
 
   /**
@@ -1703,7 +1704,7 @@ public object KWorkflow {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.startChildWorkflow must be called from within workflow code")
     @Suppress("UNCHECKED_CAST")
-    return context.startChildWorkflowWithHandle(workflowType, options.toJavaOptions(), resultClass as Class<R>, *args.toArray())
+    return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class<R>, *args.toArray())
   }
 
   /**
@@ -2225,7 +2226,7 @@ public object KWorkflow {
   public fun continueAsNew(options: KContinueAsNewOptions, vararg args: Any?): Nothing {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
-    context.continueAsNew(null, options.toJavaOptions(), *args)
+    context.continueAsNew(null, KOptionsConverters.toJava(options), *args)
   }
 
   /**
@@ -2261,7 +2262,7 @@ public object KWorkflow {
   ): Nothing {
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
-    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
+    context.continueAsNew(workflowType, KOptionsConverters.toJava(options), *args)
   }
 
   /**
@@ -2296,7 +2297,7 @@ public object KWorkflow {
     val (workflowType, _) = extractWorkflowMetadata(workflow)
     val context = currentContext.get()
       ?: throw IllegalStateException("KWorkflow.continueAsNew must be called from within workflow code")
-    context.continueAsNew(workflowType, options.toJavaOptions(), *args)
+    context.continueAsNew(workflowType, KOptionsConverters.toJava(options), *args)
   }
 
   // ==================== External Workflow Handles ====================

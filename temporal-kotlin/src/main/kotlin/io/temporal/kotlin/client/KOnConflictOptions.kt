@@ -1,7 +1,5 @@
 package io.temporal.kotlin.client
 
-import io.temporal.client.OnConflictOptions
-
 public data class KOnConflictOptions(
   val attachRequestId: Boolean = false,
   val attachCompletionCallbacks: Boolean = false,
@@ -14,10 +12,4 @@ public data class KOnConflictOptions(
       }
     }
   }
-
-  public fun toJavaOptions(): OnConflictOptions = OnConflictOptions.newBuilder()
-    .setAttachRequestId(attachRequestId)
-    .setAttachCompletionCallbacks(attachCompletionCallbacks)
-    .setAttachLinks(attachLinks)
-    .build()
 }

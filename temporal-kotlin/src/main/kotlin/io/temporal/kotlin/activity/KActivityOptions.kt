@@ -23,9 +23,7 @@
 package io.temporal.kotlin.activity
 
 import io.temporal.activity.ActivityCancellationType
-import io.temporal.activity.ActivityOptions
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.toJava
 import kotlin.time.Duration
 
 /**
@@ -74,24 +72,5 @@ public data class KActivityOptions(
     require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
       "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
     }
-  }
-
-  /**
-   * Converts this [KActivityOptions] to the Java SDK [ActivityOptions].
-   *
-   * This conversion happens once when the activity is scheduled,
-   * so there's no runtime overhead during workflow execution.
-   */
-  public fun toJavaOptions(): ActivityOptions {
-    return ActivityOptions.newBuilder().apply {
-      startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
-      scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
-      scheduleToStartTimeout?.let { setScheduleToStartTimeout(it.toJava()) }
-      heartbeatTimeout?.let { setHeartbeatTimeout(it.toJava()) }
-      taskQueue?.let { setTaskQueue(it) }
-      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-      cancellationType?.let { setCancellationType(it) }
-      setDisableEagerExecution(disableEagerExecution)
-    }.build()
   }
 }

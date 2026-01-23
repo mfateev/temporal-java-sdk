@@ -26,13 +26,11 @@ import io.temporal.api.common.v1.Callback
 import io.temporal.api.common.v1.Link
 import io.temporal.api.enums.v1.WorkflowIdConflictPolicy
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy
-import io.temporal.client.WorkflowOptions
 import io.temporal.common.Priority
 import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningOverride
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.toJava
 import kotlin.time.Duration
 
 /**
@@ -97,37 +95,4 @@ public data class KWorkflowOptions(
   val onConflictOptions: KOnConflictOptions? = null,
   val priority: Priority? = null,
   val versioningOverride: VersioningOverride? = null
-) {
-  /**
-   * Converts this [KWorkflowOptions] to the Java SDK [WorkflowOptions].
-   *
-   * This conversion happens once when the workflow is started,
-   * so there's no runtime overhead during workflow execution.
-   */
-  public fun toJavaOptions(): WorkflowOptions {
-    return WorkflowOptions.newBuilder().apply {
-      workflowId?.let { setWorkflowId(it) }
-      workflowIdReusePolicy?.let { setWorkflowIdReusePolicy(it) }
-      workflowIdConflictPolicy?.let { setWorkflowIdConflictPolicy(it) }
-      workflowRunTimeout?.let { setWorkflowRunTimeout(it.toJava()) }
-      workflowExecutionTimeout?.let { setWorkflowExecutionTimeout(it.toJava()) }
-      workflowTaskTimeout?.let { setWorkflowTaskTimeout(it.toJava()) }
-      taskQueue?.let { setTaskQueue(it) }
-      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-      cronSchedule?.let { setCronSchedule(it) }
-      memo?.let { setMemo(it) }
-      typedSearchAttributes?.let { setTypedSearchAttributes(it) }
-      contextPropagators?.let { setContextPropagators(it) }
-      setDisableEagerExecution(disableEagerExecution)
-      startDelay?.let { setStartDelay(it.toJava()) }
-      staticSummary?.let { setStaticSummary(it) }
-      staticDetails?.let { setStaticDetails(it) }
-      requestId?.let { setRequestId(it) }
-      completionCallbacks?.let { setCompletionCallbacks(it) }
-      links?.let { setLinks(it) }
-      onConflictOptions?.let { setOnConflictOptions(it.toJavaOptions()) }
-      priority?.let { setPriority(it) }
-      versioningOverride?.let { setVersioningOverride(it) }
-    }.build()
-  }
-}
+)

@@ -18,18 +18,14 @@
  * limitations under the License.
  */
 
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, io.temporal.kotlin.internal.InternalTemporalApi::class)
 
 package io.temporal.kotlin.internal.interceptor
 
-import io.temporal.activity.ActivityOptions
-import io.temporal.activity.LocalActivityOptions
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes
 import io.temporal.api.common.v1.Payloads
 import io.temporal.common.SearchAttributeUpdate
 import io.temporal.common.converter.DataConverter
-import io.temporal.kotlin.activity.KActivityOptions
-import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.interceptor.KActivityInvocationInput
 import io.temporal.kotlin.interceptor.KCancelWorkflowInput
 import io.temporal.kotlin.interceptor.KChildWorkflowInvocationInput
@@ -38,12 +34,9 @@ import io.temporal.kotlin.interceptor.KLocalActivityInvocationInput
 import io.temporal.kotlin.interceptor.KSignalExternalInput
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.KOptionsConverters
 import io.temporal.kotlin.internal.KotlinWorkflowContext
 import io.temporal.kotlin.workflow.KChildWorkflowHandle
-import io.temporal.kotlin.workflow.KChildWorkflowOptions
-import io.temporal.kotlin.workflow.KContinueAsNewOptions
-import io.temporal.workflow.ChildWorkflowOptions
-import io.temporal.workflow.ContinueAsNewOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Optional
 import java.util.Random
@@ -67,7 +60,7 @@ internal class RootWorkflowOutboundCallsInterceptor(
   // ==================== Activities ====================
 
   override suspend fun <R> executeActivity(input: KActivityInvocationInput<R>): R {
-    val javaOptions = input.options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(input.options)
     return context.executeActivityByName(
       activityName = input.activityName,
       options = javaOptions,
@@ -77,7 +70,7 @@ internal class RootWorkflowOutboundCallsInterceptor(
   }
 
   override suspend fun <R> executeLocalActivity(input: KLocalActivityInvocationInput<R>): R {
-    val javaOptions = input.options.toJavaOptions()
+    val javaOptions = KOptionsConverters.toJava(input.options)
     return context.executeLocalActivityByName(
       activityName = input.activityName,
       options = javaOptions,
@@ -91,7 +84,7 @@ internal class RootWorkflowOutboundCallsInterceptor(
   override suspend fun <T, R> startChildWorkflow(
     input: KChildWorkflowInvocationInput<R>
   ): KChildWorkflowHandle<T, R> {
-    val javaOptions = input.options.toJavaOptions(input.workflowId)
+    val javaOptions = KOptionsConverters.toJava(input.options, input.workflowId)
     return context.startChildWorkflowWithHandle(
       workflowType = input.workflowType,
       options = javaOptions,
@@ -173,7 +166,7 @@ internal class RootWorkflowOutboundCallsInterceptor(
   // ==================== Continue As New ====================
 
   override fun continueAsNew(input: KContinueAsNewInput): Nothing {
-    val javaOptions = input.options?.toJavaOptions()
+    val javaOptions = input.options?.let { KOptionsConverters.toJava(it) }
     context.continueAsNew(input.workflowType, javaOptions, *input.arguments)
   }
 
@@ -245,64 +238,5 @@ internal class RootWorkflowOutboundCallsInterceptor(
 
   override fun currentTimeMillis(): Long {
     return context.currentTimeMillis
-  }
-
-  // ==================== Conversion Helpers ====================
-
-  private fun KActivityOptions.toJavaOptions(): ActivityOptions {
-    val builder = ActivityOptions.newBuilder()
-    taskQueue?.let { builder.setTaskQueue(it) }
-    scheduleToStartTimeout?.let { builder.setScheduleToStartTimeout(it.toJavaDuration()) }
-    startToCloseTimeout?.let { builder.setStartToCloseTimeout(it.toJavaDuration()) }
-    scheduleToCloseTimeout?.let { builder.setScheduleToCloseTimeout(it.toJavaDuration()) }
-    heartbeatTimeout?.let { builder.setHeartbeatTimeout(it.toJavaDuration()) }
-    retryOptions?.let { builder.setRetryOptions(it.toJavaOptions()) }
-    cancellationType?.let { builder.setCancellationType(it) }
-    return builder.build()
-  }
-
-  private fun KLocalActivityOptions.toJavaOptions(): LocalActivityOptions {
-    val builder = LocalActivityOptions.newBuilder()
-    scheduleToCloseTimeout?.let { builder.setScheduleToCloseTimeout(it.toJavaDuration()) }
-    startToCloseTimeout?.let { builder.setStartToCloseTimeout(it.toJavaDuration()) }
-    localRetryThreshold?.let { builder.setLocalRetryThreshold(it.toJavaDuration()) }
-    retryOptions?.let { builder.setRetryOptions(it.toJavaOptions()) }
-    return builder.build()
-  }
-
-  private fun KChildWorkflowOptions.toJavaOptions(workflowId: String): ChildWorkflowOptions {
-    val builder = ChildWorkflowOptions.newBuilder()
-    builder.setWorkflowId(workflowId)
-    taskQueue?.let { builder.setTaskQueue(it) }
-    workflowExecutionTimeout?.let { builder.setWorkflowExecutionTimeout(it.toJavaDuration()) }
-    workflowRunTimeout?.let { builder.setWorkflowRunTimeout(it.toJavaDuration()) }
-    workflowTaskTimeout?.let { builder.setWorkflowTaskTimeout(it.toJavaDuration()) }
-    retryOptions?.let { builder.setRetryOptions(it.toJavaOptions()) }
-    cancellationType?.let { builder.setCancellationType(it) }
-    parentClosePolicy?.let { builder.setParentClosePolicy(it) }
-    memo?.let { builder.setMemo(it) }
-    typedSearchAttributes?.let { builder.setTypedSearchAttributes(it) }
-    return builder.build()
-  }
-
-  private fun KContinueAsNewOptions.toJavaOptions(): ContinueAsNewOptions {
-    val builder = ContinueAsNewOptions.newBuilder()
-    taskQueue?.let { builder.setTaskQueue(it) }
-    workflowRunTimeout?.let { builder.setWorkflowRunTimeout(it.toJavaDuration()) }
-    workflowTaskTimeout?.let { builder.setWorkflowTaskTimeout(it.toJavaDuration()) }
-    retryOptions?.let { builder.setRetryOptions(it.toJavaOptions()) }
-    memo?.let { builder.setMemo(it) }
-    typedSearchAttributes?.let { builder.setTypedSearchAttributes(it) }
-    return builder.build()
-  }
-
-  private fun io.temporal.kotlin.common.KRetryOptions.toJavaOptions(): io.temporal.common.RetryOptions {
-    val builder = io.temporal.common.RetryOptions.newBuilder()
-    initialInterval?.let { builder.setInitialInterval(it.toJavaDuration()) }
-    maximumInterval?.let { builder.setMaximumInterval(it.toJavaDuration()) }
-    backoffCoefficient?.let { builder.setBackoffCoefficient(it) }
-    maximumAttempts?.let { builder.setMaximumAttempts(it) }
-    doNotRetry?.let { builder.setDoNotRetry(*it.toTypedArray()) }
-    return builder.build()
   }
 }

@@ -18,12 +18,15 @@
  * limitations under the License.
  */
 
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 package io.temporal.kotlin.testing
 
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.LocalActivityOptions
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
+import io.temporal.kotlin.internal.KOptionsConverters
 import io.temporal.testing.TestActivityEnvironment
 import io.temporal.workflow.Functions
 import java.io.Closeable
@@ -116,7 +119,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KFunction1<T, R>,
         options: KActivityOptions,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub) as R }
     }
@@ -143,7 +146,7 @@ public class KTestActivityEnvironment private constructor(
         options: KActivityOptions,
         arg1: A1,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1) as R }
     }
@@ -173,7 +176,7 @@ public class KTestActivityEnvironment private constructor(
         arg1: A1,
         arg2: A2,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1, arg2) as R }
     }
@@ -197,7 +200,7 @@ public class KTestActivityEnvironment private constructor(
         arg2: A2,
         arg3: A3,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1, arg2, arg3) as R }
     }
@@ -221,7 +224,7 @@ public class KTestActivityEnvironment private constructor(
         arg3: A3,
         arg4: A4,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1, arg2, arg3, arg4) as R }
     }
@@ -248,7 +251,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KSuspendFunction1<T, R>,
         options: KActivityOptions,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.callSuspend(stub) as R }
     }
@@ -276,7 +279,7 @@ public class KTestActivityEnvironment private constructor(
         options: KActivityOptions,
         arg1: A1,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.callSuspend(stub, arg1) as R }
     }
@@ -297,7 +300,7 @@ public class KTestActivityEnvironment private constructor(
         arg1: A1,
         arg2: A2,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.callSuspend(stub, arg1, arg2) as R }
     }
@@ -320,7 +323,7 @@ public class KTestActivityEnvironment private constructor(
         arg2: A2,
         arg3: A3,
     ): R {
-        val stub = createActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.callSuspend(stub, arg1, arg2, arg3) as R }
     }
@@ -341,7 +344,7 @@ public class KTestActivityEnvironment private constructor(
         activity: KFunction1<T, R>,
         options: KLocalActivityOptions,
     ): R {
-        val stub = createLocalActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub) as R }
     }
@@ -359,7 +362,7 @@ public class KTestActivityEnvironment private constructor(
         options: KLocalActivityOptions,
         arg1: A1,
     ): R {
-        val stub = createLocalActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1) as R }
     }
@@ -379,7 +382,7 @@ public class KTestActivityEnvironment private constructor(
         arg1: A1,
         arg2: A2,
     ): R {
-        val stub = createLocalActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1, arg2) as R }
     }
@@ -401,7 +404,7 @@ public class KTestActivityEnvironment private constructor(
         arg2: A2,
         arg3: A3,
     ): R {
-        val stub = createLocalActivityStub<T>(activity, options.toJavaOptions())
+        val stub = createLocalActivityStub<T>(activity, KOptionsConverters.toJava(options))
         @Suppress("UNCHECKED_CAST")
         return invokeUnwrapped { activity.call(stub, arg1, arg2, arg3) as R }
     }

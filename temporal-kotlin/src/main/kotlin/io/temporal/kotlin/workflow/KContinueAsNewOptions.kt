@@ -25,8 +25,6 @@ package io.temporal.kotlin.workflow
 import io.temporal.common.SearchAttributes
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.toJava
-import io.temporal.workflow.ContinueAsNewOptions
 import kotlin.time.Duration
 
 /**
@@ -88,26 +86,6 @@ public data class KContinueAsNewOptions(
   val typedSearchAttributes: SearchAttributes? = null,
   val contextPropagators: List<ContextPropagator>? = null
 ) {
-
-  /**
-   * Converts this Kotlin options class to the Java SDK's [ContinueAsNewOptions].
-   *
-   * @return the equivalent Java SDK options
-   */
-  public fun toJavaOptions(): ContinueAsNewOptions {
-    val builder = ContinueAsNewOptions.newBuilder()
-
-    workflowRunTimeout?.let { builder.setWorkflowRunTimeout(it.toJava()) }
-    taskQueue?.let { builder.setTaskQueue(it) }
-    retryOptions?.let { builder.setRetryOptions(it.toJavaOptions()) }
-    workflowTaskTimeout?.let { builder.setWorkflowTaskTimeout(it.toJava()) }
-    memo?.let { builder.setMemo(it) }
-    typedSearchAttributes?.let { builder.setTypedSearchAttributes(it) }
-    contextPropagators?.let { builder.setContextPropagators(it) }
-
-    return builder.build()
-  }
-
   public companion object {
     /**
      * Default options that inherit all settings from the current workflow.

@@ -22,9 +22,7 @@
 
 package io.temporal.kotlin.activity
 
-import io.temporal.activity.LocalActivityOptions
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.toJava
 import kotlin.time.Duration
 
 /**
@@ -64,20 +62,5 @@ public data class KLocalActivityOptions(
     require(startToCloseTimeout != null || scheduleToCloseTimeout != null) {
       "At least one of startToCloseTimeout or scheduleToCloseTimeout must be specified"
     }
-  }
-
-  /**
-   * Converts this [KLocalActivityOptions] to the Java SDK [LocalActivityOptions].
-   *
-   * This conversion happens once when the local activity is scheduled,
-   * so there's no runtime overhead during workflow execution.
-   */
-  public fun toJavaOptions(): LocalActivityOptions {
-    return LocalActivityOptions.newBuilder().apply {
-      startToCloseTimeout?.let { setStartToCloseTimeout(it.toJava()) }
-      scheduleToCloseTimeout?.let { setScheduleToCloseTimeout(it.toJava()) }
-      localRetryThreshold?.let { setLocalRetryThreshold(it.toJava()) }
-      retryOptions?.let { setRetryOptions(it.toJavaOptions()) }
-    }.build()
   }
 }
