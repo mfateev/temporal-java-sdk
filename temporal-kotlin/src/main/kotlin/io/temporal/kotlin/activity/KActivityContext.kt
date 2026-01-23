@@ -32,7 +32,7 @@ import org.slf4j.Logger
  * ```kotlin
  * class MyActivityImpl : MyActivity {
  *   override fun process(input: String): String {
- *     val context = KActivityContext.current()
+ *     val context = KActivityContext.current
  *     val info = context.info
  *     println("Processing in activity ${info.activityId}, attempt ${info.attempt}")
  *
@@ -51,7 +51,7 @@ import org.slf4j.Logger
  * ```kotlin
  * class MySuspendActivityImpl : MySuspendActivity {
  *   override suspend fun fetchData(url: String): Data {
- *     val context = KActivityContext.current()
+ *     val context = KActivityContext.current
  *     println("Fetching in activity ${context.info.activityId}")
  *
  *     for (i in 1..10) {
@@ -73,11 +73,11 @@ public interface KActivityContext {
      * This is the primary entry point for accessing activity APIs from within
      * activity code. Works in both regular and suspend activities.
      *
-     * @return the current activity context
      * @throws IllegalStateException if called outside of activity code
      */
     @JvmStatic
-    public fun current(): KActivityContext = KActivity.executionContext
+    public val current: KActivityContext
+      get() = KActivity.executionContext
   }
 
   /**
