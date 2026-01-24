@@ -20,7 +20,7 @@
 
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.workflow
 
 import io.temporal.api.common.v1.Header
 import io.temporal.api.common.v1.Payloads
@@ -41,6 +41,7 @@ import io.temporal.kotlin.interceptor.KWorkflowInboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkflowInput
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkflowOutput
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.interceptor.InterceptorChain
 import io.temporal.kotlin.internal.interceptor.RootWorkflowInboundCallsInterceptor
 import io.temporal.kotlin.internal.interceptor.RootWorkflowOutboundCallsInterceptor

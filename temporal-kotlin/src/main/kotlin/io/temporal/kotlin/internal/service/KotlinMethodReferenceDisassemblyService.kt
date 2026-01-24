@@ -1,5 +1,5 @@
 
-package io.temporal.internal.async
+package io.temporal.kotlin.internal.service
 
 import io.temporal.internal.async.spi.MethodReferenceDisassemblyService
 import io.temporal.workflow.Functions

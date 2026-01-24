@@ -20,7 +20,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.converters
 
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.LocalActivityOptions
@@ -32,6 +32,7 @@ import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.client.KOnConflictOptions
 import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorkerFactoryOptions
 import io.temporal.kotlin.workflow.KChildWorkflowOptions

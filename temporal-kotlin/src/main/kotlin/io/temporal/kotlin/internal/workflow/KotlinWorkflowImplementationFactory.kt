@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.workflow
 
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.common.v1.WorkflowType
@@ -26,6 +26,7 @@ import io.temporal.common.converter.DataConverter
 import io.temporal.internal.replay.ReplayWorkflow
 import io.temporal.internal.worker.WorkflowImplementationFactory
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.workflow.KDynamicWorkflow
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass

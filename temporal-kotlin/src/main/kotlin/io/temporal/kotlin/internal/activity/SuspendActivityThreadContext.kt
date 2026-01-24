@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.activity
+package io.temporal.kotlin.internal.activity
 
 import io.temporal.activity.ActivityExecutionContext
 import io.temporal.activity.ManualActivityCompletionClient

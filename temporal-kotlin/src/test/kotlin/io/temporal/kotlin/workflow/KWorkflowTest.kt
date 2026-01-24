@@ -23,8 +23,8 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.internal.replay.ReplayWorkflowContext
-import io.temporal.kotlin.internal.KUpdateInfo
-import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.internal.workflow.KUpdateInfo
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.workflow.Workflow
 import org.junit.After
 import org.junit.Assert.assertEquals

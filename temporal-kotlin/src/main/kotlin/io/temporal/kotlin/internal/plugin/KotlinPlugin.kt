@@ -20,15 +20,15 @@
 
 @file:OptIn(InternalTemporalApi::class)
 
-package io.temporal.kotlin.worker
+package io.temporal.kotlin.internal.plugin
 
 import io.temporal.common.converter.DataConverter
 import io.temporal.internal.worker.WorkflowImplementationFactory
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KotlinWorkflowDefinition
-import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowDefinition
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.plugin.WorkerPlugin
 import io.temporal.worker.WorkerOptions

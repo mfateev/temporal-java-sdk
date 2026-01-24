@@ -30,7 +30,7 @@ import io.temporal.kotlin.common.KArgs4
 import io.temporal.kotlin.common.KArgs5
 import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.workflow.SignalMethod
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Optional

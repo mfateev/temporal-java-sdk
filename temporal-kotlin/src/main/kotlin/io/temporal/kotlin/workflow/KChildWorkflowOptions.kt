@@ -29,6 +29,7 @@ import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningIntent
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.workflow.ChildWorkflowCancellationType
 import kotlin.time.Duration
 
@@ -81,6 +82,7 @@ public data class KChildWorkflowOptions(
   val parentClosePolicy: ParentClosePolicy? = null,
   val memo: Map<String, Any>? = null,
   val typedSearchAttributes: SearchAttributes? = null,
+  @property:InternalTemporalApi
   val contextPropagators: List<ContextPropagator>? = null,
   val cancellationType: ChildWorkflowCancellationType? = null,
   @Deprecated("Worker Versioning is now deprecated, please migrate to the Worker Deployment API")

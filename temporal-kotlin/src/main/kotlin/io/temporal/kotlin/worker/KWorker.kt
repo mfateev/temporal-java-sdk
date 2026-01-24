@@ -1,3 +1,5 @@
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 /*
  * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
  *
@@ -23,10 +25,13 @@ package io.temporal.kotlin.worker
 import io.temporal.activity.ActivityInterface
 import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KDynamicActivity
-import io.temporal.kotlin.activity.KotlinActivityWrapper
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
-import io.temporal.kotlin.internal.KDynamicActivityWrapper
+import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.activity.KDynamicActivityWrapper
+import io.temporal.kotlin.internal.activity.KotlinActivityWrapper
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
 import io.temporal.worker.WorkerFactoryOptions
@@ -88,7 +93,13 @@ import kotlin.reflect.KClass
  * ```
  */
 public class KWorker private constructor(
-  /** The underlying Java Worker for interop scenarios */
+  /**
+   * The underlying Java Worker for interop scenarios.
+   *
+   * This property is marked as internal API to hide Java SDK types from the public API.
+   * Use the Kotlin-specific methods on this class instead.
+   */
+  @property:InternalTemporalApi
   public val worker: Worker,
   /** Kotlin worker interceptors for activity interception */
   internal val workerInterceptors: List<KWorkerInterceptor>,
@@ -110,10 +121,13 @@ public class KWorker private constructor(
    *
    * For simplified worker setup, use [KWorker.invoke] instead.
    *
+   * This constructor is marked as internal API to hide Java SDK types from the public API.
+   *
    * @param worker The underlying Java Worker to wrap
    * @param workerInterceptors Optional Kotlin worker interceptors
    * @param activityDispatcher Optional coroutine dispatcher for suspend activities
    */
+  @InternalTemporalApi
   @JvmOverloads
   public constructor(
     worker: Worker,
@@ -127,11 +141,14 @@ public class KWorker private constructor(
    * This constructor is used by test environments to create workers that can
    * register dynamic workflows via the KotlinPlugin.
    *
+   * This constructor is marked as internal API to hide Java SDK types from the public API.
+   *
    * @param worker The underlying Java Worker to wrap
    * @param kotlinPlugin The KotlinPlugin for dynamic workflow registration
    * @param workerInterceptors Optional Kotlin worker interceptors
    * @param activityDispatcher Optional coroutine dispatcher for suspend activities
    */
+  @InternalTemporalApi
   public constructor(
     worker: Worker,
     kotlinPlugin: KotlinPlugin,
@@ -427,6 +444,8 @@ public class KWorker private constructor(
   /**
    * Register Kotlin workflow implementation types with options using KClass.
    *
+   * This method is marked as internal API to hide Java SDK types from the public API.
+   *
    * Example:
    * ```kotlin
    * val options = WorkflowImplementationOptions.newBuilder()
@@ -438,6 +457,7 @@ public class KWorker private constructor(
    * @param options WorkflowImplementationOptions instance
    * @param workflowClasses Workflow implementation classes to register
    */
+  @InternalTemporalApi
   public fun registerWorkflowImplementationTypes(
     options: WorkflowImplementationOptions,
     vararg workflowClasses: KClass<*>
@@ -451,6 +471,8 @@ public class KWorker private constructor(
   /**
    * Register Kotlin workflow implementation types with options DSL.
    *
+   * This method is marked as internal API to hide Java SDK types from the public API.
+   *
    * Example:
    * ```kotlin
    * kWorker.registerWorkflowImplementationTypes<MyWorkflowImpl> {
@@ -460,6 +482,7 @@ public class KWorker private constructor(
    *
    * @param options DSL builder for WorkflowImplementationOptions
    */
+  @InternalTemporalApi
   public inline fun <reified T : Any> registerWorkflowImplementationTypes(
     options: WorkflowImplementationOptions.Builder.() -> Unit
   ) {

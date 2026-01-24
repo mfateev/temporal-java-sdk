@@ -23,6 +23,8 @@ package io.temporal.kotlin.worker
 import io.temporal.kotlin.interceptor.KActivityInboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkerInterceptorBase
 import io.temporal.kotlin.interceptor.KWorkflowInboundCallsInterceptor
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

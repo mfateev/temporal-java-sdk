@@ -26,7 +26,7 @@ import io.temporal.api.enums.v1.WorkflowIdConflictPolicy
 import io.temporal.client.WorkflowUpdateStage
 import io.temporal.common.converter.DataConverter
 import io.temporal.kotlin.common.kargs
-import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.UpdateMethod

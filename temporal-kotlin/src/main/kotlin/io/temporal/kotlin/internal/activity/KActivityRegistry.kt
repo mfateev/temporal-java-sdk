@@ -18,10 +18,11 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.activity
+package io.temporal.kotlin.internal.activity
 
 import io.temporal.activity.ActivityInterface
 import io.temporal.activity.ActivityMethod
+import io.temporal.kotlin.activity.KDynamicActivity
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation

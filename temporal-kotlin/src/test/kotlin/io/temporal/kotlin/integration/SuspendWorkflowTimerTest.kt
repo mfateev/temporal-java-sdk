@@ -24,7 +24,7 @@ package io.temporal.kotlin.integration
 
 import io.temporal.client.WorkflowOptions
 import io.temporal.common.converter.DataConverter
-import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.QueryMethod

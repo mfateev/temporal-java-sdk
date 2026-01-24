@@ -18,18 +18,18 @@
  * limitations under the License.
  */
 
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, io.temporal.kotlin.internal.InternalTemporalApi::class)
 
 package io.temporal.kotlin.testing
 
 import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
 import io.temporal.client.WorkflowClientOptions
-import io.temporal.kotlin.activity.KActivityRegistry
 import io.temporal.kotlin.client.KClient
+import io.temporal.kotlin.internal.activity.KActivityRegistry
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorker
-import io.temporal.kotlin.worker.KotlinPlugin
 import io.temporal.serviceclient.OperatorServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.testing.TestEnvironmentOptions

@@ -27,7 +27,7 @@ import io.temporal.activity.LocalActivityOptions
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.kotlin.activity.KActivityOptions
 import io.temporal.kotlin.activity.KLocalActivityOptions
-import io.temporal.kotlin.internal.KOptionsConverters
+import io.temporal.kotlin.internal.converters.KOptionsConverters
 import io.temporal.testing.TestActivityEnvironment
 import io.temporal.testing.TestEnvironmentOptions
 import io.temporal.workflow.Functions

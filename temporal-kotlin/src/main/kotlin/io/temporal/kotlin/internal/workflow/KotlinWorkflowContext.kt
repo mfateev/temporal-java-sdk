@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.workflow
 
 import com.uber.m3.tally.Scope
 import io.temporal.activity.ActivityCancellationType
@@ -49,6 +49,7 @@ import io.temporal.internal.statemachines.LocalActivityCallback
 import io.temporal.internal.statemachines.StartChildWorkflowExecutionParameters
 import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.workflow.ChildWorkflowCancellationType
 import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.UpdateInfo

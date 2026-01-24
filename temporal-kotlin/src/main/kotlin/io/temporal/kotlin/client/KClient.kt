@@ -39,8 +39,8 @@ import io.temporal.kotlin.common.KArgs4
 import io.temporal.kotlin.common.KArgs5
 import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KOptionsConverters
-import io.temporal.kotlin.internal.KScheduleConverters
+import io.temporal.kotlin.internal.converters.KOptionsConverters
+import io.temporal.kotlin.internal.converters.KScheduleConverters
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
@@ -73,7 +73,7 @@ import kotlin.reflect.jvm.javaMethod
 /**
  * Unified Kotlin client providing suspend functions and type-safe workflow APIs.
  *
- * This class wraps a [WorkflowClient] and provides Kotlin-idiomatic APIs including
+ * This class wraps a WorkflowClient and provides Kotlin-idiomatic APIs including
  * suspend functions and type-safe method references.
  *
  * Example using connect (recommended):
@@ -96,23 +96,22 @@ import kotlin.reflect.jvm.javaMethod
  * )
  * ```
  *
- * Example using existing service stubs:
- * ```kotlin
- * val service = WorkflowServiceStubs.newLocalServiceStubs()
- * val client = KClient(service) {
- *     setNamespace("default")
- * }
- * ```
- *
- * @param workflowClient The underlying WorkflowClient to wrap
+ * For advanced use cases that require access to the underlying Java SDK types,
+ * use `JavaInterop.toJava(client)` to obtain the WorkflowClient.
  */
-public class KClient(
+public class KClient
+@InternalTemporalApi
+public constructor(
+  @property:InternalTemporalApi
   public val workflowClient: WorkflowClient
 ) {
 
   /**
    * The underlying WorkflowServiceStubs for advanced use cases.
+   * Note: This property exposes Java SDK types and is intended for advanced use cases.
+   * For most users, the Kotlin-idiomatic APIs should be sufficient.
    */
+  @InternalTemporalApi
   public val workflowService: WorkflowServiceStubs
     get() = workflowClient.workflowServiceStubs
 
@@ -202,18 +201,15 @@ public class KClient(
     /**
      * Create a KClient connected to the specified service.
      *
-     * Example:
-     * ```kotlin
-     * val client = KClient(service) {
-     *     setNamespace("my-namespace")
-     * }
-     * ```
+     * This is an internal factory method for creating KClient from Java SDK types.
+     * For public API, use [connect] with [KClientOptions] instead.
      *
      * @param service The WorkflowServiceStubs to connect to
      * @param options DSL builder for WorkflowClientOptions
      * @return A new KClient instance
      */
     @JvmStatic
+    @InternalTemporalApi
     public operator fun invoke(
       service: WorkflowServiceStubs,
       options: WorkflowClientOptions.Builder.() -> Unit = {}

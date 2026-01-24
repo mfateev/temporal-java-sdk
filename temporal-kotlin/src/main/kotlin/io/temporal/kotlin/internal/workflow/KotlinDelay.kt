@@ -18,8 +18,9 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.workflow
 
+import io.temporal.kotlin.internal.InternalTemporalApi
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.DisposableHandle

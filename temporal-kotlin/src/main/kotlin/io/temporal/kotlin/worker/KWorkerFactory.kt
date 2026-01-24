@@ -23,7 +23,9 @@ package io.temporal.kotlin.worker
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KOptionsConverters
+import io.temporal.kotlin.internal.converters.KOptionsConverters
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
 import io.temporal.worker.WorkerFactoryOptions
@@ -86,7 +88,10 @@ public class KWorkerFactory(
 
   /**
    * The underlying WorkerFactory for advanced use cases.
+   *
+   * This property is marked as internal API to hide Java SDK types from the public API.
    */
+  @InternalTemporalApi
   public val workerFactory: WorkerFactory
 
   /**
@@ -195,6 +200,8 @@ public class KWorkerFactory(
 /**
  * Extension function to register workflow implementation types using KClass.
  *
+ * This extension function is marked as internal API since it extends the Java SDK Worker type.
+ *
  * Example:
  * ```kotlin
  * worker.registerWorkflowImplementationTypes(
@@ -203,12 +210,16 @@ public class KWorkerFactory(
  * )
  * ```
  */
+@InternalTemporalApi
 public fun Worker.registerWorkflowImplementationTypes(vararg workflowClasses: KClass<*>) {
   registerWorkflowImplementationTypes(*workflowClasses.map { it.java }.toTypedArray())
 }
 
 /**
  * Extension function to register workflow implementation types with options using KClass.
+ *
+ * This extension function is marked as internal API since it extends the Java SDK Worker type
+ * and uses Java SDK WorkflowImplementationOptions.
  *
  * Example:
  * ```kotlin
@@ -219,6 +230,7 @@ public fun Worker.registerWorkflowImplementationTypes(vararg workflowClasses: KC
  * )
  * ```
  */
+@InternalTemporalApi
 public fun Worker.registerWorkflowImplementationTypes(
   options: io.temporal.worker.WorkflowImplementationOptions,
   vararg workflowClasses: KClass<*>

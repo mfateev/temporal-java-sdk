@@ -24,7 +24,7 @@ import io.temporal.api.enums.v1.ScheduleOverlapPolicy
 import io.temporal.client.schedules.ScheduleHandle
 import io.temporal.client.schedules.ScheduleUpdateInput
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KScheduleConverters
+import io.temporal.kotlin.internal.converters.KScheduleConverters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

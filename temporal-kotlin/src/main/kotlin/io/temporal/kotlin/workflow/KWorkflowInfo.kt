@@ -27,7 +27,7 @@ import io.temporal.common.RetryOptions
 import io.temporal.internal.common.ProtoConverters
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.kotlin.toKotlin
 import io.temporal.workflow.WorkflowInfo
 import java.time.Instant

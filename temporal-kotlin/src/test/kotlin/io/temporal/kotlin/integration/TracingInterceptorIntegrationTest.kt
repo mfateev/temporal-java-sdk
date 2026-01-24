@@ -44,9 +44,9 @@ import io.temporal.kotlin.interceptor.KWorkflowInput
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptorBase
 import io.temporal.kotlin.interceptor.KWorkflowOutput
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
-import io.temporal.kotlin.worker.KotlinPlugin
-import io.temporal.kotlin.worker.KotlinPluginOptions
 import io.temporal.kotlin.workflow.KChildWorkflowHandle
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.QueryMethod

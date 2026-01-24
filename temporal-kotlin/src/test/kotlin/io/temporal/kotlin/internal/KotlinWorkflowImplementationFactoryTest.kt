@@ -23,6 +23,8 @@ package io.temporal.kotlin.internal
 import io.temporal.api.common.v1.WorkflowExecution
 import io.temporal.api.common.v1.WorkflowType
 import io.temporal.common.converter.DefaultDataConverter
+import io.temporal.kotlin.internal.workflow.KotlinReplayWorkflow
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
 import io.temporal.workflow.WorkflowInterface
 import io.temporal.workflow.WorkflowMethod
 import org.junit.Assert.assertEquals

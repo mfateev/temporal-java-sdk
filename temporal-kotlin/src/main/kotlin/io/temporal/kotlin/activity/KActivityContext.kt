@@ -21,6 +21,9 @@
 package io.temporal.kotlin.activity
 
 import io.temporal.activity.Activity
+import io.temporal.kotlin.internal.activity.CurrentSuspendActivityContext
+import io.temporal.kotlin.internal.activity.KActivityContextImpl
+import io.temporal.kotlin.internal.activity.SuspendActivityContextWrapper
 
 /**
  * Context object passed to an Activity implementation.

@@ -18,8 +18,9 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.workflow
 
+import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.workflow.KWorkflow
 import kotlinx.coroutines.ThreadContextElement
 import kotlin.coroutines.CoroutineContext

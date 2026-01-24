@@ -34,8 +34,8 @@ import io.temporal.kotlin.interceptor.KLocalActivityInvocationInput
 import io.temporal.kotlin.interceptor.KSignalExternalInput
 import io.temporal.kotlin.interceptor.KWorkflowOutboundCallsInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KOptionsConverters
-import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.internal.converters.KOptionsConverters
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.kotlin.workflow.KChildWorkflowHandle
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Optional

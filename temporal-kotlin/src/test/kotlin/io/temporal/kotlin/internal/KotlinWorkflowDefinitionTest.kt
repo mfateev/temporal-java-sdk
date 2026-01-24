@@ -20,6 +20,7 @@
 
 package io.temporal.kotlin.internal
 
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowDefinition
 import io.temporal.workflow.QueryMethod
 import io.temporal.workflow.SignalMethod
 import io.temporal.workflow.UpdateMethod

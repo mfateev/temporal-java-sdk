@@ -37,8 +37,8 @@ import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.common.KEncodedValues
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KOptionsConverters
-import io.temporal.kotlin.internal.KotlinWorkflowContext
+import io.temporal.kotlin.internal.converters.KOptionsConverters
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.kotlin.toJava
 import io.temporal.workflow.Promise
 import io.temporal.workflow.UpdateInfo
@@ -2457,6 +2457,8 @@ public object KWorkflow {
 /**
  * Converts this [Promise] to a standard [Deferred].
  *
+ * This extension is marked as internal API since it extends the Java SDK Promise type.
+ *
  * This allows Temporal promises to work with all standard kotlinx.coroutines
  * utilities like [awaitAll], structured concurrency, etc.
  *
@@ -2471,6 +2473,7 @@ public object KWorkflow {
  *
  * @return a [Deferred] that completes when this promise completes
  */
+@InternalTemporalApi
 public fun <R> Promise<R>.toDeferred(): Deferred<R> {
   val deferred = CompletableDeferred<R>()
   this.handle { result, exception ->
@@ -2487,10 +2490,13 @@ public fun <R> Promise<R>.toDeferred(): Deferred<R> {
 /**
  * Suspends until this [Promise] completes and returns the result.
  *
+ * This extension is marked as internal API since it extends the Java SDK Promise type.
+ *
  * This is a convenience extension that converts the Promise to a Deferred
  * and awaits it.
  *
  * @return the promise result
  * @throws Exception if the promise completed exceptionally
  */
+@InternalTemporalApi
 public suspend fun <R> Promise<R>.await(): R = toDeferred().await()

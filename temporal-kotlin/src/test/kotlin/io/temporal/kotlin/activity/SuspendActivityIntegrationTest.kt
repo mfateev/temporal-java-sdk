@@ -31,7 +31,7 @@ import io.temporal.common.converter.JacksonJsonPayloadConverter
 import io.temporal.common.converter.KotlinObjectMapperFactory
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.common.kargs
-import io.temporal.kotlin.internal.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.kotlin.workflow.KWorkflow
 import io.temporal.workflow.WorkflowInterface

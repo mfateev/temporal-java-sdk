@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.activity
 
 import io.temporal.activity.DynamicActivity
 import io.temporal.common.converter.EncodedValues

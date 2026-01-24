@@ -23,7 +23,7 @@ package io.temporal.kotlin.client.schedules
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
 import io.temporal.client.WorkflowOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
-import io.temporal.kotlin.internal.KScheduleConverters
+import io.temporal.kotlin.internal.converters.KScheduleConverters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

@@ -18,32 +18,29 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.activity
+package io.temporal.kotlin.internal.activity
+
+import io.temporal.activity.ActivityExecutionContext
+import io.temporal.kotlin.activity.KActivityContext
+import io.temporal.kotlin.activity.KActivityInfo
+import io.temporal.kotlin.activity.KActivityInfoImpl
 
 /**
- * Implementation of [KActivityContext] for suspend activities.
+ * Implementation of [KActivityContext] that wraps Java SDK's [ActivityExecutionContext].
  *
- * This wrapper uses the [SuspendActivityExecutionContext] which contains both
- * the Java SDK's [io.temporal.activity.ActivityExecutionContext] and the
- * [io.temporal.activity.ManualActivityCompletionClient] for heartbeating.
- *
- * The key difference from [KActivityContextImpl] is that heartbeat calls go through
- * the completion client rather than the execution context directly, as suspend activities
- * use manual completion mode.
+ * This implementation supports both regular and suspend activities:
+ * - For regular activities, uses the Java SDK context directly
+ * - For suspend activities, delegates heartbeat to [SuspendActivityContext]
  */
-internal class SuspendActivityContextWrapper(
-  private val suspendContext: SuspendActivityExecutionContext
+internal class KActivityContextImpl(
+  private val javaContext: ActivityExecutionContext
 ) : KActivityContext {
-
-  private val javaContext = suspendContext.executionContext
 
   override val info: KActivityInfo
     get() = KActivityInfoImpl(javaContext.info)
 
   override fun heartbeat(details: Any?) {
-    // Suspend activities must use the completion client for heartbeating
-    // because they operate in manual completion mode
-    suspendContext.completionClient.recordHeartbeat(details)
+    javaContext.heartbeat(details)
   }
 
   override fun <T> heartbeatDetails(detailsClass: Class<T>): T? {

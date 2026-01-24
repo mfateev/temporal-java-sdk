@@ -23,7 +23,7 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.internal.KOptionsConverters
+import io.temporal.kotlin.internal.converters.KOptionsConverters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, io.temporal.kotlin.internal.InternalTemporalApi::class)
 
 package io.temporal.kotlin.testing.internal
 
@@ -35,9 +35,9 @@ import io.temporal.common.interceptors.WorkerInterceptor
 import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
+import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import io.temporal.kotlin.worker.KWorker
-import io.temporal.kotlin.worker.KotlinPlugin
-import io.temporal.kotlin.worker.KotlinPluginOptions
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.serviceclient.WorkflowServiceStubsOptions
 import io.temporal.testing.TestWorkflowEnvironment

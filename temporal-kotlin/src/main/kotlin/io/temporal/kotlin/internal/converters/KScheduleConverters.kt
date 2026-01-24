@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal
+package io.temporal.kotlin.internal.converters
 
 import io.temporal.client.schedules.Schedule
 import io.temporal.client.schedules.ScheduleAction
@@ -44,6 +44,7 @@ import io.temporal.kotlin.client.schedules.KScheduleRange
 import io.temporal.kotlin.client.schedules.KScheduleSpec
 import io.temporal.kotlin.client.schedules.KScheduleState
 import io.temporal.kotlin.client.schedules.KScheduleUpdate
+import io.temporal.kotlin.internal.InternalTemporalApi
 
 /**
  * Internal converter for Kotlin schedule types to Java SDK types.

@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, io.temporal.kotlin.internal.InternalTemporalApi::class)
 
 package io.temporal.kotlin.testing
 

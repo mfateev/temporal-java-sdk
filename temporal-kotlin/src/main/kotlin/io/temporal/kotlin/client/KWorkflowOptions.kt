@@ -31,6 +31,7 @@ import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningOverride
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.InternalTemporalApi
 import kotlin.time.Duration
 
 /**
@@ -84,6 +85,7 @@ public data class KWorkflowOptions(
   val cronSchedule: String? = null,
   val memo: Map<String, Any>? = null,
   val typedSearchAttributes: SearchAttributes? = null,
+  @property:InternalTemporalApi
   val contextPropagators: List<ContextPropagator>? = null,
   val disableEagerExecution: Boolean = true,
   val startDelay: Duration? = null,

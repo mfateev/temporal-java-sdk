@@ -1,3 +1,5 @@
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 /*
  * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
  *

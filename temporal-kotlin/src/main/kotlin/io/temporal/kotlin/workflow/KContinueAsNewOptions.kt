@@ -25,6 +25,7 @@ package io.temporal.kotlin.workflow
 import io.temporal.common.SearchAttributes
 import io.temporal.common.context.ContextPropagator
 import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.internal.InternalTemporalApi
 import kotlin.time.Duration
 
 /**
@@ -84,6 +85,7 @@ public data class KContinueAsNewOptions(
   val workflowTaskTimeout: Duration? = null,
   val memo: Map<String, Any>? = null,
   val typedSearchAttributes: SearchAttributes? = null,
+  @property:InternalTemporalApi
   val contextPropagators: List<ContextPropagator>? = null
 ) {
   public companion object {
