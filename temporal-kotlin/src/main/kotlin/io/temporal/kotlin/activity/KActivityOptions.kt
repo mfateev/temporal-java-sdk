@@ -22,7 +22,6 @@
 
 package io.temporal.kotlin.activity
 
-import io.temporal.activity.ActivityCancellationType
 import io.temporal.kotlin.common.KRetryOptions
 import kotlin.time.Duration
 
@@ -65,7 +64,7 @@ public data class KActivityOptions(
   val heartbeatTimeout: Duration? = null,
   val taskQueue: String? = null,
   val retryOptions: KRetryOptions? = null,
-  val cancellationType: ActivityCancellationType? = null,
+  val cancellationType: KActivityCancellationType? = null,
   val disableEagerExecution: Boolean = false
 ) {
   init {

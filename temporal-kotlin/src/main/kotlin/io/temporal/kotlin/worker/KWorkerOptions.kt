@@ -23,7 +23,6 @@ package io.temporal.kotlin.worker
 import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.worker.WorkerOptions
-import io.temporal.worker.WorkflowImplementationOptions
 import io.temporal.worker.tuning.WorkerTuner
 import java.time.Duration
 import kotlin.reflect.KClass
@@ -94,7 +93,7 @@ public data class KWorkerOptions(
    * Only one dynamic activity can be registered per worker.
    */
   val dynamicActivity: KDynamicActivity? = null,
-  val workflowImplementationOptions: WorkflowImplementationOptions? = null,
+  val workflowImplementationOptions: KWorkflowImplementationOptions? = null,
   val maxConcurrentActivityExecutionSize: Int? = null,
   val maxConcurrentWorkflowTaskExecutionSize: Int? = null,
   val maxConcurrentLocalActivityExecutionSize: Int? = null,

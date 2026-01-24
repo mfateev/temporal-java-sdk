@@ -20,9 +20,8 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.WorkflowOptions
-import io.temporal.common.interceptors.Header
 import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata
+import io.temporal.kotlin.client.KWorkflowOptions
 import kotlin.reflect.KClass
 
 /**
@@ -33,20 +32,20 @@ import kotlin.reflect.KClass
  * // Start a workflow with type and options
  * KScheduleActionStartWorkflow(
  *     workflowType = "MyWorkflow",
- *     options = WorkflowOptions.newBuilder()
- *         .setWorkflowId("my-schedule-workflow")
- *         .setTaskQueue("my-task-queue")
- *         .build(),
+ *     options = KWorkflowOptions(
+ *         workflowId = "my-schedule-workflow",
+ *         taskQueue = "my-task-queue"
+ *     ),
  *     arguments = listOf("arg1", 42)
  * )
  *
  * // Start a workflow using interface class
  * KScheduleActionStartWorkflow.fromWorkflowInterface(
  *     MyWorkflow::class,
- *     options = WorkflowOptions.newBuilder()
- *         .setWorkflowId("my-schedule-workflow")
- *         .setTaskQueue("my-task-queue")
- *         .build(),
+ *     options = KWorkflowOptions(
+ *         workflowId = "my-schedule-workflow",
+ *         taskQueue = "my-task-queue"
+ *     ),
  *     arguments = listOf("arg1", 42)
  * )
  * ```
@@ -54,13 +53,11 @@ import kotlin.reflect.KClass
  * @property workflowType Name of the workflow type.
  * @property options Workflow options. ID and TaskQueue are required.
  * @property arguments Arguments for the workflow.
- * @property header Headers sent with each workflow scheduled.
  */
 public data class KScheduleActionStartWorkflow(
   val workflowType: String,
-  val options: WorkflowOptions,
-  val arguments: List<Any?> = emptyList(),
-  val header: Header = Header.empty()
+  val options: KWorkflowOptions,
+  val arguments: List<Any?> = emptyList()
 ) : KScheduleAction() {
   public companion object {
     /**
@@ -69,14 +66,12 @@ public data class KScheduleActionStartWorkflow(
      * @param workflowInterface The workflow interface class.
      * @param options Workflow options. ID and TaskQueue are required.
      * @param arguments Arguments for the workflow.
-     * @param header Headers sent with each workflow scheduled.
      */
     @JvmStatic
     public fun <T : Any> fromWorkflowInterface(
       workflowInterface: KClass<T>,
-      options: WorkflowOptions,
-      arguments: List<Any?> = emptyList(),
-      header: Header = Header.empty()
+      options: KWorkflowOptions,
+      arguments: List<Any?> = emptyList()
     ): KScheduleActionStartWorkflow {
       val metadata = POJOWorkflowInterfaceMetadata.newInstance(workflowInterface.java, true)
       val workflowType = metadata.workflowType.orElseThrow {
@@ -85,8 +80,7 @@ public data class KScheduleActionStartWorkflow(
       return KScheduleActionStartWorkflow(
         workflowType = workflowType,
         options = options,
-        arguments = arguments,
-        header = header
+        arguments = arguments
       )
     }
 
@@ -94,9 +88,8 @@ public data class KScheduleActionStartWorkflow(
      * Create a KScheduleActionStartWorkflow from a workflow interface class.
      */
     public inline fun <reified T : Any> fromWorkflowInterface(
-      options: WorkflowOptions,
-      arguments: List<Any?> = emptyList(),
-      header: Header = Header.empty()
-    ): KScheduleActionStartWorkflow = fromWorkflowInterface(T::class, options, arguments, header)
+      options: KWorkflowOptions,
+      arguments: List<Any?> = emptyList()
+    ): KScheduleActionStartWorkflow = fromWorkflowInterface(T::class, options, arguments)
   }
 }

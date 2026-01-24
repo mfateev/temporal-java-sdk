@@ -21,7 +21,7 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
-import io.temporal.client.WorkflowOptions
+import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.testing.internal.KSDKTestWorkflowRule
 import io.temporal.testing.internal.SDKTestWorkflowRule
 import io.temporal.workflow.WorkflowInterface
@@ -70,10 +70,10 @@ class KScheduleIntegrationTest {
   }
 
   private fun createTestSchedule(): KSchedule {
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue(testRule.taskQueue)
-      .setWorkflowId("test-workflow-${UUID.randomUUID()}")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = testRule.taskQueue,
+      workflowId = "test-workflow-${UUID.randomUUID()}"
+    )
 
     return KSchedule(
       action = KScheduleActionStartWorkflow(
@@ -181,10 +181,10 @@ class KScheduleIntegrationTest {
     val schedule = KSchedule(
       action = KScheduleActionStartWorkflow(
         workflowType = "TestScheduleWorkflow",
-        options = WorkflowOptions.newBuilder()
-          .setTaskQueue(testRule.taskQueue)
-          .setWorkflowId("test-workflow-${UUID.randomUUID()}")
-          .build(),
+        options = KWorkflowOptions(
+          taskQueue = testRule.taskQueue,
+          workflowId = "test-workflow-${UUID.randomUUID()}"
+        ),
         arguments = listOf("triggered")
       ),
       spec = KScheduleSpec(
@@ -240,10 +240,10 @@ class KScheduleIntegrationTest {
   fun `schedule with calendar spec`() = runBlocking {
     val scheduleId = "test-schedule-${UUID.randomUUID()}"
 
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue(testRule.taskQueue)
-      .setWorkflowId("test-workflow-${UUID.randomUUID()}")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = testRule.taskQueue,
+      workflowId = "test-workflow-${UUID.randomUUID()}"
+    )
 
     val schedule = KSchedule(
       action = KScheduleActionStartWorkflow(
@@ -277,10 +277,10 @@ class KScheduleIntegrationTest {
   fun `schedule with cron expression`() = runBlocking {
     val scheduleId = "test-schedule-${UUID.randomUUID()}"
 
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue(testRule.taskQueue)
-      .setWorkflowId("test-workflow-${UUID.randomUUID()}")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = testRule.taskQueue,
+      workflowId = "test-workflow-${UUID.randomUUID()}"
+    )
 
     val schedule = KSchedule(
       action = KScheduleActionStartWorkflow(
@@ -314,10 +314,10 @@ class KScheduleIntegrationTest {
   fun `schedule with policy`() = runBlocking {
     val scheduleId = "test-schedule-${UUID.randomUUID()}"
 
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue(testRule.taskQueue)
-      .setWorkflowId("test-workflow-${UUID.randomUUID()}")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = testRule.taskQueue,
+      workflowId = "test-workflow-${UUID.randomUUID()}"
+    )
 
     val schedule = KSchedule(
       action = KScheduleActionStartWorkflow(

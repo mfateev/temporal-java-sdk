@@ -21,7 +21,7 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
-import io.temporal.client.WorkflowOptions
+import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.converters.KScheduleConverters
 import io.temporal.kotlin.toKotlin
@@ -233,10 +233,10 @@ class KScheduleDataClassesTest {
 
   @Test
   fun `KScheduleActionStartWorkflow converts to and from Java correctly`() {
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue("test-queue")
-      .setWorkflowId("test-workflow-id")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = "test-queue",
+      workflowId = "test-workflow-id"
+    )
 
     val kotlinAction = KScheduleActionStartWorkflow(
       workflowType = "TestWorkflow",
@@ -255,10 +255,10 @@ class KScheduleDataClassesTest {
 
   @Test
   fun `KSchedule converts to and from Java correctly`() {
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue("test-queue")
-      .setWorkflowId("test-workflow-id")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = "test-queue",
+      workflowId = "test-workflow-id"
+    )
 
     val kotlinSchedule = KSchedule(
       action = KScheduleActionStartWorkflow(
@@ -303,10 +303,10 @@ class KScheduleDataClassesTest {
 
   @Test
   fun `KScheduleUpdate converts to Java correctly`() {
-    val workflowOptions = WorkflowOptions.newBuilder()
-      .setTaskQueue("test-queue")
-      .setWorkflowId("test-workflow-id")
-      .build()
+    val workflowOptions = KWorkflowOptions(
+      taskQueue = "test-queue",
+      workflowId = "test-workflow-id"
+    )
 
     val kotlinSchedule = KSchedule(
       action = KScheduleActionStartWorkflow(

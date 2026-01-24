@@ -26,10 +26,10 @@ import io.temporal.api.common.v1.Callback
 import io.temporal.api.common.v1.Link
 import io.temporal.api.enums.v1.WorkflowIdConflictPolicy
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy
-import io.temporal.common.Priority
 import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningOverride
 import io.temporal.common.context.ContextPropagator
+import io.temporal.kotlin.common.KPriority
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import kotlin.time.Duration
@@ -95,6 +95,6 @@ public data class KWorkflowOptions(
   val completionCallbacks: List<Callback>? = null,
   val links: List<Link>? = null,
   val onConflictOptions: KOnConflictOptions? = null,
-  val priority: Priority? = null,
+  val priority: KPriority? = null,
   val versioningOverride: VersioningOverride? = null
 )

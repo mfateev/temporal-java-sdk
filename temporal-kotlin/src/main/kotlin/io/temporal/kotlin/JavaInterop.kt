@@ -22,7 +22,10 @@
 
 package io.temporal.kotlin
 
+import io.temporal.activity.ActivityOptions
+import io.temporal.activity.LocalActivityOptions
 import io.temporal.client.WorkflowClient
+import io.temporal.client.WorkflowOptions
 import io.temporal.client.schedules.Schedule
 import io.temporal.client.schedules.ScheduleAction
 import io.temporal.client.schedules.ScheduleActionExecution
@@ -44,8 +47,13 @@ import io.temporal.client.schedules.SchedulePolicy
 import io.temporal.client.schedules.ScheduleRange
 import io.temporal.client.schedules.ScheduleSpec
 import io.temporal.client.schedules.ScheduleState
-import io.temporal.common.interceptors.Header
+import io.temporal.common.RetryOptions
+import io.temporal.common.interceptors.WorkflowClientInterceptor
+import io.temporal.kotlin.activity.KActivityCancellationType
+import io.temporal.kotlin.activity.KActivityOptions
+import io.temporal.kotlin.activity.KLocalActivityOptions
 import io.temporal.kotlin.client.KClient
+import io.temporal.kotlin.client.KWorkflowOptions
 import io.temporal.kotlin.client.schedules.KSchedule
 import io.temporal.kotlin.client.schedules.KScheduleAction
 import io.temporal.kotlin.client.schedules.KScheduleActionExecution
@@ -67,10 +75,17 @@ import io.temporal.kotlin.client.schedules.KSchedulePolicy
 import io.temporal.kotlin.client.schedules.KScheduleRange
 import io.temporal.kotlin.client.schedules.KScheduleSpec
 import io.temporal.kotlin.client.schedules.KScheduleState
+import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.common.toKotlin
+import io.temporal.kotlin.interceptor.KWorkflowClientInterceptor
+import io.temporal.kotlin.internal.converters.KWorkflowClientInterceptorJavaWrapper
+import io.temporal.kotlin.internal.converters.WorkflowClientInterceptorKotlinWrapper
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.kotlin.worker.KWorkerFactory
+import io.temporal.kotlin.worker.KWorkflowImplementationOptions
 import io.temporal.worker.Worker
 import io.temporal.worker.WorkerFactory
+import io.temporal.worker.WorkflowImplementationOptions
 import io.temporal.workflow.Promise
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -272,11 +287,48 @@ public fun ScheduleActionStartWorkflow.toKotlin(): KScheduleActionStartWorkflow 
   val args = arguments?.let { emptyList<Any?>() } ?: emptyList()
   return KScheduleActionStartWorkflow(
     workflowType = workflowType,
-    options = options,
-    arguments = args,
-    header = header ?: Header.empty()
+    options = options.toKotlin(),
+    arguments = args
   )
 }
+
+/**
+ * Converts a Java SDK [WorkflowOptions] to a Kotlin SDK [KWorkflowOptions].
+ */
+public fun WorkflowOptions.toKotlin(): KWorkflowOptions = KWorkflowOptions(
+  workflowId = workflowId,
+  workflowIdReusePolicy = workflowIdReusePolicy,
+  workflowIdConflictPolicy = workflowIdConflictPolicy,
+  workflowRunTimeout = workflowRunTimeout?.toKotlin(),
+  workflowExecutionTimeout = workflowExecutionTimeout?.toKotlin(),
+  workflowTaskTimeout = workflowTaskTimeout?.toKotlin(),
+  taskQueue = taskQueue,
+  retryOptions = retryOptions?.toKotlin(),
+  cronSchedule = cronSchedule,
+  memo = memo,
+  typedSearchAttributes = typedSearchAttributes,
+  contextPropagators = contextPropagators,
+  disableEagerExecution = isDisableEagerExecution,
+  startDelay = startDelay?.toKotlin(),
+  staticSummary = staticSummary,
+  staticDetails = staticDetails,
+  requestId = requestId,
+  completionCallbacks = completionCallbacks,
+  links = links,
+  priority = priority?.toKotlin(),
+  versioningOverride = versioningOverride
+)
+
+/**
+ * Converts a Java SDK [RetryOptions] to a Kotlin SDK [KRetryOptions].
+ */
+public fun RetryOptions.toKotlin(): KRetryOptions = KRetryOptions(
+  initialInterval = initialInterval.toKotlin(),
+  backoffCoefficient = backoffCoefficient,
+  maximumInterval = maximumInterval?.toKotlin(),
+  maximumAttempts = maximumAttempts,
+  doNotRetry = doNotRetry?.toList() ?: emptyList()
+)
 
 /**
  * Converts a Java SDK [ScheduleActionExecution] to a Kotlin SDK [KScheduleActionExecution].
@@ -447,3 +499,72 @@ public fun ScheduleState.toKotlin(): KScheduleState = KScheduleState(
   limitedActions = isLimitedAction,
   remainingActions = remainingActions
 )
+
+// =============================================================================
+// Activity Options Type Conversions
+// =============================================================================
+
+/**
+ * Converts a Java SDK [ActivityOptions] to a Kotlin SDK [KActivityOptions].
+ */
+public fun ActivityOptions.toKotlin(): KActivityOptions = KActivityOptions(
+  startToCloseTimeout = startToCloseTimeout?.toKotlin(),
+  scheduleToCloseTimeout = scheduleToCloseTimeout?.toKotlin(),
+  scheduleToStartTimeout = scheduleToStartTimeout?.toKotlin(),
+  heartbeatTimeout = heartbeatTimeout?.toKotlin(),
+  taskQueue = taskQueue,
+  retryOptions = retryOptions?.toKotlin(),
+  cancellationType = cancellationType?.let { KActivityCancellationType.fromJava(it) },
+  disableEagerExecution = isEagerExecutionDisabled
+)
+
+/**
+ * Converts a Java SDK [LocalActivityOptions] to a Kotlin SDK [KLocalActivityOptions].
+ */
+public fun LocalActivityOptions.toKotlin(): KLocalActivityOptions = KLocalActivityOptions(
+  startToCloseTimeout = startToCloseTimeout?.toKotlin(),
+  scheduleToCloseTimeout = scheduleToCloseTimeout?.toKotlin(),
+  localRetryThreshold = localRetryThreshold?.toKotlin(),
+  retryOptions = retryOptions?.toKotlin()
+)
+
+// =============================================================================
+// Worker Type Conversions
+// =============================================================================
+
+/**
+ * Converts a Java SDK [WorkflowImplementationOptions] to a Kotlin SDK [KWorkflowImplementationOptions].
+ */
+public fun WorkflowImplementationOptions.toKotlin(): KWorkflowImplementationOptions =
+  KWorkflowImplementationOptions(
+    failWorkflowExceptionTypes = failWorkflowExceptionTypes?.map { it.kotlin } ?: emptyList(),
+    activityOptions = activityOptions.mapValues { (_, v) -> v.toKotlin() },
+    defaultActivityOptions = defaultActivityOptions?.toKotlin(),
+    localActivityOptions = localActivityOptions.mapValues { (_, v) -> v.toKotlin() },
+    defaultLocalActivityOptions = defaultLocalActivityOptions?.toKotlin(),
+    nexusServiceOptions = nexusServiceOptions,
+    defaultNexusServiceOptions = defaultNexusServiceOptions,
+    enableUpsertVersionSearchAttributes = isEnableUpsertVersionSearchAttributes
+  )
+
+// =============================================================================
+// Client Interceptor Conversions
+// =============================================================================
+
+/**
+ * Converts a Kotlin SDK [KWorkflowClientInterceptor] to a Java SDK [WorkflowClientInterceptor].
+ *
+ * This wraps the Kotlin interceptor for use with the Java SDK, handling the conversion
+ * from suspend functions to blocking calls using runBlocking.
+ */
+public fun KWorkflowClientInterceptor.toJava(): WorkflowClientInterceptor =
+  KWorkflowClientInterceptorJavaWrapper(this)
+
+/**
+ * Converts a Java SDK [WorkflowClientInterceptor] to a Kotlin SDK [KWorkflowClientInterceptor].
+ *
+ * This wraps the Java interceptor for use with the Kotlin SDK, handling the conversion
+ * from blocking calls to suspend functions using withContext(Dispatchers.IO).
+ */
+public fun WorkflowClientInterceptor.toKotlin(): KWorkflowClientInterceptor =
+  WorkflowClientInterceptorKotlinWrapper(this)

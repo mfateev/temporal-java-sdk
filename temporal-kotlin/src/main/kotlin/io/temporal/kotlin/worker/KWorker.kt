@@ -30,6 +30,7 @@ import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.activity.KDynamicActivityWrapper
 import io.temporal.kotlin.internal.activity.KotlinActivityWrapper
+import io.temporal.kotlin.internal.converters.KOptionsConverters
 import io.temporal.kotlin.internal.plugin.KotlinPlugin
 import io.temporal.kotlin.internal.plugin.KotlinPluginOptions
 import io.temporal.worker.Worker
@@ -216,7 +217,8 @@ public class KWorker private constructor(
       val allWorkflows = options.workflows + listOfNotNull(options.dynamicWorkflow)
       if (allWorkflows.isNotEmpty()) {
         if (options.workflowImplementationOptions != null) {
-          kWorker.registerWorkflowImplementationTypes(options.workflowImplementationOptions, *allWorkflows.toTypedArray())
+          val javaOptions = KOptionsConverters.toJava(options.workflowImplementationOptions)
+          kWorker.registerWorkflowImplementationTypes(javaOptions, *allWorkflows.toTypedArray())
         } else {
           kWorker.registerWorkflowImplementationTypes(*allWorkflows.toTypedArray())
         }

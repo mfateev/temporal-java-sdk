@@ -154,8 +154,7 @@ public object KScheduleConverters {
   fun toJava(action: KScheduleActionStartWorkflow): ScheduleAction {
     val builder = ScheduleActionStartWorkflow.newBuilder()
       .setWorkflowType(action.workflowType)
-      .setOptions(action.options)
-      .setHeader(action.header)
+      .setOptions(KOptionsConverters.toJava(action.options))
     if (action.arguments.isNotEmpty()) {
       builder.setArguments(*action.arguments.toTypedArray())
     }

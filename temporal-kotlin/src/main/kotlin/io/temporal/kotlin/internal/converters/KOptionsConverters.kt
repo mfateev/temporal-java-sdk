@@ -35,9 +35,11 @@ import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorkerFactoryOptions
+import io.temporal.kotlin.worker.KWorkflowImplementationOptions
 import io.temporal.kotlin.workflow.KChildWorkflowOptions
 import io.temporal.kotlin.workflow.KContinueAsNewOptions
 import io.temporal.worker.WorkerFactoryOptions
+import io.temporal.worker.WorkflowImplementationOptions
 import io.temporal.workflow.ChildWorkflowOptions
 import io.temporal.workflow.ContinueAsNewOptions
 
@@ -61,7 +63,7 @@ public object KOptionsConverters {
       options.heartbeatTimeout?.let { setHeartbeatTimeout(it.toJava()) }
       options.taskQueue?.let { setTaskQueue(it) }
       options.retryOptions?.let { setRetryOptions(toJava(it)) }
-      options.cancellationType?.let { setCancellationType(it) }
+      options.cancellationType?.let { setCancellationType(it.toJava()) }
       setDisableEagerExecution(options.disableEagerExecution)
     }.build()
   }
@@ -119,7 +121,7 @@ public object KOptionsConverters {
       options.versioningIntent?.let { setVersioningIntent(it) }
       options.staticSummary?.let { setStaticSummary(it) }
       options.staticDetails?.let { setStaticDetails(it) }
-      options.priority?.let { setPriority(it) }
+      options.priority?.let { setPriority(it.toJava()) }
     }.build()
   }
 
@@ -151,7 +153,7 @@ public object KOptionsConverters {
       options.versioningIntent?.let { setVersioningIntent(it) }
       options.staticSummary?.let { setStaticSummary(it) }
       options.staticDetails?.let { setStaticDetails(it) }
-      options.priority?.let { setPriority(it) }
+      options.priority?.let { setPriority(it.toJava()) }
     }.build()
   }
 
@@ -197,7 +199,7 @@ public object KOptionsConverters {
       options.completionCallbacks?.let { setCompletionCallbacks(it) }
       options.links?.let { setLinks(it) }
       options.onConflictOptions?.let { setOnConflictOptions(toJava(it)) }
-      options.priority?.let { setPriority(it) }
+      options.priority?.let { setPriority(it.toJava()) }
       options.versioningOverride?.let { setVersioningOverride(it) }
     }.build()
   }
@@ -219,6 +221,53 @@ public object KOptionsConverters {
     options.maxWorkflowThreadCount?.let { builder.setMaxWorkflowThreadCount(it) }
     options.enableLoggingInReplay?.let { builder.setEnableLoggingInReplay(it) }
     options.workflowCacheSize?.let { builder.setWorkflowCacheSize(it) }
+    return builder.build()
+  }
+
+  /**
+   * Converts [KWorkflowImplementationOptions] to [WorkflowImplementationOptions].
+   */
+  @Suppress("UNCHECKED_CAST")
+  fun toJava(options: KWorkflowImplementationOptions): WorkflowImplementationOptions {
+    val builder = WorkflowImplementationOptions.newBuilder()
+
+    if (options.failWorkflowExceptionTypes.isNotEmpty()) {
+      val javaClasses = options.failWorkflowExceptionTypes
+        .map { it.java }
+        .toTypedArray() as Array<Class<out Throwable>>
+      builder.setFailWorkflowExceptionTypes(*javaClasses)
+    }
+
+    if (options.activityOptions.isNotEmpty()) {
+      builder.setActivityOptions(
+        options.activityOptions.mapValues { (_, v) -> toJava(v) }
+      )
+    }
+
+    options.defaultActivityOptions?.let {
+      builder.setDefaultActivityOptions(toJava(it))
+    }
+
+    if (options.localActivityOptions.isNotEmpty()) {
+      builder.setLocalActivityOptions(
+        options.localActivityOptions.mapValues { (_, v) -> toJava(v) }
+      )
+    }
+
+    options.defaultLocalActivityOptions?.let {
+      builder.setDefaultLocalActivityOptions(toJava(it))
+    }
+
+    if (options.nexusServiceOptions.isNotEmpty()) {
+      builder.setNexusServiceOptions(options.nexusServiceOptions)
+    }
+
+    options.defaultNexusServiceOptions?.let {
+      builder.setDefaultNexusServiceOptions(it)
+    }
+
+    builder.setEnableUpsertVersionSearchAttributes(options.enableUpsertVersionSearchAttributes)
+
     return builder.build()
   }
 }

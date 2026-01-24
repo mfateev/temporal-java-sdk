@@ -22,10 +22,11 @@
 
 package io.temporal.kotlin.workflow
 
-import io.temporal.common.Priority
-import io.temporal.common.RetryOptions
 import io.temporal.internal.common.ProtoConverters
 import io.temporal.internal.replay.ReplayWorkflowContext
+import io.temporal.kotlin.common.KPriority
+import io.temporal.kotlin.common.KRetryOptions
+import io.temporal.kotlin.common.toKotlin
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.kotlin.toKotlin
@@ -89,7 +90,7 @@ public interface KWorkflowInfo {
   /**
    * The retry options for this workflow, or null if not set.
    */
-  public val retryOptions: RetryOptions?
+  public val retryOptions: KRetryOptions?
 
   /**
    * Timeout for a Workflow Run.
@@ -163,7 +164,7 @@ public interface KWorkflowInfo {
   /**
    * The priority of the workflow task.
    */
-  public val priority: Priority
+  public val priority: KPriority
 }
 
 /**
@@ -195,8 +196,8 @@ internal class KWorkflowInfoImpl(private val javaInfo: WorkflowInfo) : KWorkflow
   override val taskQueue: String
     get() = javaInfo.taskQueue
 
-  override val retryOptions: RetryOptions?
-    get() = javaInfo.retryOptions
+  override val retryOptions: KRetryOptions?
+    get() = javaInfo.retryOptions?.toKotlin()
 
   override val workflowRunTimeout: Duration
     get() = javaInfo.workflowRunTimeout.toKotlin()
@@ -237,8 +238,8 @@ internal class KWorkflowInfoImpl(private val javaInfo: WorkflowInfo) : KWorkflow
   override val currentBuildId: String?
     get() = javaInfo.currentBuildId.orElse(null)
 
-  override val priority: Priority
-    get() = javaInfo.priority
+  override val priority: KPriority
+    get() = javaInfo.priority.toKotlin()
 }
 
 /**
@@ -277,8 +278,8 @@ internal class KWorkflowInfoFromContext(private val context: KotlinWorkflowConte
   override val taskQueue: String
     get() = replayContext.taskQueue
 
-  override val retryOptions: RetryOptions?
-    get() = replayContext.retryOptions
+  override val retryOptions: KRetryOptions?
+    get() = replayContext.retryOptions?.toKotlin()
 
   override val workflowRunTimeout: Duration
     get() = replayContext.workflowRunTimeout.toKotlin()
@@ -319,6 +320,6 @@ internal class KWorkflowInfoFromContext(private val context: KotlinWorkflowConte
   override val currentBuildId: String?
     get() = replayContext.currentBuildId.orElse(null)
 
-  override val priority: Priority
-    get() = ProtoConverters.fromProto(replayContext.priority)
+  override val priority: KPriority
+    get() = ProtoConverters.fromProto(replayContext.priority).toKotlin()
 }

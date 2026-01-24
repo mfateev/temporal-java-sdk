@@ -24,10 +24,10 @@ package io.temporal.kotlin.workflow
 
 import io.temporal.api.enums.v1.ParentClosePolicy
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy
-import io.temporal.common.Priority
 import io.temporal.common.SearchAttributes
 import io.temporal.common.VersioningIntent
 import io.temporal.common.context.ContextPropagator
+import io.temporal.kotlin.common.KPriority
 import io.temporal.kotlin.common.KRetryOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.workflow.ChildWorkflowCancellationType
@@ -89,5 +89,5 @@ public data class KChildWorkflowOptions(
   val versioningIntent: VersioningIntent? = null,
   val staticSummary: String? = null,
   val staticDetails: String? = null,
-  val priority: Priority? = null
+  val priority: KPriority? = null
 )

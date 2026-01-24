@@ -22,7 +22,8 @@ package io.temporal.kotlin.client
 
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.common.converter.DataConverter
-import io.temporal.common.interceptors.WorkflowClientInterceptor
+import io.temporal.kotlin.interceptor.KWorkflowClientInterceptor
+import io.temporal.kotlin.toJava
 import io.temporal.serviceclient.WorkflowServiceStubsOptions
 import java.time.Duration
 
@@ -57,7 +58,7 @@ public data class KClientOptions(
   val namespace: String = "default",
   val identity: String? = null,
   val dataConverter: DataConverter? = null,
-  val interceptors: List<WorkflowClientInterceptor> = emptyList(),
+  val interceptors: List<KWorkflowClientInterceptor> = emptyList(),
   val enableHttps: Boolean = false,
   val rpcTimeout: Duration? = null,
   val rpcLongPollTimeout: Duration? = null,
@@ -99,7 +100,7 @@ public data class KClientOptions(
         identity?.let { setIdentity(it) }
         dataConverter?.let { setDataConverter(it) }
         if (interceptors.isNotEmpty()) {
-          setInterceptors(*interceptors.toTypedArray())
+          setInterceptors(*interceptors.map { it.toJava() }.toTypedArray())
         }
       }
       .build()
