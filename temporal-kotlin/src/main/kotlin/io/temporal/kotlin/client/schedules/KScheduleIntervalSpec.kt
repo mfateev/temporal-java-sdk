@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleIntervalSpec
 import java.time.Duration
 
 /**
@@ -53,17 +52,5 @@ public data class KScheduleIntervalSpec(
   init {
     require(!every.isNegative && !every.isZero) { "every must be positive" }
     require(!offset.isNegative) { "offset must not be negative" }
-  }
-
-  public companion object {
-    /**
-     * Create a KScheduleIntervalSpec from a Java SDK ScheduleIntervalSpec.
-     */
-    @JvmStatic
-    public fun fromJava(spec: ScheduleIntervalSpec): KScheduleIntervalSpec =
-      KScheduleIntervalSpec(
-        every = spec.every,
-        offset = spec.offset ?: Duration.ZERO
-      )
   }
 }

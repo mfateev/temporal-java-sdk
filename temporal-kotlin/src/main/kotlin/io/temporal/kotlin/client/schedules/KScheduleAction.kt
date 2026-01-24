@@ -20,23 +20,9 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleAction
-
 /**
  * Base class for an action a schedule can take.
  *
  * @see KScheduleActionStartWorkflow
  */
-public sealed class KScheduleAction {
-  public companion object {
-    /**
-     * Create a KScheduleAction from a Java SDK ScheduleAction.
-     */
-    @JvmStatic
-    public fun fromJava(action: ScheduleAction): KScheduleAction = when (action) {
-      is io.temporal.client.schedules.ScheduleActionStartWorkflow ->
-        KScheduleActionStartWorkflow.fromJava(action)
-      else -> throw IllegalArgumentException("Unknown schedule action type: ${action::class}")
-    }
-  }
-}
+public sealed class KScheduleAction

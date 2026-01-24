@@ -21,7 +21,6 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
-import io.temporal.client.schedules.ScheduleBackfill
 import java.time.Instant
 
 /**
@@ -53,16 +52,4 @@ public data class KScheduleBackfill(
   val startAt: Instant,
   val endAt: Instant,
   val overlapPolicy: ScheduleOverlapPolicy = ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
-) {
-  public companion object {
-    /**
-     * Create a KScheduleBackfill from a Java SDK ScheduleBackfill.
-     */
-    @JvmStatic
-    public fun fromJava(backfill: ScheduleBackfill): KScheduleBackfill = KScheduleBackfill(
-      startAt = backfill.startAt,
-      endAt = backfill.endAt,
-      overlapPolicy = backfill.overlapPolicy
-    )
-  }
-}
+)

@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleCalendarSpec
-
 /**
  * Specification of when to run an action in relation to calendar time.
  *
@@ -79,20 +77,5 @@ public data class KScheduleCalendarSpec(
 
     /** Default range set for all days in a week (0-6). */
     public val ALL_WEEK_DAYS: List<KScheduleRange> = listOf(KScheduleRange(0, 6))
-
-    /**
-     * Create a KScheduleCalendarSpec from a Java SDK ScheduleCalendarSpec.
-     */
-    @JvmStatic
-    public fun fromJava(spec: ScheduleCalendarSpec): KScheduleCalendarSpec = KScheduleCalendarSpec(
-      seconds = spec.seconds?.map { KScheduleRange.fromJava(it) } ?: BEGINNING,
-      minutes = spec.minutes?.map { KScheduleRange.fromJava(it) } ?: BEGINNING,
-      hour = spec.hour?.map { KScheduleRange.fromJava(it) } ?: BEGINNING,
-      dayOfMonth = spec.dayOfMonth?.map { KScheduleRange.fromJava(it) } ?: ALL_MONTH_DAYS,
-      month = spec.month?.map { KScheduleRange.fromJava(it) } ?: ALL_MONTHS,
-      year = spec.year?.map { KScheduleRange.fromJava(it) } ?: emptyList(),
-      dayOfWeek = spec.dayOfWeek?.map { KScheduleRange.fromJava(it) } ?: ALL_WEEK_DAYS,
-      comment = spec.comment ?: ""
-    )
   }
 }

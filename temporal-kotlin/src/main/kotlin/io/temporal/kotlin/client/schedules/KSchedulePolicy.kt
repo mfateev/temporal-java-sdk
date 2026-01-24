@@ -21,7 +21,6 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.api.enums.v1.ScheduleOverlapPolicy
-import io.temporal.client.schedules.SchedulePolicy
 import java.time.Duration
 
 /**
@@ -46,16 +45,4 @@ public data class KSchedulePolicy(
   val overlap: ScheduleOverlapPolicy = ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP,
   val catchupWindow: Duration? = null,
   val pauseOnFailure: Boolean = false
-) {
-  public companion object {
-    /**
-     * Create a KSchedulePolicy from a Java SDK SchedulePolicy.
-     */
-    @JvmStatic
-    public fun fromJava(policy: SchedulePolicy): KSchedulePolicy = KSchedulePolicy(
-      overlap = policy.overlap,
-      catchupWindow = policy.catchupWindow,
-      pauseOnFailure = policy.isPauseOnFailure
-    )
-  }
-}
+)

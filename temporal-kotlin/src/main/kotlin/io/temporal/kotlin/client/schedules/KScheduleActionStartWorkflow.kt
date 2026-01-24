@@ -21,7 +21,6 @@
 package io.temporal.kotlin.client.schedules
 
 import io.temporal.client.WorkflowOptions
-import io.temporal.client.schedules.ScheduleActionStartWorkflow
 import io.temporal.common.interceptors.Header
 import io.temporal.common.metadata.POJOWorkflowInterfaceMetadata
 import kotlin.reflect.KClass
@@ -99,24 +98,5 @@ public data class KScheduleActionStartWorkflow(
       arguments: List<Any?> = emptyList(),
       header: Header = Header.empty()
     ): KScheduleActionStartWorkflow = fromWorkflowInterface(T::class, options, arguments, header)
-
-    /**
-     * Create a KScheduleActionStartWorkflow from a Java SDK ScheduleActionStartWorkflow.
-     */
-    @JvmStatic
-    public fun fromJava(action: ScheduleActionStartWorkflow): KScheduleActionStartWorkflow {
-      val args = action.arguments?.let { encodedValues ->
-        // EncodedValues doesn't expose a way to get the count or iterate,
-        // so we store it as-is and convert when needed
-        emptyList<Any?>()
-      } ?: emptyList()
-
-      return KScheduleActionStartWorkflow(
-        workflowType = action.workflowType,
-        options = action.options,
-        arguments = args,
-        header = action.header ?: Header.empty()
-      )
-    }
   }
 }

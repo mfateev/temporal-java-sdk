@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleInfo
 import java.time.Instant
 
 /**
@@ -44,21 +43,4 @@ public data class KScheduleInfo(
   val nextActionTimes: List<Instant>,
   val createdAt: Instant,
   val lastUpdatedAt: Instant?
-) {
-  public companion object {
-    /**
-     * Create a KScheduleInfo from a Java SDK ScheduleInfo.
-     */
-    @JvmStatic
-    public fun fromJava(info: ScheduleInfo): KScheduleInfo = KScheduleInfo(
-      numActions = info.numActions,
-      numActionsMissedCatchupWindow = info.numActionsMissedCatchupWindow,
-      numActionsSkippedOverlap = info.numActionsSkippedOverlap,
-      runningActions = info.runningActions?.map { KScheduleActionExecution.fromJava(it) } ?: emptyList(),
-      recentActions = info.recentActions?.map { KScheduleActionResult.fromJava(it) } ?: emptyList(),
-      nextActionTimes = info.nextActionTimes ?: emptyList(),
-      createdAt = info.createdAt,
-      lastUpdatedAt = info.lastUpdatedAt
-    )
-  }
-}
+)

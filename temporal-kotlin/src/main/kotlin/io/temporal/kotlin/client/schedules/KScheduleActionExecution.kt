@@ -20,27 +20,12 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleActionExecution
-import io.temporal.client.schedules.ScheduleActionExecutionStartWorkflow
-
 /**
  * Base class for an action execution.
  *
  * @see KScheduleActionExecutionStartWorkflow
  */
-public sealed class KScheduleActionExecution {
-  public companion object {
-    /**
-     * Create a KScheduleActionExecution from a Java SDK ScheduleActionExecution.
-     */
-    @JvmStatic
-    public fun fromJava(execution: ScheduleActionExecution): KScheduleActionExecution = when (execution) {
-      is ScheduleActionExecutionStartWorkflow ->
-        KScheduleActionExecutionStartWorkflow.fromJava(execution)
-      else -> throw IllegalArgumentException("Unknown schedule action execution type: ${execution::class}")
-    }
-  }
-}
+public sealed class KScheduleActionExecution
 
 /**
  * Action execution representing a scheduled workflow start.
@@ -51,16 +36,4 @@ public sealed class KScheduleActionExecution {
 public data class KScheduleActionExecutionStartWorkflow(
   val workflowId: String,
   val firstExecutionRunId: String
-) : KScheduleActionExecution() {
-  public companion object {
-    /**
-     * Create from a Java SDK ScheduleActionExecutionStartWorkflow.
-     */
-    @JvmStatic
-    public fun fromJava(execution: ScheduleActionExecutionStartWorkflow): KScheduleActionExecutionStartWorkflow =
-      KScheduleActionExecutionStartWorkflow(
-        workflowId = execution.workflowId,
-        firstExecutionRunId = execution.firstExecutionRunId
-      )
-  }
-}
+) : KScheduleActionExecution()

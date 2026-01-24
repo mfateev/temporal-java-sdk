@@ -41,6 +41,7 @@ import io.temporal.kotlin.common.KArgs6
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.converters.KOptionsConverters
 import io.temporal.kotlin.internal.converters.KScheduleConverters
+import io.temporal.kotlin.toKotlin
 import io.temporal.serviceclient.WorkflowServiceStubs
 import io.temporal.workflow.UpdateMethod
 import io.temporal.workflow.WorkflowMethod
@@ -1828,7 +1829,7 @@ public constructor(
   public fun listSchedules(): Flow<KScheduleListDescription> = flow {
     scheduleClient.listSchedules().use { stream ->
       stream.iterator().forEach { description ->
-        emit(KScheduleListDescription.fromJava(description))
+        emit(description.toKotlin())
       }
     }
   }.flowOn(Dispatchers.IO)
@@ -1842,7 +1843,7 @@ public constructor(
   public fun listSchedules(pageSize: Int): Flow<KScheduleListDescription> = flow {
     scheduleClient.listSchedules(pageSize).use { stream ->
       stream.iterator().forEach { description ->
-        emit(KScheduleListDescription.fromJava(description))
+        emit(description.toKotlin())
       }
     }
   }.flowOn(Dispatchers.IO)
@@ -1858,7 +1859,7 @@ public constructor(
   public fun listSchedules(query: String?, pageSize: Int?): Flow<KScheduleListDescription> = flow {
     scheduleClient.listSchedules(query, pageSize).use { stream ->
       stream.iterator().forEach { description ->
-        emit(KScheduleListDescription.fromJava(description))
+        emit(description.toKotlin())
       }
     }
   }.flowOn(Dispatchers.IO)

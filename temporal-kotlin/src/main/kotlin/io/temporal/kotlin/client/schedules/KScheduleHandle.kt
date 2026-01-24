@@ -25,6 +25,7 @@ import io.temporal.client.schedules.ScheduleHandle
 import io.temporal.client.schedules.ScheduleUpdateInput
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.converters.KScheduleConverters
+import io.temporal.kotlin.toKotlin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -99,7 +100,7 @@ public class KScheduleHandle internal constructor(
    */
   public suspend fun describe(): KScheduleDescription {
     return withContext(Dispatchers.IO) {
-      KScheduleDescription.fromJava(javaHandle.describe())
+      javaHandle.describe().toKotlin()
     }
   }
 
@@ -176,7 +177,7 @@ public class KScheduleHandle internal constructor(
     withContext(Dispatchers.IO) {
       javaHandle.update { javaInput: ScheduleUpdateInput ->
         val kotlinInput = KScheduleUpdateInput(
-          description = KScheduleDescription.fromJava(javaInput.description)
+          description = javaInput.description.toKotlin()
         )
         updater(kotlinInput)?.let { KScheduleConverters.toJava(it) }
       }

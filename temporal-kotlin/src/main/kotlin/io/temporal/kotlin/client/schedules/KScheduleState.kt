@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleState
-
 /**
  * State of a schedule.
  *
@@ -51,17 +49,4 @@ public data class KScheduleState(
   val paused: Boolean = false,
   val limitedActions: Boolean = false,
   val remainingActions: Long = 0
-) {
-  public companion object {
-    /**
-     * Create a KScheduleState from a Java SDK ScheduleState.
-     */
-    @JvmStatic
-    public fun fromJava(state: ScheduleState): KScheduleState = KScheduleState(
-      note = state.note,
-      paused = state.isPaused,
-      limitedActions = state.isLimitedAction,
-      remainingActions = state.remainingActions
-    )
-  }
-}
+)

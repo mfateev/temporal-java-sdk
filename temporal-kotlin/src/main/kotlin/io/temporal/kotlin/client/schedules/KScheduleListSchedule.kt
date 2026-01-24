@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleListSchedule
-
 /**
  * Details for a listed schedule.
  *
@@ -33,16 +31,4 @@ public data class KScheduleListSchedule(
   val action: KScheduleListAction,
   val spec: KScheduleSpec,
   val state: KScheduleListState
-) {
-  public companion object {
-    /**
-     * Create a KScheduleListSchedule from a Java SDK ScheduleListSchedule.
-     */
-    @JvmStatic
-    public fun fromJava(schedule: ScheduleListSchedule): KScheduleListSchedule = KScheduleListSchedule(
-      action = KScheduleListAction.fromJava(schedule.action),
-      spec = KScheduleSpec.fromJava(schedule.spec),
-      state = KScheduleListState.fromJava(schedule.state)
-    )
-  }
-}
+)

@@ -20,24 +20,10 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleListAction
-import io.temporal.client.schedules.ScheduleListActionStartWorkflow
-
 /**
  * Base class for an action a listed schedule can take.
  */
-public sealed class KScheduleListAction {
-  public companion object {
-    /**
-     * Create a KScheduleListAction from a Java SDK ScheduleListAction.
-     */
-    @JvmStatic
-    public fun fromJava(action: ScheduleListAction): KScheduleListAction = when (action) {
-      is ScheduleListActionStartWorkflow -> KScheduleListActionStartWorkflow.fromJava(action)
-      else -> throw IllegalArgumentException("Unknown schedule list action type: ${action::class.java}")
-    }
-  }
-}
+public sealed class KScheduleListAction
 
 /**
  * Action to start a workflow from a listed schedule.
@@ -46,15 +32,4 @@ public sealed class KScheduleListAction {
  */
 public data class KScheduleListActionStartWorkflow(
   val workflow: String
-) : KScheduleListAction() {
-  public companion object {
-    /**
-     * Create a KScheduleListActionStartWorkflow from a Java SDK ScheduleListActionStartWorkflow.
-     */
-    @JvmStatic
-    public fun fromJava(action: ScheduleListActionStartWorkflow): KScheduleListActionStartWorkflow =
-      KScheduleListActionStartWorkflow(
-        workflow = action.workflow
-      )
-  }
-}
+) : KScheduleListAction()

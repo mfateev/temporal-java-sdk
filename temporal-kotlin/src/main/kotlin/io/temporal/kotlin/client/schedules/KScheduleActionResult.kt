@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleActionResult
 import java.time.Instant
 
 /**
@@ -34,17 +33,4 @@ public data class KScheduleActionResult(
   val scheduledAt: Instant,
   val startedAt: Instant,
   val action: KScheduleActionExecution
-) {
-  public companion object {
-    /**
-     * Create a KScheduleActionResult from a Java SDK ScheduleActionResult.
-     */
-    @JvmStatic
-    public fun fromJava(result: ScheduleActionResult): KScheduleActionResult =
-      KScheduleActionResult(
-        scheduledAt = result.scheduledAt,
-        startedAt = result.startedAt,
-        action = KScheduleActionExecution.fromJava(result.action)
-      )
-  }
-}
+)

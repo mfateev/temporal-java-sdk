@@ -35,7 +35,7 @@ public class KScheduleListDescription internal constructor(
   public val schedule: KScheduleListSchedule,
   public val info: KScheduleListInfo,
   public val searchAttributes: Map<String, *>,
-  private val javaDescription: ScheduleListDescription
+  internal val javaDescription: ScheduleListDescription
 ) {
   /**
    * Get a memo value by key.
@@ -54,19 +54,4 @@ public class KScheduleListDescription internal constructor(
    * @return The memo value, or null if not found.
    */
   public inline fun <reified T> getMemo(key: String): T? = getMemo(key, T::class.java)
-
-  public companion object {
-    /**
-     * Create a KScheduleListDescription from a Java SDK ScheduleListDescription.
-     */
-    @JvmStatic
-    public fun fromJava(description: ScheduleListDescription): KScheduleListDescription =
-      KScheduleListDescription(
-        scheduleId = description.scheduleId,
-        schedule = KScheduleListSchedule.fromJava(description.schedule),
-        info = KScheduleListInfo.fromJava(description.info),
-        searchAttributes = description.searchAttributes,
-        javaDescription = description
-      )
-  }
 }

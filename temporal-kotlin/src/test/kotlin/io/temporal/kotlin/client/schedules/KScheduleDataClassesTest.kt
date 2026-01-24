@@ -24,6 +24,7 @@ import io.temporal.api.enums.v1.ScheduleOverlapPolicy
 import io.temporal.client.WorkflowOptions
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.converters.KScheduleConverters
+import io.temporal.kotlin.toKotlin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -48,7 +49,7 @@ class KScheduleDataClassesTest {
     assertEquals(10, javaRange.end)
     assertEquals(2, javaRange.step)
 
-    val backToKotlin = KScheduleRange.fromJava(javaRange)
+    val backToKotlin = javaRange.toKotlin()
     assertEquals(kotlinRange, backToKotlin)
   }
 
@@ -82,7 +83,7 @@ class KScheduleDataClassesTest {
     assertEquals(59, javaSpec.seconds[0].end)
     assertEquals(10, javaSpec.seconds[0].step)
 
-    val backToKotlin = KScheduleCalendarSpec.fromJava(javaSpec)
+    val backToKotlin = javaSpec.toKotlin()
     assertEquals(kotlinSpec, backToKotlin)
   }
 
@@ -97,7 +98,7 @@ class KScheduleDataClassesTest {
     assertEquals(Duration.ofHours(1), javaSpec.every)
     assertEquals(Duration.ofMinutes(5), javaSpec.offset)
 
-    val backToKotlin = KScheduleIntervalSpec.fromJava(javaSpec)
+    val backToKotlin = javaSpec.toKotlin()
     assertEquals(kotlinSpec, backToKotlin)
   }
 
@@ -139,7 +140,7 @@ class KScheduleDataClassesTest {
     assertEquals(Duration.ofMinutes(5), javaSpec.jitter)
     assertEquals("America/New_York", javaSpec.timeZoneName)
 
-    val backToKotlin = KScheduleSpec.fromJava(javaSpec)
+    val backToKotlin = javaSpec.toKotlin()
     assertEquals(kotlinSpec.calendars.size, backToKotlin.calendars.size)
     assertEquals(kotlinSpec.intervals.size, backToKotlin.intervals.size)
     assertEquals(kotlinSpec.cronExpressions, backToKotlin.cronExpressions)
@@ -164,7 +165,7 @@ class KScheduleDataClassesTest {
     assertTrue(javaState.isLimitedAction)
     assertEquals(5, javaState.remainingActions)
 
-    val backToKotlin = KScheduleState.fromJava(javaState)
+    val backToKotlin = javaState.toKotlin()
     assertEquals(kotlinState, backToKotlin)
   }
 
@@ -192,7 +193,7 @@ class KScheduleDataClassesTest {
     assertEquals(Duration.ofMinutes(10), javaPolicy.catchupWindow)
     assertTrue(javaPolicy.isPauseOnFailure)
 
-    val backToKotlin = KSchedulePolicy.fromJava(javaPolicy)
+    val backToKotlin = javaPolicy.toKotlin()
     assertEquals(kotlinPolicy, backToKotlin)
   }
 
@@ -247,7 +248,7 @@ class KScheduleDataClassesTest {
     assertEquals("TestWorkflow", javaAction.workflowType)
     assertEquals("test-queue", javaAction.options.taskQueue)
 
-    val backToKotlin = KScheduleActionStartWorkflow.fromJava(javaAction)
+    val backToKotlin = javaAction.toKotlin() as KScheduleActionStartWorkflow
     assertEquals("TestWorkflow", backToKotlin.workflowType)
     assertEquals("test-queue", backToKotlin.options.taskQueue)
   }
@@ -284,7 +285,7 @@ class KScheduleDataClassesTest {
     assertTrue(javaSchedule.state!!.isPaused)
     assertEquals("Test schedule", javaSchedule.state!!.note)
 
-    val backToKotlin = KSchedule.fromJava(javaSchedule)
+    val backToKotlin = javaSchedule.toKotlin()
     assertTrue(backToKotlin.action is KScheduleActionStartWorkflow)
     assertEquals("TestWorkflow", (backToKotlin.action as KScheduleActionStartWorkflow).workflowType)
     assertEquals(1, backToKotlin.spec.intervals.size)
@@ -294,7 +295,7 @@ class KScheduleDataClassesTest {
   @Test
   fun `KScheduleListState converts from Java correctly`() {
     val javaState = io.temporal.client.schedules.ScheduleListState("Test note", true)
-    val kotlinState = KScheduleListState.fromJava(javaState)
+    val kotlinState = javaState.toKotlin()
 
     assertEquals("Test note", kotlinState.note)
     assertTrue(kotlinState.paused)

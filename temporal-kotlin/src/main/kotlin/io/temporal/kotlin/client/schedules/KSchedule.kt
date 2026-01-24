@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.Schedule
-
 /**
  * A schedule for periodically running an action.
  *
@@ -57,17 +55,4 @@ public data class KSchedule(
   val spec: KScheduleSpec,
   val policy: KSchedulePolicy? = null,
   val state: KScheduleState? = null
-) {
-  public companion object {
-    /**
-     * Create a KSchedule from a Java SDK Schedule.
-     */
-    @JvmStatic
-    public fun fromJava(schedule: Schedule): KSchedule = KSchedule(
-      action = KScheduleAction.fromJava(schedule.action),
-      spec = KScheduleSpec.fromJava(schedule.spec),
-      policy = schedule.policy?.let { KSchedulePolicy.fromJava(it) },
-      state = schedule.state?.let { KScheduleState.fromJava(it) }
-    )
-  }
-}
+)

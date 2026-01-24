@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleListState
-
 /**
  * State of a listed schedule.
  *
@@ -31,15 +29,4 @@ import io.temporal.client.schedules.ScheduleListState
 public data class KScheduleListState(
   val note: String?,
   val paused: Boolean
-) {
-  public companion object {
-    /**
-     * Create a KScheduleListState from a Java SDK ScheduleListState.
-     */
-    @JvmStatic
-    public fun fromJava(state: ScheduleListState): KScheduleListState = KScheduleListState(
-      note = state.note,
-      paused = state.isPaused
-    )
-  }
-}
+)

@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleRange
-
 /**
  * Inclusive range for a schedule match value.
  *
@@ -50,14 +48,5 @@ public data class KScheduleRange(
     require(start >= 0) { "start must be non-negative" }
     require(end >= 0) { "end must be non-negative" }
     require(step >= 0) { "step must be non-negative" }
-  }
-
-  public companion object {
-    /**
-     * Create a KScheduleRange from a Java SDK ScheduleRange.
-     */
-    @JvmStatic
-    public fun fromJava(range: ScheduleRange): KScheduleRange =
-      KScheduleRange(range.start, range.end, range.step)
   }
 }

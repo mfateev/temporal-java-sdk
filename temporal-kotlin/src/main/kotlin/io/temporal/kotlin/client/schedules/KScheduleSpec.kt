@@ -20,7 +20,6 @@
 
 package io.temporal.kotlin.client.schedules
 
-import io.temporal.client.schedules.ScheduleSpec
 import java.time.Duration
 import java.time.Instant
 
@@ -74,21 +73,4 @@ public data class KScheduleSpec(
   val endAt: Instant? = null,
   val jitter: Duration? = null,
   val timeZoneName: String? = null
-) {
-  public companion object {
-    /**
-     * Create a KScheduleSpec from a Java SDK ScheduleSpec.
-     */
-    @JvmStatic
-    public fun fromJava(spec: ScheduleSpec): KScheduleSpec = KScheduleSpec(
-      calendars = spec.calendars?.map { KScheduleCalendarSpec.fromJava(it) } ?: emptyList(),
-      intervals = spec.intervals?.map { KScheduleIntervalSpec.fromJava(it) } ?: emptyList(),
-      cronExpressions = spec.cronExpressions ?: emptyList(),
-      skip = spec.skip?.map { KScheduleCalendarSpec.fromJava(it) } ?: emptyList(),
-      startAt = spec.startAt,
-      endAt = spec.endAt,
-      jitter = spec.jitter,
-      timeZoneName = spec.timeZoneName
-    )
-  }
-}
+)
