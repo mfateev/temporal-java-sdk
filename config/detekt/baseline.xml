@@ -1,0 +1,54 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>FunctionNaming:WorkflowServiceStubsExt.kt$@ExperimentalTime @Deprecated( "Use ConnectedWorkflowServiceStubs(timeout, options)", ReplaceWith("ConnectedWorkflowServiceStubs(timeout, options)") ) inline fun ConnectedWorkflowServiceStubs( options: @TemporalDsl WorkflowServiceStubsOptions.Builder.() -&gt; Unit, timeout: Duration ): WorkflowServiceStubs</ID>
+    <ID>FunctionNaming:WorkflowServiceStubsExt.kt$@ExperimentalTime inline fun ConnectedWorkflowServiceStubs( timeout: Duration, options: @TemporalDsl WorkflowServiceStubsOptions.Builder.() -&gt; Unit ): WorkflowServiceStubs</ID>
+    <ID>FunctionNaming:WorkflowServiceStubsExt.kt$fun LocalWorkflowServiceStubs(): WorkflowServiceStubs</ID>
+    <ID>FunctionNaming:WorkflowServiceStubsExt.kt$inline fun ConnectedWorkflowServiceStubs( timeout: JavaDuration? = null, options: @TemporalDsl WorkflowServiceStubsOptions.Builder.() -&gt; Unit ): WorkflowServiceStubs</ID>
+    <ID>FunctionNaming:WorkflowServiceStubsExt.kt$inline fun LazyWorkflowServiceStubs( options: @TemporalDsl WorkflowServiceStubsOptions.Builder.() -&gt; Unit ): WorkflowServiceStubs</ID>
+    <ID>LargeClass:KClient.kt$KClient</ID>
+    <ID>LargeClass:KWorkflow.kt$KWorkflow</ID>
+    <ID>LargeClass:KotlinWorkflowContext.kt$KotlinWorkflowContext</ID>
+    <ID>LongMethod:KotlinReplayWorkflow.kt$KotlinReplayWorkflow$override fun start(event: HistoryEvent, context: ReplayWorkflowContext)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$return startWorkflowInternal(workflowType, resultClass as Class&lt;R&gt;, KOptionsConverters.toJava(options), args.a1, args.a2)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$return startWorkflowInternal(workflowType, resultClass as Class&lt;R&gt;, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$return startWorkflowInternal(workflowType, resultClass as Class&lt;R&gt;, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$return startWorkflowInternal(workflowType, resultClass as Class&lt;R&gt;, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$return startWorkflowInternal(workflowType, resultClass as Class&lt;R&gt;, KOptionsConverters.toJava(options), args.a1, args.a2, args.a3, args.a4, args.a5, args.a6)</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$val</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$val execution = stub.signalWithStart(signalName, emptyArray&lt;Any?&gt;(), arrayOf&lt;Any?&gt;(workflowArgs.a1, workflowArgs.a2))</ID>
+    <ID>MaxLineLength:KClient.kt$KClient$val stub = workflowClient.newUntypedWorkflowStub(workflowId, java.util.Optional.of(runId), java.util.Optional.empty())</ID>
+    <ID>MaxLineLength:KScheduleDataClassesTest.kt$KScheduleDataClassesTest$assertEquals("TestWorkflow", (javaSchedule.action as io.temporal.client.schedules.ScheduleActionStartWorkflow).workflowType)</ID>
+    <ID>MaxLineLength:KScheduleDataClassesTest.kt$KScheduleDataClassesTest$assertEquals("TestWorkflow", (javaUpdate.schedule.action as io.temporal.client.schedules.ScheduleActionStartWorkflow).workflowType)</ID>
+    <ID>MaxLineLength:KScheduleDataClassesTest.kt$KScheduleDataClassesTest$val javaAction = kotlinAction.let { KScheduleConverters.toJava(it) } as io.temporal.client.schedules.ScheduleActionStartWorkflow</ID>
+    <ID>MaxLineLength:KWithStartWorkflowOperation.kt$KWithStartWorkflowOperation$return "KWithStartWorkflowOperation{workflowType='$workflowType', args=${args.contentToString()}, resultClass=$resultClass}"</ID>
+    <ID>MaxLineLength:KWorkflow.kt$KWorkflow$?:</ID>
+    <ID>MaxLineLength:KWorkflow.kt$KWorkflow$public inline</ID>
+    <ID>MaxLineLength:KWorkflow.kt$KWorkflow$return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class&lt;R&gt;)</ID>
+    <ID>MaxLineLength:KWorkflow.kt$KWorkflow$return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class&lt;R&gt;, *args.toArray())</ID>
+    <ID>MaxLineLength:KWorkflow.kt$KWorkflow$return context.startChildWorkflowWithHandle(workflowType, KOptionsConverters.toJava(options), resultClass as Class&lt;R&gt;, arg1)</ID>
+    <ID>MaxLineLength:KWorkflowClientCallsInterceptor.kt$KWorkflowClientCallsInterceptorBase$override suspend</ID>
+    <ID>MaxLineLength:KWorkflowClientInterceptorConverters.kt$JavaCallsInterceptorToKotlin$override suspend</ID>
+    <ID>MaxLineLength:KWorkflowClientInterceptorConverters.kt$KotlinCallsInterceptorToJava$override</ID>
+    <ID>MaxLineLength:KWorkflowClientInterceptorConverters.kt$KotlinCallsInterceptorToJava.Companion.&lt;no name provided&gt;$override</ID>
+    <ID>MaxLineLength:KWorkflowOutboundCallsInterceptor.kt$KWorkflowOutboundCallsInterceptorBase$override</ID>
+    <ID>MaxLineLength:KotlinAsyncNexusTest.kt$KotlinAsyncNexusTest.TestNexusServiceImpl$SynchronousOperationFunction&lt;Void, String&gt; { ctx: OperationContext, details: OperationStartDetails, _: Void? -&gt; "Hello Kotlin" }</ID>
+    <ID>MaxLineLength:KotlinMethodReferenceDisassemblyService.kt$KotlinMethodReferenceDisassemblyService$private</ID>
+    <ID>MaxLineLength:KotlinReplayWorkflow.kt$KotlinReplayWorkflow.DefaultWorkflowExecutor$.</ID>
+    <ID>MaxLineLength:TracingInterceptorIntegrationTest.kt$TracingInterceptorIntegrationTest$assertTrue("randomUUID should be during execution", randomUUIDIdx &gt; executeStartIdx &amp;&amp; randomUUIDIdx &lt; executeEndIdx)</ID>
+    <ID>MaxLineLength:WorkerExt.kt$@Deprecated("Use registerWorkflowImplementationFactory instead", ReplaceWith("this.registerWorkflowImplementationFactory(factory)"))</ID>
+    <ID>NestedBlockDepth:KActivityRegistry.kt$KActivityRegistry$private fun findImplementationMethod(implClass: Class&lt;*&gt;, interfaceMethod: Method): Method</ID>
+    <ID>NestedBlockDepth:KWorker.kt$KWorker$private fun findImplementationMethod( implClass: Class&lt;*&gt;, interfaceMethod: java.lang.reflect.Method ): java.lang.reflect.Method</ID>
+    <ID>NestedBlockDepth:KWorkflow.kt$KWorkflow$public suspend fun &lt;R&gt; retry( options: KRetryOptions, expiration: Duration? = null, block: suspend () -&gt; R ): R</ID>
+    <ID>RethrowCaughtException:KWorkerTest.kt$KWorkerTest$throw e</ID>
+    <ID>RethrowCaughtException:KWorkflowClientInterceptorConverters.kt$JavaCallsInterceptorToKotlin$throw e</ID>
+    <ID>UnusedParameter:KDynamicActivityHandler.kt$KDynamicActivityHandler$activityType: String</ID>
+    <ID>UnusedPrivateProperty:JavaClientToSuspendWorkflowTest.kt$JavaClientToSuspendWorkflowTest$val execution = stub.start("World")</ID>
+    <ID>UnusedPrivateProperty:KExternalWorkflowHandle.kt$KExternalWorkflowHandle$private val workflowInterface: Class&lt;T&gt;</ID>
+    <ID>UnusedPrivateProperty:KSDKTestWorkflowRule.kt$KSDKTestWorkflowRule.Builder$private var suspendActivityImplementations: List&lt;Any&gt; = emptyList()</ID>
+    <ID>UnusedPrivateProperty:KSDKTestWorkflowRuleTest.kt$KSDKTestWorkflowRuleTest$val calculatorRule = KSDKTestWorkflowRule { workflowTypes(CalculatorWorkflowImpl::class) }</ID>
+    <ID>UnusedPrivateProperty:WorkflowApiIntegrationTest.kt$WorkflowApiIntegrationTest.HandlerCompletionWorkflowImpl$private var handlerFinishedAtQuery = false</ID>
+    <ID>UtilityClassWithPublicConstructor:KotlinObjectMapperFactory.kt$KotlinObjectMapperFactory</ID>
+  </CurrentIssues>
+</SmellBaseline>
