@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.activity
 
-import io.temporal.activity.ActivityCancellationType
-
 /**
  * Specifies how an activity's cancellation is handled when its parent workflow or scope is cancelled.
  *
@@ -51,32 +49,5 @@ public enum class KActivityCancellationType {
    * and immediately report cancellation to the Workflow Execution by causing the activity stub call
    * to fail with [io.temporal.failure.CanceledFailure] immediately.
    */
-  ABANDON;
-
-  /**
-   * Converts this Kotlin enum to the Java SDK [ActivityCancellationType].
-   */
-  public fun toJava(): ActivityCancellationType = when (this) {
-    WAIT_CANCELLATION_COMPLETED -> ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
-    TRY_CANCEL -> ActivityCancellationType.TRY_CANCEL
-    ABANDON -> ActivityCancellationType.ABANDON
-  }
-
-  public companion object {
-    /**
-     * Converts a Java SDK [ActivityCancellationType] to the Kotlin equivalent.
-     */
-    @JvmStatic
-    public fun fromJava(java: ActivityCancellationType): KActivityCancellationType = when (java) {
-      ActivityCancellationType.WAIT_CANCELLATION_COMPLETED -> WAIT_CANCELLATION_COMPLETED
-      ActivityCancellationType.TRY_CANCEL -> TRY_CANCEL
-      ActivityCancellationType.ABANDON -> ABANDON
-    }
-  }
+  ABANDON
 }
-
-/**
- * Converts a Java SDK [ActivityCancellationType] to the Kotlin SDK [KActivityCancellationType].
- */
-public fun ActivityCancellationType.toKotlin(): KActivityCancellationType =
-  KActivityCancellationType.fromJava(this)

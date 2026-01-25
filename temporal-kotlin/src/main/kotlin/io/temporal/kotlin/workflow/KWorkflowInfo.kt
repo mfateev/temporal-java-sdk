@@ -26,7 +26,6 @@ import io.temporal.internal.common.ProtoConverters
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.kotlin.common.KPriority
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.common.toKotlin
 import io.temporal.kotlin.internal.InternalTemporalApi
 import io.temporal.kotlin.internal.workflow.KotlinWorkflowContext
 import io.temporal.kotlin.toKotlin

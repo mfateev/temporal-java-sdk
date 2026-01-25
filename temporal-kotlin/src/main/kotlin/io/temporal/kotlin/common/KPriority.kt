@@ -20,8 +20,6 @@
 
 package io.temporal.kotlin.common
 
-import io.temporal.common.Priority
-
 /**
  * Priority contains metadata that controls the relative ordering of task processing when tasks are
  * backed up in a queue. The affected queues depend on the server version.
@@ -60,35 +58,11 @@ public data class KPriority(
   val fairnessKey: String? = null,
   val fairnessWeight: Float = 0f
 ) {
-  /**
-   * Converts this Kotlin [KPriority] to the Java SDK [Priority].
-   */
-  public fun toJava(): Priority = Priority.newBuilder()
-    .setPriorityKey(priorityKey)
-    .apply { fairnessKey?.let { setFairnessKey(it) } }
-    .setFairnessWeight(fairnessWeight)
-    .build()
-
   public companion object {
     /**
      * Default priority instance with all default values.
      */
     @JvmField
     public val DEFAULT: KPriority = KPriority()
-
-    /**
-     * Converts a Java SDK [Priority] to the Kotlin equivalent.
-     */
-    @JvmStatic
-    public fun fromJava(java: Priority): KPriority = KPriority(
-      priorityKey = java.priorityKey,
-      fairnessKey = java.fairnessKey,
-      fairnessWeight = java.fairnessWeight
-    )
   }
 }
-
-/**
- * Converts a Java SDK [Priority] to the Kotlin SDK [KPriority].
- */
-public fun Priority.toKotlin(): KPriority = KPriority.fromJava(this)

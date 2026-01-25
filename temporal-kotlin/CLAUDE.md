@@ -17,3 +17,11 @@ Follow the Java SDK directory and package structure unless there is a specific, 
 - `io.temporal.common` → `io.temporal.kotlin.common`
 
 Do not create new package structures like `io.temporal.kotlin.options` that don't exist in the Java SDK.
+
+### Java Interop Conventions
+Do not add `toJava()` or `fromJava()` methods directly on Kotlin public classes. Instead:
+- Use extension functions in `JavaInterop.kt` for conversions (e.g., `KWorkflowOptions.toJava()` as an extension)
+- Use internal converter classes like `KOptionsConverters` and `KScheduleConverters` for `toJava()` methods
+- Use `toKotlin()` extension functions on Java types in `JavaInterop.kt` for Java-to-Kotlin conversions
+
+This keeps the Kotlin API clean and separates interop concerns from the core data classes.

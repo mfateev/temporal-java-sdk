@@ -22,6 +22,7 @@
 
 package io.temporal.kotlin
 
+import io.temporal.activity.ActivityCancellationType
 import io.temporal.activity.ActivityOptions
 import io.temporal.activity.LocalActivityOptions
 import io.temporal.client.WorkflowClient
@@ -47,6 +48,7 @@ import io.temporal.client.schedules.SchedulePolicy
 import io.temporal.client.schedules.ScheduleRange
 import io.temporal.client.schedules.ScheduleSpec
 import io.temporal.client.schedules.ScheduleState
+import io.temporal.common.Priority
 import io.temporal.common.RetryOptions
 import io.temporal.common.interceptors.WorkflowClientInterceptor
 import io.temporal.kotlin.activity.KActivityCancellationType
@@ -75,8 +77,8 @@ import io.temporal.kotlin.client.schedules.KSchedulePolicy
 import io.temporal.kotlin.client.schedules.KScheduleRange
 import io.temporal.kotlin.client.schedules.KScheduleSpec
 import io.temporal.kotlin.client.schedules.KScheduleState
+import io.temporal.kotlin.common.KPriority
 import io.temporal.kotlin.common.KRetryOptions
-import io.temporal.kotlin.common.toKotlin
 import io.temporal.kotlin.interceptor.KWorkflowClientInterceptor
 import io.temporal.kotlin.internal.converters.KWorkflowClientInterceptorJavaWrapper
 import io.temporal.kotlin.internal.converters.WorkflowClientInterceptorKotlinWrapper
@@ -514,7 +516,7 @@ public fun ActivityOptions.toKotlin(): KActivityOptions = KActivityOptions(
   heartbeatTimeout = heartbeatTimeout?.toKotlin(),
   taskQueue = taskQueue,
   retryOptions = retryOptions?.toKotlin(),
-  cancellationType = cancellationType?.let { KActivityCancellationType.fromJava(it) },
+  cancellationType = cancellationType?.toKotlin(),
   disableEagerExecution = isEagerExecutionDisabled
 )
 
@@ -568,3 +570,47 @@ public fun KWorkflowClientInterceptor.toJava(): WorkflowClientInterceptor =
  */
 public fun WorkflowClientInterceptor.toKotlin(): KWorkflowClientInterceptor =
   WorkflowClientInterceptorKotlinWrapper(this)
+
+// =============================================================================
+// Activity Cancellation Type Conversions
+// =============================================================================
+
+/**
+ * Converts a Kotlin SDK [KActivityCancellationType] to a Java SDK [ActivityCancellationType].
+ */
+public fun KActivityCancellationType.toJava(): ActivityCancellationType = when (this) {
+  KActivityCancellationType.WAIT_CANCELLATION_COMPLETED -> ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+  KActivityCancellationType.TRY_CANCEL -> ActivityCancellationType.TRY_CANCEL
+  KActivityCancellationType.ABANDON -> ActivityCancellationType.ABANDON
+}
+
+/**
+ * Converts a Java SDK [ActivityCancellationType] to a Kotlin SDK [KActivityCancellationType].
+ */
+public fun ActivityCancellationType.toKotlin(): KActivityCancellationType = when (this) {
+  ActivityCancellationType.WAIT_CANCELLATION_COMPLETED -> KActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+  ActivityCancellationType.TRY_CANCEL -> KActivityCancellationType.TRY_CANCEL
+  ActivityCancellationType.ABANDON -> KActivityCancellationType.ABANDON
+}
+
+// =============================================================================
+// Priority Conversions
+// =============================================================================
+
+/**
+ * Converts a Kotlin SDK [KPriority] to a Java SDK [Priority].
+ */
+public fun KPriority.toJava(): Priority = Priority.newBuilder()
+  .setPriorityKey(priorityKey)
+  .apply { fairnessKey?.let { setFairnessKey(it) } }
+  .setFairnessWeight(fairnessWeight)
+  .build()
+
+/**
+ * Converts a Java SDK [Priority] to a Kotlin SDK [KPriority].
+ */
+public fun Priority.toKotlin(): KPriority = KPriority(
+  priorityKey = priorityKey,
+  fairnessKey = fairnessKey,
+  fairnessWeight = fairnessWeight
+)
