@@ -302,3 +302,116 @@ class KRealActivityRegistrationTest {
         assertEquals(8, result)
     }
 }
+
+/**
+ * Tests for KDynamicActivity fallback combined with regular activities.
+ *
+ * Verifies that the registry correctly routes:
+ * - Known activity types to registered implementations
+ * - Unknown activity types to the KDynamicActivity fallback
+ */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
+class KDynamicActivityFallbackTest {
+
+    @WorkflowInterface
+    interface MixedActivityWorkflow {
+        @WorkflowMethod
+        suspend fun process(input: String): String
+    }
+
+    @ActivityInterface
+    interface KnownActivity {
+        @ActivityMethod
+        fun greet(name: String): String
+    }
+
+    class MixedActivityWorkflowImpl : MixedActivityWorkflow {
+        override suspend fun process(input: String): String {
+            // Call a known activity type (registered via mock)
+            val knownResult = KWorkflow.executeActivity(
+                KnownActivity::greet,
+                input,
+                KActivityOptions(startToCloseTimeout = 1.minutes),
+            )
+
+            // Call an unknown activity type (handled by dynamic fallback)
+            val dynamicResult = KWorkflow.executeActivity<String>(
+                "unknownActivityType",
+                listOf(input),
+                KActivityOptions(startToCloseTimeout = 1.minutes),
+            )
+
+            return "$knownResult | $dynamicResult"
+        }
+    }
+
+    class KnownActivityImpl : KnownActivity {
+        override fun greet(name: String): String = "Hello, $name!"
+    }
+
+    /**
+     * Dynamic activity fallback that handles any unknown activity type.
+     */
+    class FallbackDynamicActivity : io.temporal.kotlin.activity.KDynamicActivity {
+        override fun execute(args: io.temporal.kotlin.common.KEncodedValues): Any? {
+            val activityType = io.temporal.activity.Activity.getExecutionContext().info.activityType
+            val input = args.get<String>(0)
+            return "Dynamic[$activityType]: $input"
+        }
+    }
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val extension = kTestWorkflowExtension {
+            workflowImplementationTypes = listOf(MixedActivityWorkflowImpl::class)
+            // Register KDynamicActivity as fallback via the extension
+            activityImplementations = listOf(FallbackDynamicActivity())
+        }
+    }
+
+    @Test
+    fun `KDynamicActivity fallback handles unknown activity types while known types use registry`(
+        testEnv: KTestWorkflowEnvironment,
+        client: KClient,
+        options: KWorkflowOptions,
+    ) = runTest {
+        // Register a known activity implementation
+        testEnv.registerActivitiesImplementations(KnownActivityImpl())
+
+        // Execute workflow that calls both known and unknown activity types
+        val result = client.executeWorkflow(
+            MixedActivityWorkflow::process,
+            "World",
+            options.copy(workflowId = "mixed-${UUID.randomUUID()}"),
+        )
+
+        // Verify both activities were handled correctly
+        assertEquals("Hello, World! | Dynamic[unknownActivityType]: World", result)
+    }
+
+    @Test
+    fun `mocked activity takes precedence over KDynamicActivity fallback`(
+        testEnv: KTestWorkflowEnvironment,
+        client: KClient,
+        options: KWorkflowOptions,
+    ) = runTest {
+        // Register a mock for the known activity
+        val mockActivity = Mockito.mock(KnownActivity::class.java)
+        Mockito.`when`(mockActivity.greet(Mockito.anyString()))
+            .thenReturn("Mocked greeting!")
+
+        testEnv.registerActivitiesImplementations(mockActivity)
+
+        // Execute workflow
+        val result = client.executeWorkflow(
+            MixedActivityWorkflow::process,
+            "Test",
+            options.copy(workflowId = "mock-precedence-${UUID.randomUUID()}"),
+        )
+
+        // Verify mock was used for known activity, fallback for unknown
+        assertEquals("Mocked greeting! | Dynamic[unknownActivityType]: Test", result)
+        Mockito.verify(mockActivity).greet("Test")
+    }
+}
