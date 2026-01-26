@@ -1,3 +1,5 @@
+@file:OptIn(io.temporal.kotlin.internal.InternalTemporalApi::class)
+
 /*
  * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
  *
@@ -20,12 +22,10 @@
 
 package io.temporal.kotlin.internal.activity
 
-import io.temporal.activity.ActivityInterface
-import io.temporal.activity.ActivityMethod
+import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KDynamicActivity
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.Continuation
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspend
 import kotlin.reflect.jvm.kotlinFunction
@@ -68,7 +68,7 @@ public class KActivityRegistry {
    * @param implementation Activity implementation instance
    */
   public fun register(implementation: Any) {
-    val interfaces = findActivityInterfaces(implementation::class.java)
+    val interfaces = KActivityMetadata.findActivityInterfaces(implementation::class.java)
     if (interfaces.isEmpty()) {
       throw IllegalArgumentException(
         "Implementation does not implement any @ActivityInterface: ${implementation::class.java.name}"
@@ -89,7 +89,7 @@ public class KActivityRegistry {
    */
   public fun registerMockImplementation(mockImplementation: Any) {
     // For mocks, we need to find the activity interface from the mock's interfaces
-    val interfaces = findActivityInterfaces(mockImplementation::class.java)
+    val interfaces = KActivityMetadata.findActivityInterfaces(mockImplementation::class.java)
     if (interfaces.isEmpty()) {
       throw IllegalArgumentException(
         "Mock does not implement any @ActivityInterface: ${mockImplementation::class.java.name}"
@@ -102,13 +102,15 @@ public class KActivityRegistry {
   }
 
   private fun registerInterface(implementation: Any, activityInterface: Class<*>) {
-    for (method in activityInterface.methods) {
-      if (method.isDefault) continue
+    val implClass = implementation::class.java
+    val metadata = POJOActivityInterfaceMetadata.newInstance(activityInterface)
 
-      val activityTypeName = getActivityTypeName(method)
-      val implMethod = findImplementationMethod(implementation::class.java, method)
+    for (methodMetadata in metadata.methodsMetadata) {
+      val activityTypeName = methodMetadata.activityTypeName
+      val interfaceMethod = methodMetadata.method
+      val implMethod = KActivityMetadata.findImplementationMethod(implClass, interfaceMethod)
       val kFunction = implMethod.kotlinFunction
-      val isSuspend = isSuspendMethod(implMethod)
+      val isSuspend = KActivityMetadata.isSuspendMethod(implMethod)
 
       activities[activityTypeName] = ActivityEntry(
         implementation = implementation,
@@ -161,74 +163,5 @@ public class KActivityRegistry {
     return kotlinx.coroutines.runBlocking {
       entry.kFunction!!.callSuspend(entry.implementation, *args)
     }
-  }
-
-  private fun findActivityInterfaces(clazz: Class<*>): List<Class<*>> {
-    val result = mutableListOf<Class<*>>()
-
-    fun collectInterfaces(cls: Class<*>) {
-      for (iface in cls.interfaces) {
-        if (iface.isAnnotationPresent(ActivityInterface::class.java)) {
-          result.add(iface)
-        }
-        collectInterfaces(iface)
-      }
-      cls.superclass?.let { collectInterfaces(it) }
-    }
-
-    collectInterfaces(clazz)
-    return result.distinct()
-  }
-
-  private fun findImplementationMethod(implClass: Class<*>, interfaceMethod: Method): Method {
-    val methodName = interfaceMethod.name
-    val interfaceParams = interfaceMethod.parameterTypes
-
-    // First try exact match (for non-suspend methods)
-    try {
-      return implClass.getMethod(methodName, *interfaceParams)
-    } catch (_: NoSuchMethodException) {
-      // Not found, continue to search for suspend variant
-    }
-
-    // For suspend methods, look for method with Continuation parameter
-    val continuationClass = Continuation::class.java
-    for (method in implClass.methods) {
-      if (method.name == methodName) {
-        val params = method.parameterTypes
-        if (params.size == interfaceParams.size + 1 &&
-          continuationClass.isAssignableFrom(params.last())
-        ) {
-          var matches = true
-          for (i in interfaceParams.indices) {
-            if (interfaceParams[i] != params[i]) {
-              matches = false
-              break
-            }
-          }
-          if (matches) {
-            return method
-          }
-        }
-      }
-    }
-
-    throw IllegalStateException(
-      "Could not find implementation method for ${interfaceMethod.name} in ${implClass.name}"
-    )
-  }
-
-  private fun getActivityTypeName(method: Method): String {
-    val annotation = method.getAnnotation(ActivityMethod::class.java)
-    if (annotation != null && annotation.name.isNotEmpty()) {
-      return annotation.name
-    }
-    // Default: capitalize first letter of method name
-    return method.name.replaceFirstChar { it.uppercase() }
-  }
-
-  private fun isSuspendMethod(method: Method): Boolean {
-    val params = method.parameterTypes
-    return params.isNotEmpty() && Continuation::class.java.isAssignableFrom(params.last())
   }
 }

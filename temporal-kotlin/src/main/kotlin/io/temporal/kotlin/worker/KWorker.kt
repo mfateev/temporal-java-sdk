@@ -22,12 +22,12 @@
 
 package io.temporal.kotlin.worker
 
-import io.temporal.activity.ActivityInterface
 import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.interceptor.KWorkerInterceptor
 import io.temporal.kotlin.internal.InternalTemporalApi
+import io.temporal.kotlin.internal.activity.KActivityMetadata
 import io.temporal.kotlin.internal.activity.KDynamicActivityWrapper
 import io.temporal.kotlin.internal.activity.KotlinActivityWrapper
 import io.temporal.kotlin.internal.converters.KOptionsConverters
@@ -536,7 +536,7 @@ public class KWorker private constructor(
     val implClass = activity::class.java
 
     // Find all activity interfaces implemented by this class
-    val activityInterfaces = findActivityInterfaces(implClass)
+    val activityInterfaces = KActivityMetadata.findActivityInterfaces(implClass)
     if (activityInterfaces.isEmpty()) {
       throw IllegalArgumentException(
         "Implementation does not implement any @ActivityInterface annotated interfaces: ${implClass.name}"
@@ -553,7 +553,7 @@ public class KWorker private constructor(
         val interfaceMethod = methodMetadata.method
 
         // Find the implementation method (may be different for suspend functions)
-        val implMethod = findImplementationMethod(implClass, interfaceMethod)
+        val implMethod = KActivityMetadata.findImplementationMethod(implClass, interfaceMethod)
 
         val wrapper = KotlinActivityWrapper(
           activityTypeName = activityTypeName,
@@ -567,75 +567,6 @@ public class KWorker private constructor(
 
     // Register all wrappers with the Java worker
     worker.registerActivitiesImplementations(*wrappers.toTypedArray())
-  }
-
-  /**
-   * Find the implementation method for an interface method.
-   *
-   * For suspend functions, the implementation method will have a Continuation parameter.
-   */
-  private fun findImplementationMethod(
-    implClass: Class<*>,
-    interfaceMethod: java.lang.reflect.Method
-  ): java.lang.reflect.Method {
-    val methodName = interfaceMethod.name
-    val interfaceParams = interfaceMethod.parameterTypes
-
-    // First try exact match (for non-suspend methods)
-    try {
-      return implClass.getMethod(methodName, *interfaceParams)
-    } catch (_: NoSuchMethodException) {
-      // Not found, continue to search for suspend variant
-    }
-
-    // For suspend methods, the implementation has an extra Continuation parameter
-    // Look for a method with the same name and compatible parameter count
-    val continuationClass = kotlin.coroutines.Continuation::class.java
-    for (method in implClass.methods) {
-      if (method.name == methodName) {
-        val params = method.parameterTypes
-        // Suspend method: same params + Continuation at the end
-        if (params.size == interfaceParams.size + 1 &&
-          continuationClass.isAssignableFrom(params.last())
-        ) {
-          // Verify the other params match
-          var matches = true
-          for (i in interfaceParams.indices) {
-            if (interfaceParams[i] != params[i]) {
-              matches = false
-              break
-            }
-          }
-          if (matches) {
-            return method
-          }
-        }
-      }
-    }
-
-    throw IllegalStateException(
-      "Could not find implementation method for ${interfaceMethod.name} in ${implClass.name}"
-    )
-  }
-
-  /**
-   * Find all activity interfaces implemented by a class.
-   */
-  private fun findActivityInterfaces(clazz: Class<*>): List<Class<*>> {
-    val result = mutableListOf<Class<*>>()
-
-    fun collectInterfaces(cls: Class<*>) {
-      for (iface in cls.interfaces) {
-        if (iface.isAnnotationPresent(ActivityInterface::class.java)) {
-          result.add(iface)
-        }
-        collectInterfaces(iface)
-      }
-      cls.superclass?.let { collectInterfaces(it) }
-    }
-
-    collectInterfaces(clazz)
-    return result.distinct()
   }
 
   // ========== Nexus Registration ==========
