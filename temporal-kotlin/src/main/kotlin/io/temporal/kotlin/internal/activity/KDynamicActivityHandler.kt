@@ -21,16 +21,15 @@
 package io.temporal.kotlin.internal.activity
 
 import io.temporal.activity.Activity
-import io.temporal.activity.DynamicActivity
-import io.temporal.common.converter.EncodedValues
 import io.temporal.failure.ApplicationFailure
+import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.common.KEncodedValues
 
 /**
  * Dynamic activity handler that routes activity calls to a [KActivityRegistry].
  *
  * This handler is designed for testing scenarios where activity implementations
- * (including mocks) need to be registered at runtime. It implements [DynamicActivity]
+ * (including mocks) need to be registered at runtime. It implements [KDynamicActivity]
  * which acts as a catch-all for any activity type not handled by other registrations.
  *
  * Note: For production use, prefer [KWorker.registerActivitiesImplementations] which uses TypedDynamicActivity
@@ -40,7 +39,7 @@ import io.temporal.kotlin.common.KEncodedValues
  * ```kotlin
  * val registry = KActivityRegistry()
  * val handler = KDynamicActivityHandler(registry)
- * worker.registerActivitiesImplementations(handler)
+ * kWorker.registerActivitiesImplementations(handler)
  *
  * // Later, register mock implementations
  * registry.registerMockImplementation(mockActivity)
@@ -48,22 +47,21 @@ import io.temporal.kotlin.common.KEncodedValues
  */
 public class KDynamicActivityHandler(
   private val registry: KActivityRegistry
-) : DynamicActivity {
+) : KDynamicActivity {
 
-  override fun execute(args: EncodedValues): Any? {
+  override fun execute(args: KEncodedValues): Any? {
     val activityType = Activity.getExecutionContext().info.activityType
 
     // First check if the activity is registered in the registry
     if (registry.hasActivity(activityType)) {
-      // Decode arguments based on registered method signature
-      val decodedArgs = decodeArguments(activityType, args)
-      return registry.execute(activityType, decodedArgs)
+      // Registry handles decoding with proper types from method signature
+      return registry.execute(activityType, args)
     }
 
     // Check if there's a dynamic fallback handler
     val fallback = registry.dynamicActivityFallback
     if (fallback != null) {
-      return fallback.execute(KEncodedValues(args))
+      return fallback.execute(args)
     }
 
     // No handler found - throw non-retryable failure for fast test feedback
@@ -71,20 +69,5 @@ public class KDynamicActivityHandler(
       "Unknown activity type: $activityType. Known types: ${registry.getRegisteredTypes()}",
       "UNKNOWN_ACTIVITY_TYPE"
     )
-  }
-
-  private fun decodeArguments(activityType: String, args: EncodedValues): Array<Any?> {
-    // For now, we pass the raw EncodedValues and let the registry handle decoding
-    // This is a simplified implementation - the registry's execute method
-    // expects decoded arguments, so we need to extract them from EncodedValues
-    val count = args.size
-    if (count == 0) {
-      return emptyArray()
-    }
-
-    // Extract arguments as Object array - the types will be inferred at runtime
-    return Array(count) { index ->
-      args.get(index, Any::class.java)
-    }
   }
 }

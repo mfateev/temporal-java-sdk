@@ -255,7 +255,7 @@ public class KTestWorkflowExtension private constructor(
         // Register the unified dynamic activity handler
         // This single handler routes all Kotlin activity calls through the shared registry
         val dynamicHandler = KDynamicActivityHandler(activityRegistry)
-        worker.registerActivitiesImplementations(dynamicHandler)
+        kWorker.registerActivitiesImplementations(dynamicHandler)
 
         // Register activities via the unified registry
         // KDynamicActivity implementations are set as the fallback in the registry

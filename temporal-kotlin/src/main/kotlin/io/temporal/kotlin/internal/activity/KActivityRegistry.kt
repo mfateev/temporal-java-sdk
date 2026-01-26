@@ -24,6 +24,7 @@ package io.temporal.kotlin.internal.activity
 
 import io.temporal.common.metadata.POJOActivityInterfaceMetadata
 import io.temporal.kotlin.activity.KDynamicActivity
+import io.temporal.kotlin.common.KEncodedValues
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KFunction
@@ -135,20 +136,42 @@ public class KActivityRegistry {
    * Execute an activity by type name.
    *
    * @param activityType The activity type name
-   * @param args Arguments to pass to the activity
+   * @param args Arguments as [KEncodedValues] - will be decoded using the method's parameter types
    * @return The activity result
    * @throws IllegalArgumentException if activity type is not registered
    */
-  public fun execute(activityType: String, args: Array<Any?>): Any? {
+  public fun execute(activityType: String, args: KEncodedValues): Any? {
     val entry = activities[activityType]
       ?: throw IllegalArgumentException(
         "Unknown activity type: $activityType. Known types: ${activities.keys}"
       )
 
+    // Decode arguments using the method's parameter types for type safety
+    val decodedArgs = decodeArguments(entry, args)
+
     return if (entry.isSuspend) {
-      executeSuspend(entry, args)
+      executeSuspend(entry, decodedArgs)
     } else {
-      executeRegular(entry, args)
+      executeRegular(entry, decodedArgs)
+    }
+  }
+
+  /**
+   * Decode arguments using the registered method's parameter types.
+   */
+  private fun decodeArguments(entry: ActivityEntry, args: KEncodedValues): Array<Any?> {
+    val paramTypes = entry.method.parameterTypes
+    // For suspend methods, exclude the Continuation parameter
+    val argCount = if (entry.isSuspend) paramTypes.size - 1 else paramTypes.size
+
+    if (args.size != argCount) {
+      throw IllegalArgumentException(
+        "Expected $argCount arguments but got ${args.size} for method ${entry.method.name}"
+      )
+    }
+
+    return Array(argCount) { index ->
+      args.get(index, paramTypes[index])
     }
   }
 
