@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package io.temporal.kotlin.internal.activity
+package io.temporal.kotlin.testing.internal
 
 import io.temporal.activity.Activity
 import io.temporal.failure.ApplicationFailure
@@ -26,48 +26,45 @@ import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.common.KEncodedValues
 
 /**
- * Dynamic activity handler that routes activity calls to a [KActivityRegistry].
+ * Dynamic activity handler that routes activity calls to a [KTestActivityRegistry].
  *
  * This handler is designed for testing scenarios where activity implementations
  * (including mocks) need to be registered at runtime. It implements [KDynamicActivity]
  * which acts as a catch-all for any activity type not handled by other registrations.
  *
- * Note: For production use, prefer [KWorker.registerActivitiesImplementations] which uses TypedDynamicActivity
- * for better performance and type safety.
- *
  * Usage in tests:
  * ```kotlin
- * val registry = KActivityRegistry()
- * val handler = KDynamicActivityHandler(registry)
+ * val registry = KTestActivityRegistry()
+ * val handler = KTestDynamicActivityHandler(registry)
  * kWorker.registerActivitiesImplementations(handler)
  *
  * // Later, register mock implementations
  * registry.registerMockImplementation(mockActivity)
  * ```
  */
-public class KDynamicActivityHandler(
-  private val registry: KActivityRegistry
+internal class KTestDynamicActivityHandler(
+    private val registry: KTestActivityRegistry,
 ) : KDynamicActivity {
 
-  override fun execute(args: KEncodedValues): Any? {
-    val activityType = Activity.getExecutionContext().info.activityType
+    override fun execute(args: KEncodedValues): Any? {
+        val activityType = Activity.getExecutionContext().info.activityType
 
-    // First check if the activity is registered in the registry
-    if (registry.hasActivity(activityType)) {
-      // Registry handles decoding with proper types from method signature
-      return registry.execute(activityType, args)
+        // First check if the activity is registered in the registry
+        if (registry.hasActivity(activityType)) {
+            // Registry handles decoding with proper types from method signature
+            return registry.execute(activityType, args)
+        }
+
+        // Check if there's a dynamic fallback handler
+        val fallback = registry.dynamicActivityFallback
+        if (fallback != null) {
+            return fallback.execute(args)
+        }
+
+        // No handler found - throw non-retryable failure for fast test feedback
+        throw ApplicationFailure.newNonRetryableFailure(
+            "Unknown activity type: $activityType. Known types: ${registry.getRegisteredTypes()}",
+            "UNKNOWN_ACTIVITY_TYPE",
+        )
     }
-
-    // Check if there's a dynamic fallback handler
-    val fallback = registry.dynamicActivityFallback
-    if (fallback != null) {
-      return fallback.execute(args)
-    }
-
-    // No handler found - throw non-retryable failure for fast test feedback
-    throw ApplicationFailure.newNonRetryableFailure(
-      "Unknown activity type: $activityType. Known types: ${registry.getRegisteredTypes()}",
-      "UNKNOWN_ACTIVITY_TYPE"
-    )
-  }
 }

@@ -26,8 +26,8 @@ import io.temporal.api.enums.v1.IndexedValueType
 import io.temporal.api.nexus.v1.Endpoint
 import io.temporal.client.WorkflowClientOptions
 import io.temporal.kotlin.client.KClient
-import io.temporal.kotlin.internal.activity.KActivityRegistry
 import io.temporal.kotlin.internal.plugin.KotlinPlugin
+import io.temporal.kotlin.testing.internal.KTestActivityRegistry
 import io.temporal.kotlin.toJava
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.serviceclient.OperatorServiceStubs
@@ -76,7 +76,7 @@ import kotlin.time.Duration as KotlinDuration
  */
 public class KTestWorkflowEnvironment private constructor(
     private val testEnvironment: TestWorkflowEnvironment,
-    internal val activityRegistry: KActivityRegistry = KActivityRegistry(),
+    internal val activityRegistry: KTestActivityRegistry = KTestActivityRegistry(),
     private val kotlinPlugin: KotlinPlugin = KotlinPlugin.create(),
 ) : Closeable {
 
@@ -501,7 +501,7 @@ public class KTestWorkflowEnvironment private constructor(
          */
         internal fun create(
             testEnvironment: TestWorkflowEnvironment,
-            activityRegistry: KActivityRegistry,
+            activityRegistry: KTestActivityRegistry,
             kotlinPlugin: KotlinPlugin,
         ): KTestWorkflowEnvironment {
             return KTestWorkflowEnvironment(testEnvironment, activityRegistry, kotlinPlugin)

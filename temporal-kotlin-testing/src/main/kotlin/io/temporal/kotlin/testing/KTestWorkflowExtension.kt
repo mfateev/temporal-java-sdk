@@ -29,10 +29,10 @@ import io.temporal.kotlin.TemporalDsl
 import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.client.KClient
 import io.temporal.kotlin.client.KWorkflowOptions
-import io.temporal.kotlin.internal.activity.KActivityRegistry
-import io.temporal.kotlin.internal.activity.KDynamicActivityHandler
 import io.temporal.kotlin.internal.plugin.KotlinPlugin
 import io.temporal.kotlin.internal.workflow.KotlinWorkflowImplementationFactory
+import io.temporal.kotlin.testing.internal.KTestActivityRegistry
+import io.temporal.kotlin.testing.internal.KTestDynamicActivityHandler
 import io.temporal.kotlin.worker.KWorker
 import io.temporal.kotlin.workflow.KDynamicWorkflow
 import io.temporal.testing.TestWorkflowEnvironment
@@ -215,7 +215,7 @@ public class KTestWorkflowExtension private constructor(
         val javaTestEnv = TestWorkflowEnvironment.newInstance(testEnvOptions)
 
         // Create unified activity registry shared between test environment and worker
-        val activityRegistry = KActivityRegistry()
+        val activityRegistry = KTestActivityRegistry()
         val testEnvironment = createKTestWorkflowEnvironment(javaTestEnv, activityRegistry)
 
         // Generate unique task queue per test
@@ -254,7 +254,7 @@ public class KTestWorkflowExtension private constructor(
 
         // Register the unified dynamic activity handler
         // This single handler routes all Kotlin activity calls through the shared registry
-        val dynamicHandler = KDynamicActivityHandler(activityRegistry)
+        val dynamicHandler = KTestDynamicActivityHandler(activityRegistry)
         kWorker.registerActivitiesImplementations(dynamicHandler)
 
         // Register activities via the unified registry
@@ -353,7 +353,7 @@ public class KTestWorkflowExtension private constructor(
      */
     private fun createKTestWorkflowEnvironment(
         javaTestEnv: TestWorkflowEnvironment,
-        activityRegistry: KActivityRegistry,
+        activityRegistry: KTestActivityRegistry,
     ): KTestWorkflowEnvironment {
         return KTestWorkflowEnvironment.create(javaTestEnv, activityRegistry, KotlinPlugin.create())
     }
