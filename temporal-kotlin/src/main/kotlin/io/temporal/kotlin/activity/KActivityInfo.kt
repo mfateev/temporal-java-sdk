@@ -114,9 +114,7 @@ public interface KActivityInfo {
   public val taskToken: ByteArray
 }
 
-/**
- * Internal implementation of [KActivityInfo] that wraps Java [ActivityInfo].
- */
+// Internal implementation that wraps Java ActivityInfo
 internal class KActivityInfoImpl(private val info: ActivityInfo) : KActivityInfo {
   override val namespace: String get() = info.namespace
   override val workflowId: String get() = info.workflowId

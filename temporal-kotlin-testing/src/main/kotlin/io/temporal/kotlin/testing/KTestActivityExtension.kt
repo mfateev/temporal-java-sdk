@@ -140,13 +140,10 @@ public class KTestActivityExtension private constructor(
 
     /**
      * Creates and configures the test activity environment before each test.
-     *
-     * This method:
-     * 1. Creates a new [TestActivityEnvironment] with configured options
-     * 2. Registers regular activity implementations
-     * 3. Registers suspend activity implementations (wrapped appropriately)
-     * 4. Wraps in [KTestActivityEnvironment] and stores for parameter injection
      */
+    // Implementation: Creates a new TestActivityEnvironment with configured options,
+    // registers activity implementations, wraps in KTestActivityEnvironment, and
+    // stores for parameter injection.
     override fun beforeEach(context: ExtensionContext) {
         // Create Java test activity environment
         val javaEnv = TestActivityEnvironment.newInstance(config.testEnvironmentOptions)

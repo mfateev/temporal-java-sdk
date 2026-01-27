@@ -31,8 +31,6 @@ package io.temporal.kotlin.common
  * For all fields, the field not present or equal to zero/empty string means to inherit the value
  * from the calling workflow, or if there is no calling workflow, then use the default value.
  *
- * This is the Kotlin equivalent of [Priority].
- *
  * Example:
  * ```kotlin
  * val priority = KPriority(

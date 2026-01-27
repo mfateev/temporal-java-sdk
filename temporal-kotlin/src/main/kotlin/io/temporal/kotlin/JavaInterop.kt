@@ -557,8 +557,9 @@ public fun WorkflowImplementationOptions.toKotlin(): KWorkflowImplementationOpti
  * Converts a Kotlin SDK [KWorkflowClientInterceptor] to a Java SDK [WorkflowClientInterceptor].
  *
  * This wraps the Kotlin interceptor for use with the Java SDK, handling the conversion
- * from suspend functions to blocking calls using runBlocking.
+ * from suspend functions to blocking calls.
  */
+// Implementation: Uses runBlocking internally to bridge suspend functions to blocking calls.
 public fun KWorkflowClientInterceptor.toJava(): WorkflowClientInterceptor =
   KWorkflowClientInterceptorJavaWrapper(this)
 
@@ -566,8 +567,9 @@ public fun KWorkflowClientInterceptor.toJava(): WorkflowClientInterceptor =
  * Converts a Java SDK [WorkflowClientInterceptor] to a Kotlin SDK [KWorkflowClientInterceptor].
  *
  * This wraps the Java interceptor for use with the Kotlin SDK, handling the conversion
- * from blocking calls to suspend functions using withContext(Dispatchers.IO).
+ * from blocking calls to suspend functions.
  */
+// Implementation: Uses withContext(Dispatchers.IO) internally to bridge blocking calls to suspend functions.
 public fun WorkflowClientInterceptor.toKotlin(): KWorkflowClientInterceptor =
   WorkflowClientInterceptorKotlinWrapper(this)
 

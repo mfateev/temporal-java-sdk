@@ -29,7 +29,6 @@ import io.temporal.kotlin.internal.activity.SuspendActivityContextWrapper
  * Context object passed to an Activity implementation.
  *
  * Use [KActivityContext.current] from an activity implementation to access.
- * This matches Java SDK's [io.temporal.activity.ActivityExecutionContext] pattern.
  *
  * Example (regular activity):
  * ```kotlin
@@ -67,6 +66,7 @@ import io.temporal.kotlin.internal.activity.SuspendActivityContextWrapper
  * }
  * ```
  */
+// Equivalent to Java SDK's ActivityExecutionContext
 public interface KActivityContext {
 
   public companion object {

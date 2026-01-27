@@ -47,24 +47,18 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.reflect.KClass
 
+/*
+ * Implementation note: This worker uses TypedDynamicActivity wrappers (KotlinActivityWrapper)
+ * to register Kotlin activities with the Java SDK. Each activity method is wrapped individually,
+ * which ensures proper handling of suspend functions, compatibility with test mocking frameworks,
+ * and no conflicts with Java DynamicActivity registrations.
+ */
 /**
  * Kotlin worker that provides idiomatic APIs for registering
  * Kotlin workflows and activities (including suspend activities).
  *
  * Use [worker] property for direct access to the underlying Java Worker
  * when interoperating with Java workflows/activities.
- *
- * ## Activity Registration
- *
- * This worker uses [TypedDynamicActivity][io.temporal.activity.TypedDynamicActivity] wrappers
- * to register Kotlin activities directly with the Java SDK. Each activity method is wrapped
- * in a [KotlinActivityWrapper] that handles both suspend and non-suspend methods.
- *
- * This design ensures:
- * - Proper handling of Kotlin suspend functions
- * - No conflicts with Java DynamicActivity registrations
- * - Compatibility with test mocking frameworks
- * - Full support for activity interceptors
  *
  * Example using KWorkerFactory:
  * ```kotlin
@@ -497,9 +491,7 @@ public class KWorker private constructor(
   /**
    * Register activity implementations.
    *
-   * This method handles both suspend and non-suspend activity methods by wrapping
-   * each method in a [KotlinActivityWrapper] and registering it as a
-   * [TypedDynamicActivity][io.temporal.activity.TypedDynamicActivity] with the Java SDK.
+   * This method handles both suspend and non-suspend activity methods automatically.
    *
    * Example:
    * ```kotlin

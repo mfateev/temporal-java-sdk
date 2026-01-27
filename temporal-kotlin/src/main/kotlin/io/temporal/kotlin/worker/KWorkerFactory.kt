@@ -40,18 +40,16 @@ import kotlin.reflect.KClass
 //  using gRPC async client. This will eliminate thread pool overhead and provide true
 //  non-blocking suspension.
 
+// Implementation note: This factory wraps the Java WorkerFactory with KotlinPlugin pre-configured
+// to enable coroutine support for workflows. The plugin is added automatically during construction.
 /**
  * Kotlin worker factory that automatically enables coroutine support.
- *
- * Wraps [WorkerFactory] with [KotlinPlugin] pre-configured, providing
- * seamless support for Kotlin coroutine-based workflows.
  *
  * Example:
  * ```kotlin
  * val service = WorkflowServiceStubs.newLocalServiceStubs()
  * val client = KClient(service) { setNamespace("default") }
  *
- * // KWorkerFactory automatically enables Kotlin coroutine support
  * val factory = KWorkerFactory(client) {
  *     workerInterceptors = listOf(LoggingInterceptor())
  *     maxWorkflowThreadCount = 800

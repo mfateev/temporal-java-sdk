@@ -156,9 +156,6 @@ public class KTestWorkflowEnvironment private constructor(
     /**
      * The Kotlin workflow client for interacting with workflows.
      *
-     * This property wraps the test environment's WorkflowClient which includes
-     * the TimeLockingInterceptor needed for time skipping.
-     *
      * Example:
      * ```kotlin
      * val result = testEnv.workflowClient.executeWorkflow(
@@ -168,6 +165,8 @@ public class KTestWorkflowEnvironment private constructor(
      * )
      * ```
      */
+    // Implementation: Wraps the test environment's WorkflowClient which includes
+    // the TimeLockingInterceptor needed for time skipping.
     public val workflowClient: KClient by lazy {
         KClient(testEnvironment.workflowClient)
     }

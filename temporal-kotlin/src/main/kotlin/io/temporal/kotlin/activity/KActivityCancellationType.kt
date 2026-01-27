@@ -22,9 +22,8 @@ package io.temporal.kotlin.activity
 
 /**
  * Specifies how an activity's cancellation is handled when its parent workflow or scope is cancelled.
- *
- * This is the Kotlin equivalent of [ActivityCancellationType].
  */
+// Maps to Java SDK's ActivityCancellationType enum
 public enum class KActivityCancellationType {
   /**
    * Wait for the Activity Execution to confirm any requested cancellation.

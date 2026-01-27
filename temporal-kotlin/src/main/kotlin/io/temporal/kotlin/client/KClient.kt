@@ -67,15 +67,13 @@ import kotlin.reflect.KSuspendFunction6
 import kotlin.reflect.KSuspendFunction7
 import kotlin.reflect.jvm.javaMethod
 
-// TODO: Switch from Dispatchers.IO + blocking Java SDK calls to fully async implementation
-//  using gRPC async client. This will eliminate thread pool overhead and provide true
-//  non-blocking suspension.
+// Implementation note: Currently uses Dispatchers.IO + blocking Java SDK calls.
+// TODO: Switch to fully async implementation using gRPC async client for true non-blocking suspension.
 
+// Wraps WorkflowClient from Java SDK with Kotlin-idiomatic suspend APIs.
+// All blocking operations run on Dispatchers.IO to avoid blocking coroutines.
 /**
  * Unified Kotlin client providing suspend functions and type-safe workflow APIs.
- *
- * This class wraps a WorkflowClient and provides Kotlin-idiomatic APIs including
- * suspend functions and type-safe method references.
  *
  * Example using connect (recommended):
  * ```kotlin

@@ -40,7 +40,7 @@ package io.temporal.kotlin.common
  */
 public sealed interface KArgs {
   /**
-   * Returns the arguments as an array for internal use.
+   * Returns the arguments as an array.
    */
   public fun toArray(): Array<Any?>
 }

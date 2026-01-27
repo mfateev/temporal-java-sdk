@@ -166,9 +166,7 @@ public interface KWorkflowInfo {
   public val priority: KPriority
 }
 
-/**
- * Internal implementation of [KWorkflowInfo] that wraps a Java [WorkflowInfo].
- */
+// Internal implementation of KWorkflowInfo that wraps a Java WorkflowInfo.
 internal class KWorkflowInfoImpl(private val javaInfo: WorkflowInfo) : KWorkflowInfo {
 
   override val namespace: String
@@ -241,12 +239,9 @@ internal class KWorkflowInfoImpl(private val javaInfo: WorkflowInfo) : KWorkflow
     get() = javaInfo.priority.toKotlin()
 }
 
-/**
- * Internal implementation of [KWorkflowInfo] that gets data from [KotlinWorkflowContext].
- *
- * This implementation is used for Kotlin coroutine-based workflows and does not rely
- * on Java SDK thread-local context.
- */
+// Internal implementation of KWorkflowInfo that gets data from KotlinWorkflowContext.
+// This implementation is used for Kotlin coroutine-based workflows and does not rely
+// on Java SDK thread-local context.
 @InternalTemporalApi
 internal class KWorkflowInfoFromContext(private val context: KotlinWorkflowContext) : KWorkflowInfo {
 
