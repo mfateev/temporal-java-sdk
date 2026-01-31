@@ -10,19 +10,19 @@ This proposal describes a refactoring to create a minimal `temporal-core` module
 2. **Protobuf-only interface** - Core accepts/returns protobuf types exclusively
 3. **SDK independence** - Each SDK defines its own options, handles, and API patterns
 4. **No shared Options classes** - Eliminates coupling between SDK APIs
-5. **Kotlin SDK independence** - `temporal-kotlin-sdk` has no dependency on Java public API or `temporal-kotlin`
+5. **Kotlin SDK independence** - `temporal-kotlin-sdk-alpha` has no dependency on Java public API or `temporal-kotlin`
 
 ## Module Naming Strategy
 
 | Module | Purpose | Dependencies |
 |--------|---------|--------------|
 | `temporal-kotlin` | **Existing** Kotlin extensions for Java SDK (DSL builders, coroutine adapters) | `temporal-sdk` |
-| `temporal-kotlin-sdk` | **New** independent Kotlin SDK with idiomatic API | `temporal-core` only |
-| `temporal-kotlin-testing` | Test utilities for `temporal-kotlin-sdk` | `temporal-kotlin-sdk`, `temporal-core-testing` |
+| `temporal-kotlin-sdk-alpha` | **New** independent Kotlin SDK with idiomatic API | `temporal-core` only |
+| `temporal-kotlin-testing-alpha` | Test utilities for `temporal-kotlin-sdk-alpha` | `temporal-kotlin-sdk-alpha`, `temporal-core-testing` |
 
-**Key principle**: `temporal-kotlin-sdk` does NOT depend on `temporal-kotlin`. They are independent modules:
+**Key principle**: `temporal-kotlin-sdk-alpha` does NOT depend on `temporal-kotlin`. They are independent modules:
 - Users who want Java SDK with Kotlin conveniences use `temporal-kotlin`
-- Users who want a pure Kotlin SDK use `temporal-kotlin-sdk`
+- Users who want a pure Kotlin SDK use `temporal-kotlin-sdk-alpha`
 - Users can use both if they need interop during migration
 
 ## Architecture
@@ -50,7 +50,7 @@ This proposal describes a refactoring to create a minimal `temporal-core` module
          │                           │                      │
          ▼                           ▼                      ▼
 ┌────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐
-│   temporal-sdk     │  │ temporal-kotlin-sdk  │  │temporal-core-testing│
+│   temporal-sdk     │  │ temporal-kotlin-sdk-alpha  │  │temporal-core-testing│
 │ ┌────────────────┐ │  │ ┌──────────────────┐ │  │ ┌────────────────┐ │
 │ │WorkflowClient  │ │  │ │KClient           │ │  │ │TestEnvironment │ │
 │ │WorkflowStub    │ │  │ │KWorkflowHandle   │ │  │ │Internal        │ │
@@ -63,7 +63,7 @@ This proposal describes a refactoring to create a minimal `temporal-core` module
          │                       │                         │
          ▼                       ▼                         │
 ┌────────────────────┐  ┌────────────────────────┐         │
-│  temporal-kotlin   │  │temporal-kotlin-testing │◄────────┘
+│  temporal-kotlin   │  │temporal-kotlin-testing-alpha │◄────────┘
 │ ┌────────────────┐ │  │ ┌────────────────────┐ │
 │ │DSL Builders    │ │  │ │KTestWorkflow       │ │
 │ │Coroutine ext.  │ │  │ │Environment         │ │
@@ -306,7 +306,7 @@ final class WorkflowOptionsProtoConverter {
 }
 ```
 
-### Kotlin SDK (temporal-kotlin-sdk)
+### Kotlin SDK (temporal-kotlin-sdk-alpha)
 
 ```kotlin
 package io.temporal.kotlinsdk.client
@@ -466,7 +466,7 @@ internal object KProtoConverters {
 
 ### Phase 4: Create New Kotlin SDK Module
 
-1. Create new `temporal-kotlin-sdk` module (separate from existing `temporal-kotlin`)
+1. Create new `temporal-kotlin-sdk-alpha` module (separate from existing `temporal-kotlin`)
 2. Depend ONLY on `temporal-core` (not `temporal-sdk` or `temporal-kotlin`)
 3. Add Kotlin annotations (`@KWorkflowInterface`, `@KWorkflowMethod`, etc.)
 4. Create `KWorkflowMetadata` and `KActivityMetadata` for annotation processing
@@ -478,8 +478,8 @@ internal object KProtoConverters {
 
 ### Phase 5: Create Kotlin Testing Module
 
-1. Create `temporal-kotlin-testing` module
-2. Depend on `temporal-kotlin-sdk` (NOT `temporal-kotlin`)
+1. Create `temporal-kotlin-testing-alpha` module
+2. Depend on `temporal-kotlin-sdk-alpha` (NOT `temporal-kotlin`)
 3. Implement `KTestWorkflowEnvironment`
 4. Implement `KTestWorkflowExtension` (JUnit 5)
 5. Optionally implement `KTestWorkflowRule` (JUnit 4)
@@ -492,10 +492,10 @@ internal object KProtoConverters {
 
 ### Phase 7: Clean Up and Documentation
 
-1. Verify `temporal-kotlin-sdk` has NO imports from `io.temporal.client`, `io.temporal.workflow`, etc.
-2. Verify `temporal-kotlin-sdk` does NOT depend on `temporal-kotlin`
+1. Verify `temporal-kotlin-sdk-alpha` has NO imports from `io.temporal.client`, `io.temporal.workflow`, etc.
+2. Verify `temporal-kotlin-sdk-alpha` does NOT depend on `temporal-kotlin`
 3. Update documentation to explain the two Kotlin module options
-4. Provide migration guide for users moving from `temporal-kotlin` to `temporal-kotlin-sdk`
+4. Provide migration guide for users moving from `temporal-kotlin` to `temporal-kotlin-sdk-alpha`
 
 ## Module Dependencies
 
@@ -508,14 +508,14 @@ temporal-serviceclient (gRPC, protobuf)
          │
     ┌────┴─────────┬─────────────────────┐
     ▼              ▼                     ▼
-temporal-sdk   temporal-kotlin-sdk   temporal-core-testing
+temporal-sdk   temporal-kotlin-sdk-alpha   temporal-core-testing
 (depends on:   (depends on:          (depends on:
  temporal-core) temporal-core ONLY)   temporal-core)
     │              │                     │
     ▼              ▼                     │
-temporal-kotlin temporal-kotlin-testing ◄┘
+temporal-kotlin temporal-kotlin-testing-alpha ◄┘
 (depends on:    (depends on:
- temporal-sdk)   temporal-kotlin-sdk,
+ temporal-sdk)   temporal-kotlin-sdk-alpha,
     │            temporal-core-testing)
     ▼
 temporal-testing
@@ -532,16 +532,16 @@ temporal-serviceclient
 │   ├── temporal-sdk (Java public API)
 │   │   ├── temporal-kotlin (Kotlin extensions for Java SDK)
 │   │   └── temporal-testing (Java test utilities)
-│   ├── temporal-kotlin-sdk (Independent Kotlin SDK - NO dependency on temporal-kotlin!)
-│   │   └── temporal-kotlin-testing (Kotlin SDK test utilities)
+│   ├── temporal-kotlin-sdk-alpha (Independent Kotlin SDK - NO dependency on temporal-kotlin!)
+│   │   └── temporal-kotlin-testing-alpha (Kotlin SDK test utilities)
 │   └── temporal-core-testing (Shared test infrastructure)
 │       ├── temporal-testing
-│       └── temporal-kotlin-testing
+│       └── temporal-kotlin-testing-alpha
 ```
 
 ### Independence Guarantee
 
-**Critical**: `temporal-kotlin-sdk` MUST NOT depend on:
+**Critical**: `temporal-kotlin-sdk-alpha` MUST NOT depend on:
 - `temporal-sdk` (Java SDK)
 - `temporal-kotlin` (Java SDK extensions)
 - Any `io.temporal.client.*`, `io.temporal.workflow.*`, `io.temporal.activity.*` packages
@@ -557,8 +557,8 @@ This ensures users can use the pure Kotlin SDK without pulling in the Java SDK.
 | temporal-sdk | ~2,000-3,000 | WorkflowClient, WorkerFactory, Worker, stubs, options, annotations, interceptors |
 | temporal-testing | ~800-1,200 | TestWorkflowEnvironment, JUnit rules/extensions |
 | temporal-kotlin | ~500-800 | DSL builders, coroutine extensions for Java SDK (existing, unchanged) |
-| temporal-kotlin-sdk | ~1,500-2,000 | KClient, KWorkerFactory, KWorker, handles, annotations, interceptors, options → protobuf conversion |
-| temporal-kotlin-testing | ~400-600 | KTestWorkflowEnvironment, JUnit 5 extension |
+| temporal-kotlin-sdk-alpha | ~1,500-2,000 | KClient, KWorkerFactory, KWorker, handles, annotations, interceptors, options → protobuf conversion |
+| temporal-kotlin-testing-alpha | ~400-600 | KTestWorkflowEnvironment, JUnit 5 extension |
 
 ## Benefits
 
@@ -1639,12 +1639,12 @@ internal class KWorkflowClientInterceptorJavaWrapper(
 
 These converters allow using Java interceptors in Kotlin and vice versa during migration.
 
-## Testing Module: temporal-kotlin-testing
+## Testing Module: temporal-kotlin-testing-alpha
 
 ### Module Structure
 
 ```
-temporal-kotlin-testing/
+temporal-kotlin-testing-alpha/
 ├── src/main/kotlin/io/temporal/kotlin/testing/
 │   ├── KTestWorkflowEnvironment.kt
 │   ├── KTestWorkflowExtension.kt      # JUnit 5 extension
@@ -1658,7 +1658,7 @@ temporal-kotlin-testing/
 ### Dependencies
 
 ```kotlin
-// temporal-kotlin-testing/build.gradle.kts
+// temporal-kotlin-testing-alpha/build.gradle.kts
 dependencies {
     api(project(":temporal-kotlin"))
     api(project(":temporal-core-testing"))  // New core testing module

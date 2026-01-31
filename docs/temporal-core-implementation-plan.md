@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a detailed implementation plan for the temporal-core refactoring described in `temporal-core-protobuf-api-proposal.md`. The goal is to create a minimal `temporal-core` module and an independent `temporal-kotlin-sdk`.
+This document provides a detailed implementation plan for the temporal-core refactoring described in `temporal-core-protobuf-api-proposal.md`. The goal is to create a minimal `temporal-core` module and an independent `temporal-kotlin-sdk-alpha`.
 
 ## Prerequisites
 
@@ -621,14 +621,14 @@ Refactor `TestWorkflowEnvironment` to use `TestEnvironmentInternal`.
 
 ---
 
-## Phase 4: Create temporal-kotlin-sdk Module
+## Phase 4: Create temporal-kotlin-sdk-alpha Module
 
 **Goal**: Create independent Kotlin SDK with no Java SDK dependency.
 
 ### Task 4.1: Create Module Structure
 
 ```
-temporal-kotlin-sdk/
+temporal-kotlin-sdk-alpha/
 ├── build.gradle.kts
 ├── src/main/kotlin/io/temporal/kotlinsdk/
 │   ├── client/
@@ -1020,7 +1020,7 @@ internal class KActivityContextImpl(
 **Validation script**:
 ```bash
 #!/bin/bash
-# Check for forbidden imports in temporal-kotlin-sdk
+# Check for forbidden imports in temporal-kotlin-sdk-alpha
 
 FORBIDDEN_PATTERNS=(
     "import io.temporal.client\."
@@ -1032,7 +1032,7 @@ FORBIDDEN_PATTERNS=(
 )
 
 for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
-    if grep -r "$pattern" temporal-kotlin-sdk/src/main/kotlin/; then
+    if grep -r "$pattern" temporal-kotlin-sdk-alpha/src/main/kotlin/; then
         echo "ERROR: Found forbidden import pattern: $pattern"
         exit 1
     fi
@@ -1045,7 +1045,7 @@ echo "OK: No forbidden imports found"
 
 ### Phase 4 Completion Criteria
 
-- [ ] `temporal-kotlin-sdk` module compiles successfully
+- [ ] `temporal-kotlin-sdk-alpha` module compiles successfully
 - [ ] All lint checks pass (ktlint)
 - [ ] NO imports from `io.temporal.client.*`, `io.temporal.workflow.*`, etc.
 - [ ] NO dependency on `temporal-sdk` or `temporal-kotlin`
@@ -1053,17 +1053,17 @@ echo "OK: No forbidden imports found"
 - [ ] KClient can start/signal/query workflows
 - [ ] KWorker can execute workflows and activities
 - [ ] ALL tests for equivalent functionality written and pass
-- [ ] `./gradlew :temporal-kotlin-sdk:build :temporal-kotlin-sdk:test` succeeds
+- [ ] `./gradlew :temporal-kotlin-sdk-alpha:build :temporal-kotlin-sdk-alpha:test` succeeds
 - [ ] Import checker script passes (no forbidden imports)
 
 ---
 
-## Phase 5: Create temporal-kotlin-testing Module
+## Phase 5: Create temporal-kotlin-testing-alpha Module
 
 ### Task 5.1: Create Module Structure
 
 ```
-temporal-kotlin-testing/
+temporal-kotlin-testing-alpha/
 ├── build.gradle.kts
 ├── src/main/kotlin/io/temporal/kotlinsdk/testing/
 │   ├── KTestWorkflowEnvironment.kt
@@ -1075,7 +1075,7 @@ temporal-kotlin-testing/
 **Dependencies**:
 ```kotlin
 dependencies {
-    api(project(":temporal-kotlin-sdk"))
+    api(project(":temporal-kotlin-sdk-alpha"))
     api(project(":temporal-core-testing"))
 
     compileOnly("org.junit.jupiter:junit-jupiter-api:5.10.0")
@@ -1153,12 +1153,12 @@ class KTestWorkflowExtension(
 
 ### Phase 5 Completion Criteria
 
-- [ ] `temporal-kotlin-testing` module compiles successfully
+- [ ] `temporal-kotlin-testing-alpha` module compiles successfully
 - [ ] All lint checks pass (ktlint)
 - [ ] ALL unit tests pass (zero tests deleted/disabled)
 - [ ] Can run workflow tests with time skipping
 - [ ] JUnit 5 extension works
-- [ ] `./gradlew :temporal-kotlin-testing:build :temporal-kotlin-testing:test` succeeds
+- [ ] `./gradlew :temporal-kotlin-testing-alpha:build :temporal-kotlin-testing-alpha:test` succeeds
 
 ---
 
@@ -1176,7 +1176,7 @@ class KTestWorkflowExtension(
 
 Add documentation explaining the two Kotlin options:
 - `temporal-kotlin` for Java SDK users who want Kotlin conveniences
-- `temporal-kotlin-sdk` for pure Kotlin SDK experience
+- `temporal-kotlin-sdk-alpha` for pure Kotlin SDK experience
 
 ---
 
@@ -1194,8 +1194,8 @@ All modules must pass:
 - temporal-sdk
 - temporal-testing
 - temporal-kotlin
-- temporal-kotlin-sdk
-- temporal-kotlin-testing
+- temporal-kotlin-sdk-alpha
+- temporal-kotlin-testing-alpha
 
 **Test Count Verification**:
 ```bash
@@ -1217,7 +1217,7 @@ diff original_test_count.txt new_test_count.txt
 
 ### Task 7.2: Verify Independence
 
-Run the forbidden import check on `temporal-kotlin-sdk`:
+Run the forbidden import check on `temporal-kotlin-sdk-alpha`:
 - No `io.temporal.client.*`
 - No `io.temporal.workflow.*`
 - No `io.temporal.activity.*`
@@ -1229,7 +1229,7 @@ Run the forbidden import check on `temporal-kotlin-sdk`:
 ### Task 7.3: Create Migration Guide
 
 Document:
-1. How to migrate from `temporal-kotlin` to `temporal-kotlin-sdk`
+1. How to migrate from `temporal-kotlin` to `temporal-kotlin-sdk-alpha`
 2. Annotation mapping (`@WorkflowInterface` → `@KWorkflowInterface`)
 3. Type mapping (`WorkflowOptions` → `KWorkflowOptions`)
 4. API differences
@@ -1240,7 +1240,7 @@ Document:
 
 - Update main README with new module structure
 - Add Kotlin SDK quickstart guide
-- Document when to use `temporal-kotlin` vs `temporal-kotlin-sdk`
+- Document when to use `temporal-kotlin` vs `temporal-kotlin-sdk-alpha`
 
 ---
 
@@ -1275,6 +1275,6 @@ Document:
 4. temporal-sdk (refactored)
 5. temporal-testing (refactored)
 6. temporal-kotlin (unchanged)
-7. temporal-kotlin-sdk (new)
-8. temporal-kotlin-testing (new)
+7. temporal-kotlin-sdk-alpha (new)
+8. temporal-kotlin-testing-alpha (new)
 ```
