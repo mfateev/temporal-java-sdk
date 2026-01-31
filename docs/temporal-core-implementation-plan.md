@@ -15,6 +15,63 @@ Before starting implementation:
 
 ---
 
+## Mandatory Requirements for Every Phase
+
+**CRITICAL**: The following requirements are NON-NEGOTIABLE for each phase:
+
+### 1. Compilation
+- All modules MUST compile successfully after each task
+- No `@Suppress` annotations to hide compilation errors
+- No commented-out code to bypass compilation issues
+
+### 2. Linting
+- All code MUST pass lint checks (ktlint for Kotlin, checkstyle for Java)
+- No suppression of lint rules to bypass issues
+- Code style must be consistent with existing codebase
+
+### 3. Unit Test Policy
+
+**ABSOLUTELY NO TEST DELETION OR DISABLING**
+
+- Every single existing unit test MUST continue to pass
+- You are NOT allowed to:
+  - Delete any test
+  - Disable any test with `@Disabled`, `@Ignore`, or similar annotations
+  - Comment out any test
+  - Change test assertions to make failing tests pass
+  - Skip tests in build configuration
+- When moving code to a new module:
+  - The corresponding tests MUST be moved with the code
+  - Tests must pass in the new location
+  - Original tests may be converted to integration tests if they now test across module boundaries
+
+### 4. Phase Gate Checklist
+
+Before marking ANY phase as complete, verify:
+
+```bash
+# Must all succeed
+./gradlew clean build                    # Compilation
+./gradlew check                          # Linting
+./gradlew test                           # Unit tests
+./gradlew integrationTest                # Integration tests (if applicable)
+
+# Verify test count hasn't decreased
+./gradlew test --info | grep "tests found"
+```
+
+### 5. Test Migration Tracking
+
+Maintain a spreadsheet/document tracking:
+| Original Test Class | Original Module | New Module | Status |
+|---------------------|-----------------|------------|--------|
+| GenericWorkflowClientTest | temporal-sdk | temporal-core | Migrated ✓ |
+| ... | ... | ... | ... |
+
+Every test must be accounted for. The total test count across all modules must be >= the original count.
+
+---
+
 ## Phase 1: Extract Core Module
 
 **Goal**: Create `temporal-core` module with protobuf-only interfaces.
@@ -368,10 +425,13 @@ public interface CoreWorkflowInfo {
 
 ### Phase 1 Completion Criteria
 
-- [ ] `temporal-core` module builds independently
+- [ ] `temporal-core` module compiles successfully
+- [ ] All lint checks pass for `temporal-core`
+- [ ] ALL unit tests for moved classes are migrated and pass (zero tests deleted/disabled)
 - [ ] All moved classes have no imports from `io.temporal.client.*`, `io.temporal.workflow.*`, `io.temporal.activity.*`
-- [ ] Unit tests for core classes pass
 - [ ] No circular dependencies between core and SDK
+- [ ] `./gradlew :temporal-core:build :temporal-core:test` succeeds
+- [ ] Test count verification: all original tests accounted for
 
 ---
 
@@ -427,9 +487,12 @@ public interface TestEnvironmentInternal extends AutoCloseable {
 
 ### Phase 2 Completion Criteria
 
-- [ ] `temporal-core-testing` module builds
+- [ ] `temporal-core-testing` module compiles successfully
+- [ ] All lint checks pass
+- [ ] ALL unit tests for testing infrastructure migrated and pass (zero tests deleted/disabled)
 - [ ] Can create test environment without SDK dependency
 - [ ] Time skipping works
+- [ ] `./gradlew :temporal-core-testing:build :temporal-core-testing:test` succeeds
 
 ---
 
@@ -548,10 +611,13 @@ Refactor `TestWorkflowEnvironment` to use `TestEnvironmentInternal`.
 
 ### Phase 3 Completion Criteria
 
-- [ ] Java SDK depends on `temporal-core`
+- [ ] Java SDK compiles successfully with `temporal-core` dependency
+- [ ] All lint checks pass
+- [ ] ALL existing Java SDK tests pass (zero tests deleted/disabled)
 - [ ] All existing public APIs unchanged
-- [ ] All existing tests pass
 - [ ] No breaking changes for users
+- [ ] `./gradlew :temporal-sdk:build :temporal-sdk:test :temporal-testing:build :temporal-testing:test` succeeds
+- [ ] Test count >= original test count
 
 ---
 
@@ -979,13 +1045,16 @@ echo "OK: No forbidden imports found"
 
 ### Phase 4 Completion Criteria
 
-- [ ] `temporal-kotlin-sdk` module builds
+- [ ] `temporal-kotlin-sdk` module compiles successfully
+- [ ] All lint checks pass (ktlint)
 - [ ] NO imports from `io.temporal.client.*`, `io.temporal.workflow.*`, etc.
 - [ ] NO dependency on `temporal-sdk` or `temporal-kotlin`
 - [ ] All Kotlin annotations defined and working
 - [ ] KClient can start/signal/query workflows
 - [ ] KWorker can execute workflows and activities
-- [ ] Integration tests pass
+- [ ] ALL tests for equivalent functionality written and pass
+- [ ] `./gradlew :temporal-kotlin-sdk:build :temporal-kotlin-sdk:test` succeeds
+- [ ] Import checker script passes (no forbidden imports)
 
 ---
 
@@ -1084,9 +1153,12 @@ class KTestWorkflowExtension(
 
 ### Phase 5 Completion Criteria
 
-- [ ] `temporal-kotlin-testing` module builds
+- [ ] `temporal-kotlin-testing` module compiles successfully
+- [ ] All lint checks pass (ktlint)
+- [ ] ALL unit tests pass (zero tests deleted/disabled)
 - [ ] Can run workflow tests with time skipping
 - [ ] JUnit 5 extension works
+- [ ] `./gradlew :temporal-kotlin-testing:build :temporal-kotlin-testing:test` succeeds
 
 ---
 
@@ -1124,6 +1196,22 @@ All modules must pass:
 - temporal-kotlin
 - temporal-kotlin-sdk
 - temporal-kotlin-testing
+
+**Test Count Verification**:
+```bash
+# Record original test count before refactoring
+./gradlew test --info 2>&1 | grep -E "tests found|tests executed" > original_test_count.txt
+
+# After refactoring, verify count hasn't decreased
+./gradlew test --info 2>&1 | grep -E "tests found|tests executed" > new_test_count.txt
+
+# Compare - new count must be >= original
+diff original_test_count.txt new_test_count.txt
+```
+
+**REMINDER**: Zero tests may be deleted or disabled. Every original test must either:
+1. Pass in its original location, OR
+2. Be migrated to a new module and pass there
 
 ---
 
