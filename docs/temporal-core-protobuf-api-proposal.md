@@ -10,7 +10,20 @@ This proposal describes a refactoring to create a minimal `temporal-core` module
 2. **Protobuf-only interface** - Core accepts/returns protobuf types exclusively
 3. **SDK independence** - Each SDK defines its own options, handles, and API patterns
 4. **No shared Options classes** - Eliminates coupling between SDK APIs
-5. **Kotlin module independence** - `temporal-kotlin` has no dependency on Java public API
+5. **Kotlin SDK independence** - `temporal-kotlin-sdk` has no dependency on Java public API or `temporal-kotlin`
+
+## Module Naming Strategy
+
+| Module | Purpose | Dependencies |
+|--------|---------|--------------|
+| `temporal-kotlin` | **Existing** Kotlin extensions for Java SDK (DSL builders, coroutine adapters) | `temporal-sdk` |
+| `temporal-kotlin-sdk` | **New** independent Kotlin SDK with idiomatic API | `temporal-core` only |
+| `temporal-kotlin-testing` | Test utilities for `temporal-kotlin-sdk` | `temporal-kotlin-sdk`, `temporal-core-testing` |
+
+**Key principle**: `temporal-kotlin-sdk` does NOT depend on `temporal-kotlin`. They are independent modules:
+- Users who want Java SDK with Kotlin conveniences use `temporal-kotlin`
+- Users who want a pure Kotlin SDK use `temporal-kotlin-sdk`
+- Users can use both if they need interop during migration
 
 ## Architecture
 
@@ -36,27 +49,38 @@ This proposal describes a refactoring to create a minimal `temporal-core` module
 └─────────────────────────────────────────────────────────────────┘
          │                           │                      │
          ▼                           ▼                      ▼
-┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
-│   temporal-sdk     │  │  temporal-kotlin   │  │temporal-core-testing│
-│ ┌────────────────┐ │  │ ┌────────────────┐ │  │ ┌────────────────┐ │
-│ │WorkflowClient  │ │  │ │KClient         │ │  │ │TestEnvironment │ │
-│ │WorkflowStub    │ │  │ │KWorkflowHandle │ │  │ │Internal        │ │
-│ │Worker/Factory  │ │  │ │KWorker/Factory │ │  │ │(in-memory srv) │ │
-│ │@WorkflowMethod │ │  │ │@KWorkflowMethod│ │  │ └────────────────┘ │
-│ │Interceptors    │ │  │ │KInterceptors   │ │  └────────────────────┘
-│ └────────────────┘ │  │ └────────────────┘ │           │
-│(stub-based, Java)  │  │(suspend, Kotlin)   │           │
-└────────────────────┘  └────────────────────┘           │
-         │                       │                       │
-         ▼                       ▼                       │
-┌────────────────────┐  ┌────────────────────────┐       │
-│ temporal-testing   │  │temporal-kotlin-testing │◄──────┘
+┌────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐
+│   temporal-sdk     │  │ temporal-kotlin-sdk  │  │temporal-core-testing│
+│ ┌────────────────┐ │  │ ┌──────────────────┐ │  │ ┌────────────────┐ │
+│ │WorkflowClient  │ │  │ │KClient           │ │  │ │TestEnvironment │ │
+│ │WorkflowStub    │ │  │ │KWorkflowHandle   │ │  │ │Internal        │ │
+│ │Worker/Factory  │ │  │ │KWorker/Factory   │ │  │ │(in-memory srv) │ │
+│ │@WorkflowMethod │ │  │ │@KWorkflowMethod  │ │  │ └────────────────┘ │
+│ │Interceptors    │ │  │ │KInterceptors     │ │  └────────────────────┘
+│ └────────────────┘ │  │ └──────────────────┘ │           │
+│(stub-based, Java)  │  │(suspend, pure Kotlin)│           │
+└────────────────────┘  └──────────────────────┘           │
+         │                       │                         │
+         ▼                       ▼                         │
+┌────────────────────┐  ┌────────────────────────┐         │
+│  temporal-kotlin   │  │temporal-kotlin-testing │◄────────┘
 │ ┌────────────────┐ │  │ ┌────────────────────┐ │
-│ │TestWorkflow    │ │  │ │KTestWorkflow       │ │
-│ │Environment     │ │  │ │Environment         │ │
-│ │JUnit Rule      │ │  │ │JUnit5 Extension    │ │
+│ │DSL Builders    │ │  │ │KTestWorkflow       │ │
+│ │Coroutine ext.  │ │  │ │Environment         │ │
+│ │Java SDK helpers│ │  │ │JUnit5 Extension    │ │
 │ └────────────────┘ │  │ └────────────────────┘ │
-└────────────────────┘  └────────────────────────┘
+│(extensions on Java)│  └────────────────────────┘
+└────────────────────┘
+         │
+         ▼
+┌────────────────────┐
+│ temporal-testing   │
+│ ┌────────────────┐ │
+│ │TestWorkflow    │ │
+│ │Environment     │ │
+│ │JUnit Rule      │ │
+│ └────────────────┘ │
+└────────────────────┘
 ```
 
 ## What Lives in temporal-core
@@ -282,10 +306,10 @@ final class WorkflowOptionsProtoConverter {
 }
 ```
 
-### Kotlin SDK (temporal-kotlin)
+### Kotlin SDK (temporal-kotlin-sdk)
 
 ```kotlin
-package io.temporal.kotlin.client
+package io.temporal.kotlinsdk.client
 
 // Pure data class - no conversion logic
 data class KWorkflowOptions(
@@ -344,7 +368,7 @@ class KWorkflowHandle<R>(
 ```
 
 ```kotlin
-package io.temporal.kotlin.internal.converters
+package io.temporal.kotlinsdk.internal.converters
 
 // Internal converter - keeps options classes clean
 internal object KProtoConverters {
@@ -440,30 +464,38 @@ internal object KProtoConverters {
 6. Remove duplicated internal classes now in core
 7. Update `temporal-testing` to depend on `temporal-core-testing`
 
-### Phase 4: Update Kotlin SDK
+### Phase 4: Create New Kotlin SDK Module
 
-1. Change dependency from `temporal-sdk` to `temporal-core`
-2. Add Kotlin annotations (`@KWorkflowInterface`, `@KWorkflowMethod`, etc.)
-3. Create `KWorkflowMetadata` and `KActivityMetadata` for annotation processing
-4. Remove all imports from `io.temporal.client`, `io.temporal.workflow`, etc.
-5. Implement direct proto conversion in Kotlin options classes
-6. Update `KClient` to use `GenericWorkflowClient` directly
-7. Update `KWorkerFactory`/`KWorker` to wrap core internal classes
-8. Implement `KScheduleProtoUtil` for schedule conversions
+1. Create new `temporal-kotlin-sdk` module (separate from existing `temporal-kotlin`)
+2. Depend ONLY on `temporal-core` (not `temporal-sdk` or `temporal-kotlin`)
+3. Add Kotlin annotations (`@KWorkflowInterface`, `@KWorkflowMethod`, etc.)
+4. Create `KWorkflowMetadata` and `KActivityMetadata` for annotation processing
+5. Implement all Kotlin types (`KClient`, `KWorker`, `KWorkflowOptions`, etc.)
+6. Implement direct proto conversion in Kotlin options classes
+7. Use `GenericWorkflowClient` and `GenericScheduleClient` directly
+8. Wrap `WorkerFactoryInternal`/`WorkerInternal` from core
+9. Implement `KScheduleProtoUtil` for schedule conversions
 
 ### Phase 5: Create Kotlin Testing Module
 
 1. Create `temporal-kotlin-testing` module
-2. Implement `KTestWorkflowEnvironment`
-3. Implement `KTestWorkflowExtension` (JUnit 5)
-4. Optionally implement `KTestWorkflowRule` (JUnit 4)
+2. Depend on `temporal-kotlin-sdk` (NOT `temporal-kotlin`)
+3. Implement `KTestWorkflowEnvironment`
+4. Implement `KTestWorkflowExtension` (JUnit 5)
+5. Optionally implement `KTestWorkflowRule` (JUnit 4)
 
-### Phase 6: Clean Up
+### Phase 6: Keep Existing temporal-kotlin
 
-1. Remove any remaining cross-SDK dependencies
-2. Verify each SDK can be built independently with only `temporal-core`
-3. Update documentation
-4. Remove deprecated Java-to-Kotlin converter utilities that are no longer needed
+1. Keep `temporal-kotlin` as-is for users who want Java SDK with Kotlin extensions
+2. `temporal-kotlin` continues to depend on `temporal-sdk`
+3. No changes required - provides DSL builders and coroutine adapters for Java SDK
+
+### Phase 7: Clean Up and Documentation
+
+1. Verify `temporal-kotlin-sdk` has NO imports from `io.temporal.client`, `io.temporal.workflow`, etc.
+2. Verify `temporal-kotlin-sdk` does NOT depend on `temporal-kotlin`
+3. Update documentation to explain the two Kotlin module options
+4. Provide migration guide for users moving from `temporal-kotlin` to `temporal-kotlin-sdk`
 
 ## Module Dependencies
 
@@ -474,18 +506,22 @@ temporal-serviceclient (gRPC, protobuf)
     temporal-core
     (depends on: temporal-serviceclient)
          │
-    ┌────┴────┬─────────────────────┐
-    ▼         ▼                     ▼
-temporal-sdk  temporal-kotlin   temporal-core-testing
-(depends on:  (depends on:      (depends on:
- temporal-core) temporal-core)   temporal-core)
-    │              │                 │
-    ▼              ▼                 │
-temporal-testing  temporal-kotlin-testing ◄─┘
-(depends on:      (depends on:
- temporal-sdk,     temporal-kotlin,
- temporal-core-    temporal-core-testing)
- testing)
+    ┌────┴─────────┬─────────────────────┐
+    ▼              ▼                     ▼
+temporal-sdk   temporal-kotlin-sdk   temporal-core-testing
+(depends on:   (depends on:          (depends on:
+ temporal-core) temporal-core ONLY)   temporal-core)
+    │              │                     │
+    ▼              ▼                     │
+temporal-kotlin temporal-kotlin-testing ◄┘
+(depends on:    (depends on:
+ temporal-sdk)   temporal-kotlin-sdk,
+    │            temporal-core-testing)
+    ▼
+temporal-testing
+(depends on:
+ temporal-sdk,
+ temporal-core-testing)
 ```
 
 ### Full Dependency Tree
@@ -494,13 +530,23 @@ temporal-testing  temporal-kotlin-testing ◄─┘
 temporal-serviceclient
 ├── temporal-core
 │   ├── temporal-sdk (Java public API)
+│   │   ├── temporal-kotlin (Kotlin extensions for Java SDK)
 │   │   └── temporal-testing (Java test utilities)
-│   ├── temporal-kotlin (Kotlin public API)
-│   │   └── temporal-kotlin-testing (Kotlin test utilities)
+│   ├── temporal-kotlin-sdk (Independent Kotlin SDK - NO dependency on temporal-kotlin!)
+│   │   └── temporal-kotlin-testing (Kotlin SDK test utilities)
 │   └── temporal-core-testing (Shared test infrastructure)
 │       ├── temporal-testing
 │       └── temporal-kotlin-testing
 ```
+
+### Independence Guarantee
+
+**Critical**: `temporal-kotlin-sdk` MUST NOT depend on:
+- `temporal-sdk` (Java SDK)
+- `temporal-kotlin` (Java SDK extensions)
+- Any `io.temporal.client.*`, `io.temporal.workflow.*`, `io.temporal.activity.*` packages
+
+This ensures users can use the pure Kotlin SDK without pulling in the Java SDK.
 
 ## Code Size Estimates
 
@@ -510,7 +556,8 @@ temporal-serviceclient
 | temporal-core-testing | ~500-800 | TestEnvironmentInternal, in-memory server integration |
 | temporal-sdk | ~2,000-3,000 | WorkflowClient, WorkerFactory, Worker, stubs, options, annotations, interceptors |
 | temporal-testing | ~800-1,200 | TestWorkflowEnvironment, JUnit rules/extensions |
-| temporal-kotlin | ~1,500-2,000 | KClient, KWorkerFactory, KWorker, handles, annotations, interceptors, options → protobuf conversion |
+| temporal-kotlin | ~500-800 | DSL builders, coroutine extensions for Java SDK (existing, unchanged) |
+| temporal-kotlin-sdk | ~1,500-2,000 | KClient, KWorkerFactory, KWorker, handles, annotations, interceptors, options → protobuf conversion |
 | temporal-kotlin-testing | ~400-600 | KTestWorkflowEnvironment, JUnit 5 extension |
 
 ## Benefits
@@ -830,7 +877,7 @@ public final class Workflow {
 ```
 
 ```kotlin
-package io.temporal.kotlin.workflow
+package io.temporal.kotlinsdk.workflow
 
 // Kotlin SDK - uses suspend functions and coroutines
 object KWorkflow {
@@ -979,7 +1026,7 @@ public interface ActivityExecutionContext extends CoreActivityContext {
 
 Kotlin SDK:
 ```kotlin
-package io.temporal.kotlin.activity
+package io.temporal.kotlinsdk.activity
 
 interface KActivityContext {
     val info: KActivityInfo
@@ -1120,7 +1167,7 @@ The Kotlin SDK can replicate this conversion directly. Key observations:
 #### Proposed Kotlin Implementation
 
 ```kotlin
-package io.temporal.kotlin.internal.converters
+package io.temporal.kotlinsdk.internal.converters
 
 internal object KScheduleProtoUtil {
 
@@ -1326,7 +1373,7 @@ public final class WorkerFactory {
 #### Kotlin SDK
 
 ```kotlin
-package io.temporal.kotlin.worker
+package io.temporal.kotlinsdk.worker
 
 class KWorkerFactory private constructor(
     private val internal: WorkerFactoryInternal,
@@ -1390,7 +1437,7 @@ The Kotlin SDK currently imports Java annotations (`@WorkflowInterface`, `@Workf
 ### Kotlin Annotation Definitions
 
 ```kotlin
-package io.temporal.kotlin.workflow
+package io.temporal.kotlinsdk.workflow
 
 /**
  * Marks an interface as a Temporal workflow definition.
@@ -1451,7 +1498,7 @@ annotation class KUpdateValidatorMethod(
 ```
 
 ```kotlin
-package io.temporal.kotlin.activity
+package io.temporal.kotlinsdk.activity
 
 /**
  * Marks an interface as a Temporal activity definition.
@@ -1479,7 +1526,7 @@ annotation class KActivityMethod(
 The Kotlin SDK needs metadata extraction similar to Java's `POJOWorkflowInterfaceMetadata` and `POJOActivityInterfaceMetadata`:
 
 ```kotlin
-package io.temporal.kotlin.internal.metadata
+package io.temporal.kotlinsdk.internal.metadata
 
 internal object KWorkflowMetadata {
     fun getWorkflowType(workflowInterface: KClass<*>): String {
@@ -1649,7 +1696,7 @@ public interface TestEnvironmentInternal {
 ### Kotlin Test Environment
 
 ```kotlin
-package io.temporal.kotlin.testing
+package io.temporal.kotlinsdk.testing
 
 /**
  * Test environment for Kotlin workflows and activities.
@@ -1733,7 +1780,7 @@ data class KTestWorkflowEnvironmentOptions(
 ### JUnit 5 Extension
 
 ```kotlin
-package io.temporal.kotlin.testing
+package io.temporal.kotlinsdk.testing
 
 import org.junit.jupiter.api.extension.*
 
