@@ -2,11 +2,13 @@ package io.temporal.common.converter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Defaults;
+import com.google.common.base.Preconditions;
 import com.google.common.reflect.TypeToken;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.common.Experimental;
+import io.temporal.failure.DefaultFailureConverter;
 import io.temporal.payload.codec.PayloadCodec;
 import io.temporal.payload.context.SerializationContext;
 import java.lang.reflect.Type;
@@ -150,33 +152,31 @@ public interface DataConverter {
   }
 
   /**
-   * Instantiate an appropriate Java Exception from a serialized Failure object. Implementations
-   * should delegate to a {@link FailureConverter} for the actual conversion.
+   * Instantiate an appropriate Java Exception from a serialized Failure object. The default
+   * implementation delegates the conversion process to an instance of {@link FailureConverter},
+   * using this data converter for payload decoding.
    *
    * @param failure Failure protobuf object to deserialize into an exception
    * @throws NullPointerException if failure is null
-   * @throws UnsupportedOperationException if not overridden. Use {@link
-   *     PayloadAndFailureDataConverter} or {@link DefaultDataConverter} for built-in support.
    */
   @Nonnull
   default RuntimeException failureToException(@Nonnull Failure failure) {
-    throw new UnsupportedOperationException(
-        "failureToException not implemented. Use PayloadAndFailureDataConverter or DefaultDataConverter.");
+    Preconditions.checkNotNull(failure, "failure");
+    return new DefaultFailureConverter().failureToException(failure, this);
   }
 
   /**
-   * Serialize an existing Throwable object into a Failure object. Implementations should delegate
-   * to a {@link FailureConverter} for the actual conversion.
+   * Serialize an existing Throwable object into a Failure object. The default implementation
+   * delegates the conversion process to an instance of {@link FailureConverter}, using this data
+   * converter for payload encoding.
    *
    * @param throwable a Throwable object to serialize into a Failure protobuf object
    * @throws NullPointerException if throwable is null
-   * @throws UnsupportedOperationException if not overridden. Use {@link
-   *     PayloadAndFailureDataConverter} or {@link DefaultDataConverter} for built-in support.
    */
   @Nonnull
   default Failure exceptionToFailure(@Nonnull Throwable throwable) {
-    throw new UnsupportedOperationException(
-        "exceptionToFailure not implemented. Use PayloadAndFailureDataConverter or DefaultDataConverter.");
+    Preconditions.checkNotNull(throwable, "throwable");
+    return new DefaultFailureConverter().exceptionToFailure(throwable, this);
   }
 
   /**

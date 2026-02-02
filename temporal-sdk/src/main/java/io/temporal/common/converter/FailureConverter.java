@@ -1,6 +1,7 @@
 package io.temporal.common.converter;
 
 import io.temporal.api.failure.v1.Failure;
+import io.temporal.failure.DefaultFailureConverter;
 import io.temporal.payload.context.SerializationContext;
 import javax.annotation.Nonnull;
 
@@ -9,8 +10,8 @@ import javax.annotation.Nonnull;
  * Java {@link Exception}, and back.
  *
  * <p>Most users should _never_ need to implement a failure converter. We strongly recommended
- * relying on the default FailureConverter implementation, in order to maintain cross-language
- * Failure serialization compatibility.
+ * relying on the {@link DefaultFailureConverter}, in order to maintain cross-language Failure
+ * serialization compatibility.
  *
  * <p>To _encrypt_ the content of failures, see {@link
  * io.temporal.common.converter.CodecDataConverter} instead.

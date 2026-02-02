@@ -11,7 +11,6 @@ import io.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior;
 import io.temporal.api.failure.v1.*;
 import io.temporal.client.ActivityCanceledException;
 import io.temporal.common.converter.DataConverter;
-import io.temporal.common.converter.DefaultFailureConverterProvider;
 import io.temporal.common.converter.EncodedValues;
 import io.temporal.common.converter.FailureConverter;
 import io.temporal.internal.activity.ActivityTaskHandlerImpl;
@@ -34,11 +33,6 @@ import org.slf4j.LoggerFactory;
  * algorithm.
  */
 public final class DefaultFailureConverter implements FailureConverter {
-
-  static {
-    // Register this class as the default FailureConverter provider for temporal-core
-    DefaultFailureConverterProvider.register(DefaultFailureConverter::new);
-  }
 
   private static final Logger log = LoggerFactory.getLogger(DefaultFailureConverter.class);
 

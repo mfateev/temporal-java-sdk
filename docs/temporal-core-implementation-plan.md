@@ -53,7 +53,7 @@ This document provides the implementation plan for extracting `temporal-core` fr
 
 ### Step 1.2: Move DataConverter to temporal-core
 
-**Status**: COMPLETED
+**Status**: NOT STARTED
 
 **Depends on**: Step 1.1
 
