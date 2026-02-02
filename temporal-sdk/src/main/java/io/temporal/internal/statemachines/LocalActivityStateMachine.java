@@ -18,12 +18,14 @@ import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.internal.history.LocalActivityMarkerMetadata;
 import io.temporal.internal.history.LocalActivityMarkerUtils;
 import io.temporal.internal.worker.LocalActivityResult;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 final class LocalActivityStateMachine
@@ -40,15 +42,15 @@ final class LocalActivityStateMachine
   static final String LOCAL_ACTIVITY_CANCELED_MESSAGE =
       "Local " + ActivityStateMachine.ACTIVITY_CANCELED_MESSAGE;
 
-  private final Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink;
+  private final Consumer<ExecuteLocalActivityParameters> localActivityRequestSink;
   private final LocalActivityCallback callback;
 
   private ExecuteLocalActivityParameters localActivityParameters;
   private @Nullable UserMetadata userMetadata;
-  private final Functions.Func<Boolean> replaying;
+  private final Supplier<Boolean> replaying;
 
   /** Accepts proposed current time. Returns accepted current time. */
-  private final Functions.Func1<Long, Long> setCurrentTimeCallback;
+  private final Function<Long, Long> setCurrentTimeCallback;
 
   private final String activityId;
   private final ActivityType activityType;
@@ -159,13 +161,13 @@ final class LocalActivityStateMachine
    * @param commandSink callback to send commands to
    */
   public static LocalActivityStateMachine newInstance(
-      Functions.Func<Boolean> replaying,
-      Functions.Func1<Long, Long> setCurrentTimeCallback,
+      Supplier<Boolean> replaying,
+      Function<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       LocalActivityCallback callback,
-      Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink,
+      Consumer<ExecuteLocalActivityParameters> localActivityRequestSink,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink,
       long workflowTimeMillisWhenStarted) {
     return new LocalActivityStateMachine(
         replaying,
@@ -180,13 +182,13 @@ final class LocalActivityStateMachine
   }
 
   private LocalActivityStateMachine(
-      Functions.Func<Boolean> replaying,
-      Functions.Func1<Long, Long> setCurrentTimeCallback,
+      Supplier<Boolean> replaying,
+      Function<Long, Long> setCurrentTimeCallback,
       ExecuteLocalActivityParameters localActivityParameters,
       LocalActivityCallback callback,
-      Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink,
+      Consumer<ExecuteLocalActivityParameters> localActivityRequestSink,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink,
       long workflowTimeMillisWhenStarted,
       long systemNanoTimeWhenStarted) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
@@ -206,7 +208,7 @@ final class LocalActivityStateMachine
   }
 
   State getExecutionState() {
-    return replaying.apply() ? State.REPLAYING : State.EXECUTING;
+    return replaying.get() ? State.REPLAYING : State.EXECUTING;
   }
 
   public void cancel() {
@@ -217,7 +219,7 @@ final class LocalActivityStateMachine
   }
 
   public void sendRequest() {
-    localActivityRequestSink.apply(localActivityParameters);
+    localActivityRequestSink.accept(localActivityParameters);
     if (localActivityParameters.isDoNotIncludeArgumentsIntoMarker()) {
       // avoid retaining parameters for the duration of activity execution
       localActivityParameters = null;
@@ -242,7 +244,7 @@ final class LocalActivityStateMachine
     RecordMarkerCommandAttributes.Builder markerAttributes =
         RecordMarkerCommandAttributes.newBuilder();
     Map<String, Payloads> details = new HashMap<>();
-    if (!replaying.apply()) {
+    if (!replaying.get()) {
       markerAttributes.setMarkerName(LocalActivityMarkerUtils.MARKER_NAME);
       Payloads id = DefaultDataConverter.STANDARD_INSTANCE.toPayloads(activityId).get();
       details.put(LocalActivityMarkerUtils.MARKER_ACTIVITY_ID_KEY, id);
@@ -346,7 +348,8 @@ final class LocalActivityStateMachine
         Preconditions.checkNotNull(
             LocalActivityMarkerUtils.getTime(attributes),
             "'time' payload of a LocalActivity marker can't be empty");
-    setCurrentTimeCallback.apply(time);
+    @SuppressWarnings("unused")
+    Long ignored = setCurrentTimeCallback.apply(time);
     if (attributes.hasFailure()) {
       // In older markers metadata is missing
       @Nullable
@@ -358,15 +361,15 @@ final class LocalActivityStateMachine
       LocalActivityCallback.LocalActivityFailedException localActivityFailedException =
           new LocalActivityCallback.LocalActivityFailedException(
               attributes.getFailure(), originalScheduledTimestamp, lastAttempt, backoff);
-      callback.apply(null, localActivityFailedException);
+      callback.accept(null, localActivityFailedException);
     } else {
       Optional<Payloads> result =
           Optional.ofNullable(LocalActivityMarkerUtils.getResult(attributes));
-      callback.apply(result, null);
+      callback.accept(result, null);
     }
   }
 
   private void notifyResultFromResponse() {
-    callback.apply(executionSuccess, executionFailure);
+    callback.accept(executionSuccess, executionFailure);
   }
 }

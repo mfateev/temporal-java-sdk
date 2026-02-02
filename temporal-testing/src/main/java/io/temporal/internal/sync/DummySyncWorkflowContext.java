@@ -13,9 +13,12 @@ import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.statemachines.*;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -172,37 +175,36 @@ public class DummySyncWorkflowContext {
 
     @Override
     public ScheduleActivityTaskOutput scheduleActivityTask(
-        ExecuteActivityParameters parameters,
-        Functions.Proc2<Optional<Payloads>, Failure> callback) {
+        ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Functions.Proc scheduleLocalActivityTask(
+    public Runnable scheduleLocalActivityTask(
         ExecuteLocalActivityParameters parameters, LocalActivityCallback callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Functions.Proc1<Exception> startChildWorkflow(
+    public Consumer<Exception> startChildWorkflow(
         StartChildWorkflowExecutionParameters parameters,
-        Functions.Proc2<WorkflowExecution, Exception> executionCallback,
-        Functions.Proc2<Optional<Payloads>, Exception> callback) {
+        BiConsumer<WorkflowExecution, Exception> executionCallback,
+        BiConsumer<Optional<Payloads>, Exception> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Functions.Proc1<Exception> startNexusOperation(
+    public Consumer<Exception> startNexusOperation(
         StartNexusOperationParameters parameters,
-        Functions.Proc2<Optional<String>, Failure> startedCallback,
-        Functions.Proc2<Optional<Payload>, Failure> completionCallback) {
+        BiConsumer<Optional<String>, Failure> startedCallback,
+        BiConsumer<Optional<Payload>, Failure> completionCallback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
     @Override
-    public Functions.Proc1<Exception> signalExternalWorkflowExecution(
+    public Consumer<Exception> signalExternalWorkflowExecution(
         SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-        Functions.Proc2<Void, Failure> callback) {
+        BiConsumer<Void, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -210,7 +212,7 @@ public class DummySyncWorkflowContext {
     public void requestCancelExternalWorkflowExecution(
         WorkflowExecution execution,
         @Nullable String reason,
-        Functions.Proc2<Void, RuntimeException> callback) {
+        BiConsumer<Void, RuntimeException> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 
@@ -236,36 +238,36 @@ public class DummySyncWorkflowContext {
     }
 
     @Override
-    public Functions.Proc1<RuntimeException> newTimer(
-        Duration delay, UserMetadata metadata, Functions.Proc1<RuntimeException> callback) {
+    public Consumer<RuntimeException> newTimer(
+        Duration delay, UserMetadata metadata, Consumer<RuntimeException> callback) {
       timer.schedule(
           new TimerTask() {
             @Override
             public void run() {
-              callback.apply(null);
+              callback.accept(null);
             }
           },
           delay.toMillis());
       return (e) -> {
-        callback.apply(new CanceledFailure(null));
+        callback.accept(new CanceledFailure(null));
       };
     }
 
     @Override
     public void sideEffect(
-        Functions.Func<Optional<Payloads>> func,
+        Supplier<Optional<Payloads>> func,
         UserMetadata userMetadata,
-        Functions.Proc1<Optional<Payloads>> callback) {
-      callback.apply(func.apply());
+        Consumer<Optional<Payloads>> callback) {
+      callback.accept(func.get());
     }
 
     @Override
     public void mutableSideEffect(
         String id,
         UserMetadata userMetadata,
-        Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-        Functions.Proc1<Optional<Payloads>> callback) {
-      callback.apply(func.apply(Optional.empty()));
+        Function<Optional<Payloads>, Optional<Payloads>> func,
+        Consumer<Optional<Payloads>> callback) {
+      callback.accept(func.apply(Optional.empty()));
     }
 
     @Override
@@ -278,7 +280,7 @@ public class DummySyncWorkflowContext {
         String changeId,
         int minSupported,
         int maxSupported,
-        Functions.Proc2<Integer, RuntimeException> callback) {
+        BiConsumer<Integer, RuntimeException> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 

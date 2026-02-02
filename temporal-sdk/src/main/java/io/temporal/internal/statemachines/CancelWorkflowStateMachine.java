@@ -4,7 +4,7 @@ import io.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 final class CancelWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
@@ -16,15 +16,15 @@ final class CancelWorkflowStateMachine
 
   public static void newInstance(
       CancelWorkflowExecutionCommandAttributes cancelWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new CancelWorkflowStateMachine(cancelWorkflowAttributes, commandSink, stateMachineSink);
   }
 
   private CancelWorkflowStateMachine(
       CancelWorkflowExecutionCommandAttributes cancelWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.cancelWorkflowAttributes = cancelWorkflowAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);

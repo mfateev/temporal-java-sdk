@@ -15,11 +15,12 @@ import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.statemachines.*;
 import io.temporal.internal.worker.SingleWorkerOptions;
-import io.temporal.workflow.Functions;
-import io.temporal.workflow.Functions.Func;
-import io.temporal.workflow.Functions.Func1;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -183,57 +184,56 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public ScheduleActivityTaskOutput scheduleActivityTask(
-      ExecuteActivityParameters parameters, Functions.Proc2<Optional<Payloads>, Failure> callback) {
+      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback) {
     ScheduleActivityTaskCommandAttributes.Builder attributes = parameters.getAttributes();
     if (attributes.getActivityId().isEmpty()) {
       attributes.setActivityId(workflowStateMachines.randomUUID().toString());
     }
-    Functions.Proc cancellationHandler =
-        workflowStateMachines.scheduleActivityTask(parameters, callback);
+    Runnable cancellationHandler = workflowStateMachines.scheduleActivityTask(parameters, callback);
     return new ScheduleActivityTaskOutput(
-        attributes.getActivityId(), (exception) -> cancellationHandler.apply());
+        attributes.getActivityId(), (exception) -> cancellationHandler.run());
   }
 
   @Override
-  public Functions.Proc scheduleLocalActivityTask(
+  public Runnable scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters, LocalActivityCallback callback) {
     return workflowStateMachines.scheduleLocalActivityTask(parameters, callback);
   }
 
   @Override
-  public Functions.Proc1<Exception> startChildWorkflow(
+  public Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      Functions.Proc2<WorkflowExecution, Exception> startCallback,
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback) {
-    Functions.Proc cancellationHandler =
+      BiConsumer<WorkflowExecution, Exception> startCallback,
+      BiConsumer<Optional<Payloads>, Exception> completionCallback) {
+    Runnable cancellationHandler =
         workflowStateMachines.startChildWorkflow(parameters, startCallback, completionCallback);
-    return (exception) -> cancellationHandler.apply();
+    return (exception) -> cancellationHandler.run();
   }
 
   @Override
-  public Functions.Proc1<Exception> startNexusOperation(
+  public Consumer<Exception> startNexusOperation(
       StartNexusOperationParameters parameters,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback) {
-    Functions.Proc cancellationHandler =
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback) {
+    Runnable cancellationHandler =
         workflowStateMachines.startNexusOperation(parameters, startedCallback, completionCallback);
-    return (exception) -> cancellationHandler.apply();
+    return (exception) -> cancellationHandler.run();
   }
 
   @Override
-  public Functions.Proc1<Exception> signalExternalWorkflowExecution(
+  public Consumer<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      Functions.Proc2<Void, Failure> callback) {
-    Functions.Proc cancellationHandler =
+      BiConsumer<Void, Failure> callback) {
+    Runnable cancellationHandler =
         workflowStateMachines.signalExternalWorkflowExecution(attributes.build(), callback);
-    return (e) -> cancellationHandler.apply();
+    return (e) -> cancellationHandler.run();
   }
 
   @Override
   public void requestCancelExternalWorkflowExecution(
       WorkflowExecution execution,
       @Nullable String reason,
-      Functions.Proc2<Void, RuntimeException> callback) {
+      BiConsumer<Void, RuntimeException> callback) {
     RequestCancelExternalWorkflowExecutionCommandAttributes.Builder attributes =
         RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
             .setWorkflowId(execution.getWorkflowId())
@@ -278,10 +278,10 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   }
 
   @Override
-  public Functions.Proc1<RuntimeException> newTimer(
-      Duration delay, UserMetadata metadata, Functions.Proc1<RuntimeException> callback) {
+  public Consumer<RuntimeException> newTimer(
+      Duration delay, UserMetadata metadata, Consumer<RuntimeException> callback) {
     if (delay.compareTo(Duration.ZERO) <= 0) {
-      callback.apply(null);
+      callback.accept(null);
       return (e) -> {};
     }
     StartTimerCommandAttributes attributes =
@@ -289,23 +289,23 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
             .setStartToFireTimeout(ProtobufTimeUtils.toProtoDuration(delay))
             .setTimerId(workflowStateMachines.randomUUID().toString())
             .build();
-    Functions.Proc cancellationHandler =
+    Runnable cancellationHandler =
         workflowStateMachines.newTimer(
             attributes, metadata, (event) -> handleTimerCallback(callback, event));
-    return (e) -> cancellationHandler.apply();
+    return (e) -> cancellationHandler.run();
   }
 
-  private void handleTimerCallback(Functions.Proc1<RuntimeException> callback, HistoryEvent event) {
+  private void handleTimerCallback(Consumer<RuntimeException> callback, HistoryEvent event) {
     switch (event.getEventType()) {
       case EVENT_TYPE_TIMER_FIRED:
         {
-          callback.apply(null);
+          callback.accept(null);
           return;
         }
       case EVENT_TYPE_TIMER_CANCELED:
         {
           CanceledFailure exception = new CanceledFailure("Canceled by request");
-          callback.apply(exception);
+          callback.accept(exception);
           return;
         }
       default:
@@ -315,9 +315,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public void sideEffect(
-      Func<Optional<Payloads>> func,
+      Supplier<Optional<Payloads>> func,
       UserMetadata metadata,
-      Functions.Proc1<Optional<Payloads>> callback) {
+      Consumer<Optional<Payloads>> callback) {
     workflowStateMachines.sideEffect(func, metadata, callback);
   }
 
@@ -325,8 +325,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   public void mutableSideEffect(
       String id,
       UserMetadata metadata,
-      Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback) {
+      Function<Optional<Payloads>, Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback) {
     workflowStateMachines.mutableSideEffect(id, metadata, func, callback);
   }
 
@@ -335,7 +335,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       String changeId,
       int minSupported,
       int maxSupported,
-      Functions.Proc2<Integer, RuntimeException> callback) {
+      BiConsumer<Integer, RuntimeException> callback) {
     return workflowStateMachines.getVersion(changeId, minSupported, maxSupported, callback);
   }
 

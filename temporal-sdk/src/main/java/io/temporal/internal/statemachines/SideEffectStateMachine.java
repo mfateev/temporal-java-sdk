@@ -7,10 +7,11 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.workflow.Functions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 final class SideEffectStateMachine
     extends EntityStateMachineInitialCommand<
@@ -35,9 +36,9 @@ final class SideEffectStateMachine
   static final String SIDE_EFFECT_MARKER_NAME = "SideEffect";
 
   private UserMetadata metadata;
-  private final Functions.Proc1<Optional<Payloads>> callback;
-  private final Functions.Func<Optional<Payloads>> func;
-  private final Functions.Func<Boolean> replaying;
+  private final Consumer<Optional<Payloads>> callback;
+  private final Supplier<Optional<Payloads>> func;
+  private final Supplier<Boolean> replaying;
 
   private Optional<Payloads> result;
 
@@ -81,21 +82,21 @@ final class SideEffectStateMachine
    */
   public static void newInstance(
       UserMetadata metadata,
-      Functions.Func<Boolean> replaying,
-      Functions.Func<Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Supplier<Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new SideEffectStateMachine(metadata, replaying, func, callback, commandSink, stateMachineSink);
   }
 
   private SideEffectStateMachine(
       UserMetadata metadata,
-      Functions.Func<Boolean> replaying,
-      Functions.Func<Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Supplier<Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.metadata = metadata;
     this.replaying = replaying;
@@ -107,12 +108,12 @@ final class SideEffectStateMachine
   private State createMarkerCommand() {
     State transitionTo;
     RecordMarkerCommandAttributes markerAttributes;
-    if (replaying.apply()) {
+    if (replaying.get()) {
       markerAttributes = RecordMarkerCommandAttributes.getDefaultInstance();
       transitionTo = State.MARKER_COMMAND_CREATED_REPLAYING;
     } else {
       // executing first time
-      result = func.apply();
+      result = func.get();
       if (result == null) {
         throw new IllegalStateException("marker function returned null");
       }
@@ -150,10 +151,10 @@ final class SideEffectStateMachine
     }
     Map<String, Payloads> map = attributes.getDetailsMap();
     Optional<Payloads> fromMarker = Optional.ofNullable(map.get(MARKER_DATA_KEY));
-    callback.apply(fromMarker);
+    callback.accept(fromMarker);
   }
 
   private void markerResultFromFunc() {
-    callback.apply(result);
+    callback.accept(result);
   }
 }

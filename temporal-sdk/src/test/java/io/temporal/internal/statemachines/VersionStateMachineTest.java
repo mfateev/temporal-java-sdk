@@ -17,7 +17,6 @@ import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.internal.history.VersionMarkerUtils;
 import io.temporal.worker.NonDeterministicException;
-import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -720,7 +719,7 @@ public class VersionStateMachineTest {
                         (r, e) -> {
                           assertNull(e);
                           versionId2 = r;
-                          c.apply(r);
+                          c.accept(r);
                         }))
             .<HistoryEvent>add1(
                 (v, c) ->
@@ -1161,7 +1160,7 @@ public class VersionStateMachineTest {
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
-        AtomicReference<Functions.Proc> cancelTimerProc = new AtomicReference<>();
+        AtomicReference<Runnable> cancelTimerProc = new AtomicReference<>();
 
         builder
             .add(
@@ -1174,7 +1173,7 @@ public class VersionStateMachineTest {
                                 .build(),
                             null,
                             ignore -> {})))
-            .add((v) -> cancelTimerProc.get().apply())
+            .add((v) -> cancelTimerProc.get().run())
             .<Integer, RuntimeException>add2(
                 (v, c) -> stateMachines.getVersion("id1", maxSupported - 3, maxSupported + 10, c))
             .<HistoryEvent>add1(

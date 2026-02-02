@@ -5,12 +5,12 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.protocol.v1.Message;
 import io.temporal.internal.common.ProtocolType;
 import io.temporal.internal.common.ProtocolUtils;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 class EntityStateMachineBase<State, ExplicitEvent, Data> implements EntityStateMachine {
   protected final StateMachine<State, ExplicitEvent, Data> stateMachine;
-  protected final Functions.Proc1<CancellableCommand> commandSink;
+  protected final Consumer<CancellableCommand> commandSink;
 
   protected HistoryEvent currentEvent;
   protected boolean hasNextEvent;
@@ -23,12 +23,12 @@ class EntityStateMachineBase<State, ExplicitEvent, Data> implements EntityStateM
    */
   public EntityStateMachineBase(
       StateMachineDefinition<State, ExplicitEvent, Data> stateMachineDefinition,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink,
       @Nullable String entityName) {
     this.stateMachine = StateMachine.newInstance(stateMachineDefinition, entityName);
     this.commandSink = commandSink;
-    stateMachineSink.apply(this.stateMachine);
+    stateMachineSink.accept(this.stateMachine);
   }
 
   /**

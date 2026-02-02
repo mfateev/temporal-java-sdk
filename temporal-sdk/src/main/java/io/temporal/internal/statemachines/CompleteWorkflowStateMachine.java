@@ -5,8 +5,8 @@ import io.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.Functions;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 final class CompleteWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
@@ -18,8 +18,8 @@ final class CompleteWorkflowStateMachine
 
   public static void newInstance(
       Optional<Payloads> workflowOutput,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     CompleteWorkflowExecutionCommandAttributes.Builder attributes =
         CompleteWorkflowExecutionCommandAttributes.newBuilder();
     if (workflowOutput.isPresent()) {
@@ -30,8 +30,8 @@ final class CompleteWorkflowStateMachine
 
   private CompleteWorkflowStateMachine(
       CompleteWorkflowExecutionCommandAttributes completeWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.completeWorkflowAttributes = completeWorkflowAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);

@@ -21,11 +21,11 @@ import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.internal.history.LocalActivityMarkerUtils;
 import io.temporal.internal.worker.LocalActivityResult;
 import io.temporal.workflow.ChildWorkflowCancellationType;
-import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import org.junit.AfterClass;
 import org.junit.Test;
 
@@ -357,8 +357,8 @@ public class LocalActivityStateMachineTest {
         // TODO: This is a workaround for the lack of support for child workflow in the test
         // framework.
         // The test framework has no support for state machines with multiple callbacks.
-        AtomicReference<Functions.Proc> cc = new AtomicReference<>();
-        AtomicReference<Functions.Proc2<Optional<Payloads>, Exception>> completionCallback =
+        AtomicReference<Runnable> cc = new AtomicReference<>();
+        AtomicReference<BiConsumer<Optional<Payloads>, Exception>> completionCallback =
             new AtomicReference<>();
         builder
             .<WorkflowExecution, Exception>add2(
@@ -368,9 +368,9 @@ public class LocalActivityStateMachineTest {
                             childRequest,
                             c,
                             (r1, c1) -> {
-                              completionCallback.get().apply(r1, c1);
+                              completionCallback.get().accept(r1, c1);
                             })))
-            .add((r) -> cc.get().apply())
+            .add((r) -> cc.get().run())
             .<Optional<Payloads>, Exception>add2(
                 (r, c) -> {
                   completionCallback.set(c);

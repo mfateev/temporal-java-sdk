@@ -4,7 +4,7 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 final class ContinueAsNewWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
@@ -16,16 +16,16 @@ final class ContinueAsNewWorkflowStateMachine
 
   public static void newInstance(
       ContinueAsNewWorkflowExecutionCommandAttributes continueAsNewWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new ContinueAsNewWorkflowStateMachine(
         continueAsNewWorkflowAttributes, commandSink, stateMachineSink);
   }
 
   private ContinueAsNewWorkflowStateMachine(
       ContinueAsNewWorkflowExecutionCommandAttributes continueAsNewWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.continueAsNewWorkflowAttributes = continueAsNewWorkflowAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);

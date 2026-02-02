@@ -14,8 +14,11 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.internal.history.VersionMarkerUtils;
 import io.temporal.worker.NonDeterministicException;
-import io.temporal.workflow.Functions;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 final class VersionStateMachine {
@@ -23,9 +26,9 @@ final class VersionStateMachine {
       "The most probable cause is retroactive addition of a getVersion call with an existing 'changeId'";
 
   private final String changeId;
-  private final Functions.Func<Boolean> replaying;
-  private final Functions.Proc1<CancellableCommand> commandSink;
-  private final Functions.Proc1<StateMachine> stateMachineSink;
+  private final Supplier<Boolean> replaying;
+  private final Consumer<CancellableCommand> commandSink;
+  private final Consumer<StateMachine> stateMachineSink;
 
   @Nullable private Integer version;
 
@@ -133,14 +136,14 @@ final class VersionStateMachine {
 
     private final int minSupported;
     private final int maxSupported;
-    private final Functions.Func1<Integer, SearchAttributes> upsertSearchAttributeCallback;
-    private final Functions.Proc2<Integer, RuntimeException> resultCallback;
+    private final Function<Integer, SearchAttributes> upsertSearchAttributeCallback;
+    private final BiConsumer<Integer, RuntimeException> resultCallback;
 
     InvocationStateMachine(
         int minSupported,
         int maxSupported,
-        Functions.Func1<Integer, SearchAttributes> upsertSearchAttributeCallback,
-        Functions.Proc2<Integer, RuntimeException> callback) {
+        Function<Integer, SearchAttributes> upsertSearchAttributeCallback,
+        BiConsumer<Integer, RuntimeException> callback) {
       super(STATE_MACHINE_DEFINITION, VersionStateMachine.this.commandSink, stateMachineSink);
       this.minSupported = minSupported;
       this.maxSupported = maxSupported;
@@ -149,7 +152,7 @@ final class VersionStateMachine {
     }
 
     State getExecutionState() {
-      return replaying.apply() ? State.REPLAYING : State.EXECUTING;
+      return replaying.get() ? State.REPLAYING : State.EXECUTING;
     }
 
     @Override
@@ -216,11 +219,11 @@ final class VersionStateMachine {
 
     void notifyFromVersion(boolean preloaded) {
       Integer versionToUse = preloaded ? preloadedVersion : version;
-      resultCallback.apply(versionToUse, null);
+      resultCallback.accept(versionToUse, null);
     }
 
     void notifyFromException(RuntimeException ex) {
-      resultCallback.apply(null, ex);
+      resultCallback.accept(null, ex);
     }
 
     void notifyFromVersionExecuting() {
@@ -365,17 +368,17 @@ final class VersionStateMachine {
   /** Creates new VersionStateMachine */
   public static VersionStateMachine newInstance(
       String id,
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new VersionStateMachine(id, replaying, commandSink, stateMachineSink);
   }
 
   private VersionStateMachine(
       String changeId,
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     this.changeId = Objects.requireNonNull(changeId);
     this.replaying = Objects.requireNonNull(replaying);
     this.commandSink = Objects.requireNonNull(commandSink);
@@ -393,8 +396,8 @@ final class VersionStateMachine {
   public Integer getVersion(
       int minSupported,
       int maxSupported,
-      Functions.Func1<Integer, SearchAttributes> upsertSearchAttributeCallback,
-      Functions.Proc2<Integer, RuntimeException> callback) {
+      Function<Integer, SearchAttributes> upsertSearchAttributeCallback,
+      BiConsumer<Integer, RuntimeException> callback) {
     InvocationStateMachine ism =
         new InvocationStateMachine(
             minSupported, maxSupported, upsertSearchAttributeCallback, callback);

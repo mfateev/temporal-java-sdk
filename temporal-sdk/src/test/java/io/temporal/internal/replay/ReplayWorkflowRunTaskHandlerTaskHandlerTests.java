@@ -145,7 +145,7 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
             null,
             null));
     for (int i = 0; i < 5; i++) {
-      executeLA.getOnNewAttemptCallback().apply();
+      executeLA.getOnNewAttemptCallback().run();
     }
     // Verify retries are not counted for the first task
     assertEquals(0, laMeteringHelper.getNonfirstAttempts());
@@ -153,7 +153,7 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
     assertEquals(0, laMeteringHelper.getNonfirstAttempts());
     // Verify retries are counted for the non first task
     for (int i = 0; i < 5; i++) {
-      executeLA.getOnNewAttemptCallback().apply();
+      executeLA.getOnNewAttemptCallback().run();
     }
     assertEquals(5, laMeteringHelper.getNonfirstAttempts());
   }

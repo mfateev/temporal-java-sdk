@@ -2,13 +2,12 @@ package io.temporal.internal.statemachines;
 
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.internal.common.UpdateMessage;
-import io.temporal.workflow.Functions;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
 abstract class TestEntityManagerListenerBase implements StatesMachinesCallback {
 
-  private final Queue<Functions.Proc> callbacks = new ArrayDeque<>();
+  private final Queue<Runnable> callbacks = new ArrayDeque<>();
 
   @Override
   public final void start(HistoryEvent startWorkflowEvent) {
@@ -37,11 +36,11 @@ abstract class TestEntityManagerListenerBase implements StatesMachinesCallback {
   @Override
   public final void eventLoop() {
     while (true) {
-      Functions.Proc callback = callbacks.poll();
+      Runnable callback = callbacks.poll();
       if (callback == null) {
         break;
       }
-      callback.apply();
+      callback.run();
     }
   }
 }

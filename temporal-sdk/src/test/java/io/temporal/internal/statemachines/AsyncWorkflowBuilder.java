@@ -1,7 +1,8 @@
 package io.temporal.internal.statemachines;
 
-import io.temporal.workflow.Functions;
 import java.util.Queue;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Represents a step in a workflow which takes {@code <T>} as an input value from the previous step
@@ -42,12 +43,12 @@ interface AsyncWorkflowBuilder<T> {
    * of this method.
    *
    * @param proc function that processes input {@code <T>} from the previous step and passes newly
-   *     generated outputs (inputs for the next step) into a callback {@code Functions.Proc1<R>} to
-   *     trigger the AsyncWorkflowBuilder returned from this function
+   *     generated outputs (inputs for the next step) into a callback {@code Consumer<R>} to trigger
+   *     the AsyncWorkflowBuilder returned from this function
    * @return the next step AsyncWorkflowBuilder<R>> that gets as an input whatever {@code proc}
    *     provides to its callback
    */
-  <R> AsyncWorkflowBuilder<R> add1(Functions.Proc2<T, Functions.Proc1<R>> proc);
+  <R> AsyncWorkflowBuilder<R> add1(BiConsumer<T, Consumer<R>> proc);
 
   /**
    * Adds a function {@code proc} to the callbacks and also creates a new step {@code
@@ -60,13 +61,12 @@ interface AsyncWorkflowBuilder<T> {
    * AsyncWorkflowBuilder<Pair<R1, R2>>} provided as a return value of this method.
    *
    * @param proc function that processes input {@code <T>} from the previous step and passes newly
-   *     generated output pairs (inputs for the next step) into a callback {@code
-   *     Functions.Proc2<R1, R2>} to trigger the AsyncWorkflowBuilder returned from this function.
+   *     generated output pairs (inputs for the next step) into a callback {@code BiConsumer<R1,
+   *     R2>} to trigger the AsyncWorkflowBuilder returned from this function.
    * @return the next step AsyncWorkflowBuilder<Pair<R1, R2>> that gets as an input whatever {@code
    *     proc} provides to its callback
    */
-  <R1, R2> AsyncWorkflowBuilder<Pair<R1, R2>> add2(
-      Functions.Proc2<T, Functions.Proc2<R1, R2>> proc);
+  <R1, R2> AsyncWorkflowBuilder<Pair<R1, R2>> add2(BiConsumer<T, BiConsumer<R1, R2>> proc);
 
   /**
    * Adds a function {@code proc} to the processing of {@code <T>}
@@ -77,9 +77,9 @@ interface AsyncWorkflowBuilder<T> {
    * @param proc function to add into callbacks
    * @return this
    */
-  AsyncWorkflowBuilder<T> add(Functions.Proc1<T> proc);
+  AsyncWorkflowBuilder<T> add(Consumer<T> proc);
 
-  static <T> AsyncWorkflowBuilder newScheduler(Queue<Functions.Proc> dispatchQueue, T value) {
+  static <T> AsyncWorkflowBuilder newScheduler(Queue<Runnable> dispatchQueue, T value) {
     AsyncWorkflowBuilderImpl scheduler = new AsyncWorkflowBuilderImpl(dispatchQueue);
     dispatchQueue.add(() -> scheduler.apply(value));
     return scheduler;

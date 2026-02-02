@@ -16,7 +16,6 @@ import io.temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.internal.common.ProtobufTimeUtils;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -125,7 +124,7 @@ public class TimerStateMachineTest {
   @Test
   public void testImmediateTimerCancellation() {
     class TestTimerImmediateCancellationListener extends TestEntityManagerListenerBase {
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -158,7 +157,7 @@ public class TimerStateMachineTest {
             .add((firedEvent) -> stateMachines.completeWorkflow(converter.toPayloads("result1")));
 
         // Immediate cancellation
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -196,7 +195,7 @@ public class TimerStateMachineTest {
   public void testStartedTimerCancellation() {
 
     class TestTimerCancellationListener extends TestEntityManagerListenerBase {
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
       private String firedTimerId;
 
       public String getFiredTimerId() {
@@ -244,7 +243,7 @@ public class TimerStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 

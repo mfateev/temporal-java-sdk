@@ -8,7 +8,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.TimerCanceledEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 final class TimerStateMachine
@@ -19,7 +19,7 @@ final class TimerStateMachine
 
   private UserMetadata metadata;
 
-  private final Functions.Proc1<HistoryEvent> completionCallback;
+  private final Consumer<HistoryEvent> completionCallback;
 
   /**
    * Creates a new timer state machine
@@ -33,9 +33,9 @@ final class TimerStateMachine
   public static TimerStateMachine newInstance(
       StartTimerCommandAttributes attributes,
       @Nullable UserMetadata metadata,
-      Functions.Proc1<HistoryEvent> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<HistoryEvent> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new TimerStateMachine(
         attributes, metadata, completionCallback, commandSink, stateMachineSink);
   }
@@ -43,9 +43,9 @@ final class TimerStateMachine
   private TimerStateMachine(
       StartTimerCommandAttributes attributes,
       @Nullable UserMetadata metadata,
-      Functions.Proc1<HistoryEvent> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<HistoryEvent> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink, attributes.getTimerId());
     this.startAttributes = attributes;
     this.metadata = metadata;
@@ -141,7 +141,7 @@ final class TimerStateMachine
   }
 
   private void notifyCancellation() {
-    completionCallback.apply(
+    completionCallback.accept(
         HistoryEvent.newBuilder()
             .setEventType(EventType.EVENT_TYPE_TIMER_CANCELED)
             .setTimerCanceledEventAttributes(
@@ -152,7 +152,7 @@ final class TimerStateMachine
   }
 
   private void notifyCompletion() {
-    completionCallback.apply(currentEvent);
+    completionCallback.accept(currentEvent);
   }
 
   private void createCancelTimerCommand() {

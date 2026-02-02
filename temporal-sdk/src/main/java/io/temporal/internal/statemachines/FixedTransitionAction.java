@@ -1,17 +1,17 @@
 package io.temporal.internal.statemachines;
 
-import io.temporal.workflow.Functions;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 /** Action that can transition to exactly one state. */
 class FixedTransitionAction<State, Data> implements TransitionAction<State, Data> {
 
   final State state;
 
-  final Functions.Proc1<Data> action;
+  final Consumer<Data> action;
 
-  FixedTransitionAction(State state, Functions.Proc1<Data> action) {
+  FixedTransitionAction(State state, Consumer<Data> action) {
     this.state = state;
     this.action = action;
   }
@@ -23,7 +23,7 @@ class FixedTransitionAction<State, Data> implements TransitionAction<State, Data
 
   @Override
   public State apply(Data data) {
-    action.apply(data);
+    action.accept(data);
     return state;
   }
 

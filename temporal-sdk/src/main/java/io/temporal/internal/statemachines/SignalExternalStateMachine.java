@@ -9,7 +9,8 @@ import io.temporal.api.failure.v1.ApplicationFailureInfo;
 import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes;
-import io.temporal.workflow.Functions;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 final class SignalExternalStateMachine
     extends EntityStateMachineInitialCommand<
@@ -19,7 +20,7 @@ final class SignalExternalStateMachine
 
   private SignalExternalWorkflowExecutionCommandAttributes signalAttributes;
 
-  private final Functions.Proc2<Void, Failure> completionCallback;
+  private final BiConsumer<Void, Failure> completionCallback;
   private WorkflowExecution execution;
 
   /**
@@ -32,11 +33,11 @@ final class SignalExternalStateMachine
    * @param commandSink sink to send commands
    * @return cancellation handler
    */
-  public static Functions.Proc newInstance(
+  public static Runnable newInstance(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<Void, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     SignalExternalStateMachine commands =
         new SignalExternalStateMachine(
             signalAttributes, completionCallback, commandSink, stateMachineSink);
@@ -45,9 +46,9 @@ final class SignalExternalStateMachine
 
   private SignalExternalStateMachine(
       SignalExternalWorkflowExecutionCommandAttributes signalAttributes,
-      Functions.Proc2<Void, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.signalAttributes = signalAttributes;
     this.execution = signalAttributes.getExecution();
@@ -123,7 +124,7 @@ final class SignalExternalStateMachine
   }
 
   private void notifyCompleted() {
-    completionCallback.apply(null, null);
+    completionCallback.accept(null, null);
   }
 
   private void notifyFailed() {
@@ -140,7 +141,7 @@ final class SignalExternalStateMachine
                     + ", runId="
                     + execution.getRunId())
             .build();
-    completionCallback.apply(null, failure);
+    completionCallback.accept(null, failure);
   }
 
   private void cancelSignalExternalCommand() {
@@ -150,6 +151,6 @@ final class SignalExternalStateMachine
             .setMessage("Signal external workflow execution canceled")
             .setCanceledFailureInfo(CanceledFailureInfo.newBuilder().build())
             .build();
-    completionCallback.apply(null, failure);
+    completionCallback.accept(null, failure);
   }
 }

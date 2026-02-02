@@ -24,7 +24,6 @@ import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.DefaultDataConverter;
-import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -312,7 +311,7 @@ public class ActivityStateMachineTest {
   public void testImmediateActivityCancellation() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -334,7 +333,7 @@ public class ActivityStateMachineTest {
                 });
 
         // Immediate cancellation
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -360,7 +359,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellation() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -386,7 +385,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -462,7 +461,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellationWhileTimeout() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -488,7 +487,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -546,7 +545,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellationLaterTimeout() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -572,7 +571,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -652,7 +651,7 @@ public class ActivityStateMachineTest {
   public void testStartedActivityCancellation() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -678,7 +677,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -770,7 +769,7 @@ public class ActivityStateMachineTest {
   public void testStartedActivityCancellationTimeout() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -796,7 +795,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -890,7 +889,7 @@ public class ActivityStateMachineTest {
   public void testStartedActivityCancellationWhileTimeout() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -916,7 +915,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -987,7 +986,7 @@ public class ActivityStateMachineTest {
   public void testStartedActivityCancellationFailed() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -1012,7 +1011,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -1107,7 +1106,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellationWhileStarted() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -1133,7 +1132,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -1216,7 +1215,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellationBufferedStarted() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -1242,7 +1241,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -1324,7 +1323,7 @@ public class ActivityStateMachineTest {
   public void testScheduledActivityCancellationBufferedStartedCompleted() {
     class TestActivityListener extends TestEntityManagerListenerBase {
 
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -1343,7 +1342,7 @@ public class ActivityStateMachineTest {
       protected void signal(HistoryEvent signalEvent, AsyncWorkflowBuilder<Void> builder) {
         assertEquals(
             "signal1", signalEvent.getWorkflowExecutionSignaledEventAttributes().getSignalName());
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 

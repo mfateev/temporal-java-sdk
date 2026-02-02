@@ -20,8 +20,9 @@ import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.*;
 import io.temporal.internal.replay.ChildWorkflowTaskFailedException;
-import io.temporal.workflow.Functions;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 final class ChildWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
@@ -121,9 +122,9 @@ final class ChildWorkflowStateMachine
 
   private UserMetadata metadata;
 
-  private final Functions.Proc2<WorkflowExecution, Exception> startedCallback;
+  private final BiConsumer<WorkflowExecution, Exception> startedCallback;
 
-  private final Functions.Proc2<Optional<Payloads>, Exception> completionCallback;
+  private final BiConsumer<Optional<Payloads>, Exception> completionCallback;
 
   /**
    * Creates a new child workflow state machine
@@ -137,10 +138,10 @@ final class ChildWorkflowStateMachine
   public static ChildWorkflowStateMachine newInstance(
       StartChildWorkflowExecutionCommandAttributes attributes,
       UserMetadata metadata,
-      Functions.Proc2<WorkflowExecution, Exception> startedCallback,
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<WorkflowExecution, Exception> startedCallback,
+      BiConsumer<Optional<Payloads>, Exception> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new ChildWorkflowStateMachine(
         attributes, metadata, startedCallback, completionCallback, commandSink, stateMachineSink);
   }
@@ -148,10 +149,10 @@ final class ChildWorkflowStateMachine
   private ChildWorkflowStateMachine(
       StartChildWorkflowExecutionCommandAttributes startAttributes,
       UserMetadata metadata,
-      Functions.Proc2<WorkflowExecution, Exception> startedCallback,
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<WorkflowExecution, Exception> startedCallback,
+      BiConsumer<Optional<Payloads>, Exception> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.startAttributes = startAttributes;
     this.metadata = metadata;
@@ -203,8 +204,8 @@ final class ChildWorkflowStateMachine
             namespace,
             RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
             new CanceledFailure("Child immediately canceled"));
-    startedCallback.apply(null, failure);
-    completionCallback.apply(Optional.empty(), failure);
+    startedCallback.accept(null, failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyCompleted() {
@@ -212,7 +213,7 @@ final class ChildWorkflowStateMachine
         currentEvent.getChildWorkflowExecutionCompletedEventAttributes();
     Optional<Payloads> result =
         attributes.hasResult() ? Optional.of(attributes.getResult()) : Optional.empty();
-    completionCallback.apply(result, null);
+    completionCallback.accept(result, null);
   }
 
   private void notifyStartFailed() {
@@ -235,8 +236,8 @@ final class ChildWorkflowStateMachine
             RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
             cause);
 
-    startedCallback.apply(null, failure);
-    completionCallback.apply(Optional.empty(), failure);
+    startedCallback.accept(null, failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyFailed() {
@@ -253,7 +254,7 @@ final class ChildWorkflowStateMachine
             null);
     RuntimeException failure =
         new ChildWorkflowTaskFailedException(exception, attributes.getFailure());
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyTimedOut() {
@@ -270,7 +271,7 @@ final class ChildWorkflowStateMachine
             attributes.getNamespace(),
             attributes.getRetryState(),
             timeoutFailure);
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyCanceled() {
@@ -286,7 +287,7 @@ final class ChildWorkflowStateMachine
             RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
             new CanceledFailure(
                 "Child canceled", new EncodedValues(attributes.getDetails()), null));
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyTerminated() {
@@ -301,11 +302,11 @@ final class ChildWorkflowStateMachine
             attributes.getNamespace(),
             RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE,
             new TerminatedFailure(null, null));
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   private void notifyStarted() {
-    startedCallback.apply(
+    startedCallback.accept(
         currentEvent.getChildWorkflowExecutionStartedEventAttributes().getWorkflowExecution(),
         null);
   }

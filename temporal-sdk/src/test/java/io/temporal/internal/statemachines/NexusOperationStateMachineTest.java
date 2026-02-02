@@ -14,12 +14,12 @@ import io.temporal.api.failure.v1.NexusOperationFailureInfo;
 import io.temporal.api.history.v1.*;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.DefaultDataConverter;
-import io.temporal.workflow.Functions;
 import io.temporal.workflow.NexusOperationCancellationType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
@@ -366,7 +366,7 @@ public class NexusOperationStateMachineTest {
   @Test
   public void testSyncNexusOperationImmediateCancellation() {
     class TestNexusListener extends TestEntityManagerListenerBase {
-      private Functions.Proc cancellationHandler;
+      private Runnable cancellationHandler;
 
       @Override
       public void buildWorkflow(AsyncWorkflowBuilder<Void> builder) {
@@ -382,7 +382,7 @@ public class NexusOperationStateMachineTest {
                         stateMachines.startNexusOperation(startParams, (o, f) -> {}, c))
             .add((pair) -> stateMachines.failWorkflow(pair.getT2()));
         // Immediate cancellation
-        builder.add((v) -> cancellationHandler.apply());
+        builder.add((v) -> cancellationHandler.run());
       }
     }
 
@@ -793,14 +793,14 @@ public class NexusOperationStateMachineTest {
   }
 
   public static class DelayedCallback2<T1, T2> {
-    private final AtomicReference<Functions.Proc2<T1, T2>> callback = new AtomicReference<>();
+    private final AtomicReference<BiConsumer<T1, T2>> callback = new AtomicReference<>();
 
-    public void set(Functions.Proc2<T1, T2> callback) {
+    public void set(BiConsumer<T1, T2> callback) {
       this.callback.set(callback);
     }
 
     public void run(T1 t1, T2 t2) {
-      callback.get().apply(t1, t2);
+      callback.get().accept(t1, t2);
     }
   }
 }

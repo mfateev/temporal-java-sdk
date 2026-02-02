@@ -2,19 +2,18 @@ package io.temporal.internal.statemachines;
 
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 @FunctionalInterface
 public interface LocalActivityCallback
-    extends Functions.Proc2<
-        Optional<Payloads>, LocalActivityCallback.LocalActivityFailedException> {
+    extends BiConsumer<Optional<Payloads>, LocalActivityCallback.LocalActivityFailedException> {
 
   @Override
-  void apply(Optional<Payloads> successOutput, LocalActivityFailedException exception);
+  void accept(Optional<Payloads> successOutput, LocalActivityFailedException exception);
 
   class LocalActivityFailedException extends RuntimeException {
     private final @Nonnull Failure failure;

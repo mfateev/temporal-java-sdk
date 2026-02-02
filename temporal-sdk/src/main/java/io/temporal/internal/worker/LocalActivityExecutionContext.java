@@ -144,7 +144,7 @@ class LocalActivityExecutionContext {
   }
 
   public void newAttempt() {
-    executionParams.getOnNewAttemptCallback().apply();
+    executionParams.getOnNewAttemptCallback().run();
   }
 
   public void setPermit(SlotPermit permit) {

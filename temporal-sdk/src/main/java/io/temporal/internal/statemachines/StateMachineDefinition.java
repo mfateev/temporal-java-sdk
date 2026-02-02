@@ -3,7 +3,6 @@ package io.temporal.internal.statemachines;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.internal.common.ProtocolType;
-import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -13,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * State machine definition of a single server side entity like activity, workflow task or the whole
@@ -96,7 +96,7 @@ final class StateMachineDefinition<State, ExplicitEvent, Data> {
    * @return the current StateMachine instance for the fluid pattern.
    */
   StateMachineDefinition<State, ExplicitEvent, Data> add(
-      State from, ExplicitEvent explicitEvent, State to, Functions.Proc1<Data> action) {
+      State from, ExplicitEvent explicitEvent, State to, Consumer<Data> action) {
     checkFinalState(from);
     add(
         new Transition<>(from, new TransitionEvent<>(explicitEvent)),
@@ -133,7 +133,7 @@ final class StateMachineDefinition<State, ExplicitEvent, Data> {
    * @return the current StateMachine instance for the fluid pattern.
    */
   StateMachineDefinition<State, ExplicitEvent, Data> add(
-      State from, EventType eventType, State to, Functions.Proc1<Data> action) {
+      State from, EventType eventType, State to, Consumer<Data> action) {
     checkFinalState(from);
     add(
         new Transition<>(from, new TransitionEvent<>(eventType)),
@@ -193,7 +193,7 @@ final class StateMachineDefinition<State, ExplicitEvent, Data> {
    * @return the current StateMachine instance for the fluid pattern.
    */
   StateMachineDefinition<State, ExplicitEvent, Data> add(
-      State from, CommandType commandType, State to, Functions.Proc1<Data> action) {
+      State from, CommandType commandType, State to, Consumer<Data> action) {
     checkFinalState(from);
     add(
         new Transition<>(from, new TransitionEvent<>(commandType)),
@@ -251,7 +251,7 @@ final class StateMachineDefinition<State, ExplicitEvent, Data> {
    * @return the current StateMachine instance for the fluid pattern.
    */
   StateMachineDefinition<State, ExplicitEvent, Data> add(
-      State from, ProtocolType messageType, State to, Functions.Proc1<Data> action) {
+      State from, ProtocolType messageType, State to, Consumer<Data> action) {
     checkFinalState(from);
     add(
         new Transition<>(from, new TransitionEvent<>(messageType)),

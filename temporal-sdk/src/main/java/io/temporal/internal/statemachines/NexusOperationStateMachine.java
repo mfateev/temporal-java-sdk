@@ -10,8 +10,9 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.failure.v1.NexusOperationFailureInfo;
 import io.temporal.api.history.v1.*;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.workflow.Functions;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 /**
@@ -29,10 +30,10 @@ final class NexusOperationStateMachine
 
   private ScheduleNexusOperationCommandAttributes scheduleAttributes;
   private UserMetadata metadata;
-  private final Functions.Proc2<Optional<String>, Failure> startedCallback;
+  private final BiConsumer<Optional<String>, Failure> startedCallback;
   private boolean async = false;
 
-  private final Functions.Proc2<Optional<Payload>, Failure> completionCallback;
+  private final BiConsumer<Optional<Payload>, Failure> completionCallback;
   private final String endpoint;
   private final String service;
   private final String operation;
@@ -156,8 +157,8 @@ final class NexusOperationStateMachine
             .setCanceledFailureInfo(CanceledFailureInfo.getDefaultInstance())
             .build();
     Failure failure = createCancelNexusOperationFailure(cause);
-    startedCallback.apply(Optional.empty(), failure);
-    completionCallback.apply(Optional.empty(), failure);
+    startedCallback.accept(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
   @SuppressWarnings("deprecation") // Continue to check operation id for history compatibility
@@ -166,7 +167,7 @@ final class NexusOperationStateMachine
     String operationToken =
         currentEvent.getNexusOperationStartedEventAttributes().getOperationToken();
     String operationId = currentEvent.getNexusOperationStartedEventAttributes().getOperationId();
-    startedCallback.apply(
+    startedCallback.accept(
         Optional.of(operationToken.isEmpty() ? operationId : operationToken), null);
   }
 
@@ -174,36 +175,36 @@ final class NexusOperationStateMachine
     NexusOperationCompletedEventAttributes attributes =
         currentEvent.getNexusOperationCompletedEventAttributes();
     if (!async) {
-      startedCallback.apply(Optional.empty(), null);
+      startedCallback.accept(Optional.empty(), null);
     }
-    completionCallback.apply(Optional.of(attributes.getResult()), null);
+    completionCallback.accept(Optional.of(attributes.getResult()), null);
   }
 
   private void notifyFailed() {
     NexusOperationFailedEventAttributes attributes =
         currentEvent.getNexusOperationFailedEventAttributes();
     if (!async) {
-      startedCallback.apply(Optional.empty(), attributes.getFailure());
+      startedCallback.accept(Optional.empty(), attributes.getFailure());
     }
-    completionCallback.apply(Optional.empty(), attributes.getFailure());
+    completionCallback.accept(Optional.empty(), attributes.getFailure());
   }
 
   private void notifyCanceled() {
     NexusOperationCanceledEventAttributes attributes =
         currentEvent.getNexusOperationCanceledEventAttributes();
     if (!async) {
-      startedCallback.apply(Optional.empty(), attributes.getFailure());
+      startedCallback.accept(Optional.empty(), attributes.getFailure());
     }
-    completionCallback.apply(Optional.empty(), attributes.getFailure());
+    completionCallback.accept(Optional.empty(), attributes.getFailure());
   }
 
   private void notifyTimedOut() {
     NexusOperationTimedOutEventAttributes attributes =
         currentEvent.getNexusOperationTimedOutEventAttributes();
     if (!async) {
-      startedCallback.apply(Optional.empty(), attributes.getFailure());
+      startedCallback.accept(Optional.empty(), attributes.getFailure());
     }
-    completionCallback.apply(Optional.empty(), attributes.getFailure());
+    completionCallback.accept(Optional.empty(), attributes.getFailure());
   }
 
   /**
@@ -216,10 +217,10 @@ final class NexusOperationStateMachine
   public static NexusOperationStateMachine newInstance(
       ScheduleNexusOperationCommandAttributes attributes,
       @Nullable UserMetadata metadata,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new NexusOperationStateMachine(
         attributes, metadata, startedCallback, completionCallback, commandSink, stateMachineSink);
   }
@@ -227,10 +228,10 @@ final class NexusOperationStateMachine
   private NexusOperationStateMachine(
       ScheduleNexusOperationCommandAttributes attributes,
       @Nullable UserMetadata metadata,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.scheduleAttributes = attributes;
     this.metadata = metadata;

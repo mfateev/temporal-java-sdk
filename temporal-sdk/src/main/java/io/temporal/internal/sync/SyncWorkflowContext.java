@@ -305,7 +305,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              activityOutput.getCancellationHandle().apply(new CanceledFailure(reason));
+              activityOutput.getCancellationHandle().accept(new CanceledFailure(reason));
               return null;
             });
     return new ActivityOutput<>(activityOutput.getActivityId(), callback.result);
@@ -405,7 +405,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     private final CompletablePromise<Optional<Payloads>> result = Workflow.newPromise();
 
     @Override
-    public void apply(Optional<Payloads> successOutput, LocalActivityFailedException exception) {
+    public void accept(Optional<Payloads> successOutput, LocalActivityFailedException exception) {
       if (exception != null) {
         runner.executeInWorkflowThread(
             "local activity failure callback", () -> result.completeExceptionally(exception));
@@ -543,12 +543,12 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
             attempt,
             originalScheduledTime,
             previousExecutionFailure);
-    Functions.Proc cancellationCallback = replayContext.scheduleLocalActivityTask(params, callback);
+    Runnable cancellationCallback = replayContext.scheduleLocalActivityTask(params, callback);
     CancellationScope.current()
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              cancellationCallback.apply();
+              cancellationCallback.run();
               return null;
             });
     return callback.result;
@@ -716,7 +716,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
             memo,
             userMetadata);
 
-    Functions.Proc1<Exception> cancellationCallback =
+    java.util.function.Consumer<Exception> cancellationCallback =
         replayContext.startChildWorkflow(
             parameters,
             (execution, failure) -> {
@@ -751,7 +751,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         .thenApply(
             (reason) -> {
               if (!callbackCalled.getAndSet(true)) {
-                cancellationCallback.apply(new CanceledFailure(reason));
+                cancellationCallback.accept(new CanceledFailure(reason));
               }
               return null;
             });
@@ -809,7 +809,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         new StartNexusOperationParameters(
             attributes, input.getOptions().getCancellationType(), userMetadata);
 
-    Functions.Proc1<Exception> cancellationCallback =
+    java.util.function.Consumer<Exception> cancellationCallback =
         replayContext.startNexusOperation(
             parameters,
             (operationExec, failure) -> {
@@ -844,7 +844,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         .thenApply(
             (reason) -> {
               if (!callbackCalled.getAndSet(true)) {
-                cancellationCallback.apply(new CanceledFailure(reason));
+                cancellationCallback.accept(new CanceledFailure(reason));
               }
               return null;
             });
@@ -1001,7 +1001,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     UserMetadata userMetadata =
         makeUserMetaData(options.getSummary(), null, dataConverterWithCurrentWorkflowContext);
 
-    Functions.Proc1<RuntimeException> cancellationHandler =
+    java.util.function.Consumer<RuntimeException> cancellationHandler =
         replayContext.newTimer(
             delay,
             userMetadata,
@@ -1019,7 +1019,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         .getCancellationRequest()
         .thenApply(
             (r) -> {
-              cancellationHandler.apply(new CanceledFailure(r));
+              cancellationHandler.accept(new CanceledFailure(r));
               return r;
             });
     return p;
@@ -1285,7 +1285,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     Optional<Payloads> payloads = dataConverterWithChildWorkflowContext.toPayloads(input.getArgs());
     payloads.ifPresent(attributes::setInput);
     CompletablePromise<Void> result = Workflow.newPromise();
-    Functions.Proc1<Exception> cancellationCallback =
+    java.util.function.Consumer<Exception> cancellationCallback =
         replayContext.signalExternalWorkflowExecution(
             attributes,
             (output, failure) -> {
@@ -1304,7 +1304,7 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
         .getCancellationRequest()
         .thenApply(
             (reason) -> {
-              cancellationCallback.apply(new CanceledFailure(reason));
+              cancellationCallback.accept(new CanceledFailure(reason));
               return null;
             });
     return new SignalExternalOutput(result);

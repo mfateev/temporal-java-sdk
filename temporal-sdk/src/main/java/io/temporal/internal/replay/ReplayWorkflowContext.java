@@ -31,14 +31,15 @@ import io.temporal.common.RetryOptions;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.statemachines.*;
 import io.temporal.internal.worker.WorkflowImplementationFactory;
-import io.temporal.workflow.Functions;
-import io.temporal.workflow.Functions.Func;
-import io.temporal.workflow.Functions.Func1;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -85,19 +86,18 @@ public interface ReplayWorkflowContext extends ReplayAware {
   /** Output structure returned when scheduling an activity task. */
   class ScheduleActivityTaskOutput {
     private final String activityId;
-    private final Functions.Proc1<Exception> cancellationHandle;
+    private final Consumer<Exception> cancellationHandle;
 
-    public ScheduleActivityTaskOutput(
-        String activityId, Functions.Proc1<Exception> cancllationHandle) {
+    public ScheduleActivityTaskOutput(String activityId, Consumer<Exception> cancellationHandle) {
       this.activityId = activityId;
-      this.cancellationHandle = cancllationHandle;
+      this.cancellationHandle = cancellationHandle;
     }
 
     public String getActivityId() {
       return activityId;
     }
 
-    public Functions.Proc1<Exception> getCancellationHandle() {
+    public Consumer<Exception> getCancellationHandle() {
       return cancellationHandle;
     }
   }
@@ -183,13 +183,12 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param parameters An object which encapsulates all the information required to schedule an
    *     activity for execution
    * @param callback Callback that is called upon activity completion or failure.
-   * @return cancellation handle. Invoke {@link io.temporal.workflow.Functions.Proc1#apply(Object)}
-   *     to cancel activity task.
+   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel activity task.
    */
   ScheduleActivityTaskOutput scheduleActivityTask(
-      ExecuteActivityParameters parameters, Functions.Proc2<Optional<Payloads>, Failure> callback);
+      ExecuteActivityParameters parameters, BiConsumer<Optional<Payloads>, Failure> callback);
 
-  Functions.Proc scheduleLocalActivityTask(
+  Runnable scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters, LocalActivityCallback callback);
 
   /**
@@ -199,13 +198,12 @@ public interface ReplayWorkflowContext extends ReplayAware {
    *     execution
    * @param startCallback callback that is called upon child start or failure to start
    * @param completionCallback callback that is called upon child workflow completion or failure
-   * @return cancellation handle. Invoke {@link io.temporal.workflow.Functions.Proc1#apply(Object)}
-   *     to cancel activity task.
+   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel child workflow.
    */
-  Functions.Proc1<Exception> startChildWorkflow(
+  Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      Functions.Proc2<WorkflowExecution, Exception> startCallback,
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback);
+      BiConsumer<WorkflowExecution, Exception> startCallback,
+      BiConsumer<Optional<Payloads>, Exception> completionCallback);
 
   /**
    * Start a Nexus operation.
@@ -214,13 +212,12 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param startedCallback callback that is called when the operation is start if async, or
    *     completes if it is sync.
    * @param completionCallback callback that is called upon child workflow completion or failure
-   * @return cancellation handle. Invoke {@link io.temporal.workflow.Functions.Proc1#apply(Object)}
-   *     to cancel activity task.
+   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel Nexus operation.
    */
-  Functions.Proc1<Exception> startNexusOperation(
+  Consumer<Exception> startNexusOperation(
       StartNexusOperationParameters parameters,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback);
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback);
 
   /**
    * Signal a workflow execution by WorkflowId and optionally RunId.
@@ -229,9 +226,9 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param callback callback notified about the operation result
    * @return cancellation handler that should be calle to cancel the operation.
    */
-  Functions.Proc1<Exception> signalExternalWorkflowExecution(
+  Consumer<Exception> signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes.Builder attributes,
-      Functions.Proc2<Void, Failure> callback);
+      BiConsumer<Void, Failure> callback);
 
   /**
    * Request cancellation of a workflow execution by WorkflowId and optionally RunId.
@@ -243,7 +240,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
   void requestCancelExternalWorkflowExecution(
       WorkflowExecution execution,
       @Nullable String reason,
-      Functions.Proc2<Void, RuntimeException> callback);
+      BiConsumer<Void, RuntimeException> callback);
 
   /**
    * @return time of the {@link PollWorkflowTaskQueueResponse} start event of the workflow task
@@ -258,11 +255,10 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param metadata user metadata to be associated with the timer.
    * @param callback Callback that is called with null parameter after the specified delay.
    *     CanceledException is passed as a parameter in case of a cancellation.
-   * @return cancellation handle. Invoke {@link io.temporal.workflow.Functions.Proc1#apply(Object)}
-   *     to cancel timer.
+   * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel timer.
    */
-  Functions.Proc1<RuntimeException> newTimer(
-      Duration delay, UserMetadata metadata, Functions.Proc1<RuntimeException> callback);
+  Consumer<RuntimeException> newTimer(
+      Duration delay, UserMetadata metadata, Consumer<RuntimeException> callback);
 
   /**
    * Executes the provided function once, records its result into the workflow history. The recorded
@@ -280,9 +276,9 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param callback function that accepts the result of the side effect.
    */
   void sideEffect(
-      Func<Optional<Payloads>> func,
+      Supplier<Optional<Payloads>> func,
       UserMetadata userMetadata,
-      Functions.Proc1<Optional<Payloads>> callback);
+      Consumer<Optional<Payloads>> callback);
 
   /**
    * {@code mutableSideEffect} is similar to {@code sideEffect} in allowing calls of
@@ -314,8 +310,8 @@ public interface ReplayWorkflowContext extends ReplayAware {
   void mutableSideEffect(
       String id,
       UserMetadata userMetadata,
-      Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback);
+      Function<Optional<Payloads>, Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback);
 
   /**
    * GetVersion is used to safely perform backwards incompatible changes to workflow definitions. It
@@ -337,7 +333,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
       String changeId,
       int minSupported,
       int maxSupported,
-      Functions.Proc2<Integer, RuntimeException> callback);
+      BiConsumer<Integer, RuntimeException> callback);
 
   /** Replay safe random. */
   Random newRandom();

@@ -17,8 +17,9 @@ import io.temporal.api.update.v1.Request;
 import io.temporal.api.update.v1.Response;
 import io.temporal.internal.common.ProtocolType;
 import io.temporal.internal.common.UpdateMessage;
-import io.temporal.workflow.Functions;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +51,10 @@ final class UpdateProtocolStateMachine
 
   private static final Logger log = LoggerFactory.getLogger(UpdateProtocolStateMachine.class);
 
-  private final Functions.Func<Boolean> replaying;
+  private final Supplier<Boolean> replaying;
 
-  private final Functions.Proc1<UpdateMessage> updateHandle;
-  private final Functions.Proc1<Message> sendHandle;
+  private final Consumer<UpdateMessage> updateHandle;
+  private final Consumer<Message> sendHandle;
 
   private String protoInstanceID;
   private String requestMsgId;
@@ -130,21 +131,21 @@ final class UpdateProtocolStateMachine
                   UpdateProtocolStateMachine::sendCommandMessage);
 
   public static UpdateProtocolStateMachine newInstance(
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<UpdateMessage> updateHandle,
-      Functions.Proc1<Message> sendHandle,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<UpdateMessage> updateHandle,
+      Consumer<Message> sendHandle,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new UpdateProtocolStateMachine(
         replaying, updateHandle, sendHandle, commandSink, stateMachineSink);
   }
 
   private UpdateProtocolStateMachine(
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<UpdateMessage> updateHandle,
-      Functions.Proc1<Message> sendHandle,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<UpdateMessage> updateHandle,
+      Consumer<Message> sendHandle,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.replaying = replaying;
     this.updateHandle = updateHandle;
@@ -164,7 +165,7 @@ final class UpdateProtocolStateMachine
     UpdateMessage updateMessage =
         new UpdateMessage(this.currentMessage, new UpdateProtocolCallbackImpl());
 
-    updateHandle.apply(updateMessage);
+    updateHandle.accept(updateMessage);
   }
 
   void sendCommandMessage() {
@@ -186,7 +187,7 @@ final class UpdateProtocolStateMachine
     // Clear the original request to allow GC to reclaim the memory.
     originalRequest = Optional.empty();
     messageId = requestMsgId + "/accept";
-    sendHandle.apply(
+    sendHandle.accept(
         Message.newBuilder()
             .setId(messageId)
             .setProtocolInstanceId(protoInstanceID)
@@ -205,7 +206,7 @@ final class UpdateProtocolStateMachine
             .build();
 
     String messageId = requestMsgId + "/reject";
-    sendHandle.apply(
+    sendHandle.accept(
         Message.newBuilder()
             .setId(messageId)
             .setProtocolInstanceId(protoInstanceID)
@@ -225,7 +226,7 @@ final class UpdateProtocolStateMachine
     Response outcomeResponse = Response.newBuilder().setOutcome(outcome).setMeta(meta).build();
 
     messageId = requestMsgId + "/complete";
-    sendHandle.apply(
+    sendHandle.accept(
         Message.newBuilder()
             .setId(messageId)
             .setProtocolInstanceId(protoInstanceID)
@@ -268,7 +269,7 @@ final class UpdateProtocolStateMachine
 
     @Override
     public boolean isReplaying() {
-      return UpdateProtocolStateMachine.this.replaying.apply();
+      return UpdateProtocolStateMachine.this.replaying.get();
     }
   }
 }

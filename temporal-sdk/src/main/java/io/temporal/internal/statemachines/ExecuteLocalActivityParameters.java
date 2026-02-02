@@ -6,7 +6,6 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.internal.common.ProtobufTimeUtils;
-import io.temporal.workflow.Functions;
 import io.temporal.workflow.Workflow;
 import java.time.Duration;
 import java.util.Objects;
@@ -31,7 +30,7 @@ public class ExecuteLocalActivityParameters {
   private final @Nonnull Duration localRetryThreshold;
   private final boolean doNotIncludeArgumentsIntoMarker;
   private final @Nullable Duration scheduleToStartTimeout;
-  private @Nullable Functions.Proc onNewAttemptCallback;
+  private @Nullable Runnable onNewAttemptCallback;
   private final UserMetadata metadata;
 
   public ExecuteLocalActivityParameters(
@@ -110,14 +109,14 @@ public class ExecuteLocalActivityParameters {
   }
 
   @Nonnull
-  public Functions.Proc getOnNewAttemptCallback() {
+  public Runnable getOnNewAttemptCallback() {
     if (onNewAttemptCallback == null) {
       return () -> {};
     }
     return onNewAttemptCallback;
   }
 
-  public void setOnNewAttemptCallback(@Nonnull Functions.Proc onNewAttemptCallback) {
+  public void setOnNewAttemptCallback(@Nonnull Runnable onNewAttemptCallback) {
     this.onNewAttemptCallback = onNewAttemptCallback;
   }
 

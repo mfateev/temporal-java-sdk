@@ -11,11 +11,13 @@ import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.common.converter.StdConverterBackwardsCompatAdapter;
-import io.temporal.workflow.Functions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 final class MutableSideEffectStateMachine {
 
@@ -26,8 +28,8 @@ final class MutableSideEffectStateMachine {
 
   private final String id;
   private UserMetadata metadata;
-  private final Functions.Func<Boolean> replaying;
-  private final Functions.Proc1<CancellableCommand> commandSink;
+  private final Supplier<Boolean> replaying;
+  private final Consumer<CancellableCommand> commandSink;
 
   private Optional<Payloads> result = Optional.empty();
 
@@ -111,13 +113,13 @@ final class MutableSideEffectStateMachine {
   class InvocationStateMachine
       extends EntityStateMachineInitialCommand<State, ExplicitEvent, InvocationStateMachine> {
 
-    private final Functions.Proc1<Optional<Payloads>> resultCallback;
-    private final Functions.Func1<Optional<Payloads>, Optional<Payloads>> func;
+    private final Consumer<Optional<Payloads>> resultCallback;
+    private final Function<Optional<Payloads>, Optional<Payloads>> func;
 
     InvocationStateMachine(
-        Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-        Functions.Proc1<Optional<Payloads>> callback,
-        Functions.Proc1<StateMachine> stateMachineSink) {
+        Function<Optional<Payloads>, Optional<Payloads>> func,
+        Consumer<Optional<Payloads>> callback,
+        Consumer<StateMachine> stateMachineSink) {
       super(
           STATE_MACHINE_DEFINITION,
           MutableSideEffectStateMachine.this.commandSink,
@@ -127,7 +129,7 @@ final class MutableSideEffectStateMachine {
     }
 
     State getExecutionState() {
-      return replaying.apply() ? State.REPLAYING : State.EXECUTING;
+      return replaying.get() ? State.REPLAYING : State.EXECUTING;
     }
 
     @Override
@@ -235,7 +237,7 @@ final class MutableSideEffectStateMachine {
     }
 
     void notifyCachedResult() {
-      resultCallback.apply(result);
+      resultCallback.accept(result);
     }
 
     void cancelCommandNotifyCachedResult() {
@@ -248,9 +250,9 @@ final class MutableSideEffectStateMachine {
   public static MutableSideEffectStateMachine newInstance(
       String id,
       UserMetadata metadata,
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     return new MutableSideEffectStateMachine(
         id, metadata, replaying, commandSink, stateMachineSink);
   }
@@ -258,9 +260,9 @@ final class MutableSideEffectStateMachine {
   private MutableSideEffectStateMachine(
       String id,
       UserMetadata metadata,
-      Functions.Func<Boolean> replaying,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Supplier<Boolean> replaying,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     this.id = Objects.requireNonNull(id);
     this.metadata = metadata;
     this.replaying = Objects.requireNonNull(replaying);
@@ -268,9 +270,9 @@ final class MutableSideEffectStateMachine {
   }
 
   public void mutableSideEffect(
-      Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Function<Optional<Payloads>, Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback,
+      Consumer<StateMachine> stateMachineSink) {
     InvocationStateMachine ism = new InvocationStateMachine(func, callback, stateMachineSink);
     ism.explicitEvent(ExplicitEvent.CHECK_EXECUTION_STATE);
     ism.explicitEvent(ExplicitEvent.SCHEDULE);

@@ -1,56 +1,57 @@
 package io.temporal.internal.statemachines;
 
-import io.temporal.workflow.Functions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 class AsyncWorkflowBuilderImpl<T> implements AsyncWorkflowBuilder<T> {
 
-  private final Queue<Functions.Proc> scheduled;
+  private final Queue<Runnable> scheduled;
 
-  private final List<Functions.Proc1<T>> callbacks = new ArrayList<>();
+  private final List<Consumer<T>> callbacks = new ArrayList<>();
 
-  private final Functions.Proc1<T> callback =
+  private final Consumer<T> callback =
       (result) -> {
-        for (Functions.Proc1<T> callback : callbacks) {
-          schedule(() -> callback.apply(result));
+        for (Consumer<T> callback : callbacks) {
+          schedule(() -> callback.accept(result));
         }
       };
 
   void apply(T value) {
-    callback.apply(value);
+    callback.accept(value);
   }
 
-  private void schedule(Functions.Proc proc) {
+  private void schedule(Runnable proc) {
     scheduled.add(proc);
   }
 
-  AsyncWorkflowBuilderImpl(Queue<Functions.Proc> scheduled) {
+  AsyncWorkflowBuilderImpl(Queue<Runnable> scheduled) {
     this.scheduled = scheduled;
   }
 
   @Override
-  public <R> AsyncWorkflowBuilder<R> add1(Functions.Proc2<T, Functions.Proc1<R>> proc) {
+  public <R> AsyncWorkflowBuilder<R> add1(BiConsumer<T, Consumer<R>> proc) {
     AsyncWorkflowBuilderImpl<R> scheduler = new AsyncWorkflowBuilderImpl<>(scheduled);
-    callbacks.add((value) -> schedule(() -> proc.apply(value, scheduler.callback)));
+    callbacks.add((value) -> schedule(() -> proc.accept(value, scheduler.callback)));
     return scheduler;
   }
 
   @Override
-  public <R1, R2> AsyncWorkflowBuilder<Pair<R1, R2>> add2(
-      Functions.Proc2<T, Functions.Proc2<R1, R2>> proc) {
+  public <R1, R2> AsyncWorkflowBuilder<Pair<R1, R2>> add2(BiConsumer<T, BiConsumer<R1, R2>> proc) {
     AsyncWorkflowBuilderImpl<Pair<R1, R2>> scheduler = new AsyncWorkflowBuilderImpl<>(scheduled);
     callbacks.add(
         (value) ->
             schedule(
-                () -> proc.apply(value, (t1, t2) -> scheduler.callback.apply(new Pair<>(t1, t2)))));
+                () ->
+                    proc.accept(value, (t1, t2) -> scheduler.callback.accept(new Pair<>(t1, t2)))));
     return scheduler;
   }
 
   @Override
-  public AsyncWorkflowBuilder<T> add(Functions.Proc1<T> proc) {
-    callbacks.add((result) -> schedule(() -> proc.apply(result)));
+  public AsyncWorkflowBuilder<T> add(Consumer<T> proc) {
+    callbacks.add((result) -> schedule(() -> proc.accept(result)));
     return this;
   }
 }

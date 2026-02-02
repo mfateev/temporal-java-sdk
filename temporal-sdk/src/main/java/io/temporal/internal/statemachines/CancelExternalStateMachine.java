@@ -6,7 +6,8 @@ import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.workflow.CancelExternalWorkflowException;
-import io.temporal.workflow.Functions;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 final class CancelExternalStateMachine
     extends EntityStateMachineInitialCommand<
@@ -16,7 +17,7 @@ final class CancelExternalStateMachine
 
   private final RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes;
 
-  private final Functions.Proc2<Void, RuntimeException> completionCallback;
+  private final BiConsumer<Void, RuntimeException> completionCallback;
 
   /**
    * @param attributes attributes to use to cancel external workflow
@@ -26,17 +27,17 @@ final class CancelExternalStateMachine
    */
   public static void newInstance(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc2<Void, RuntimeException> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, RuntimeException> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new CancelExternalStateMachine(attributes, completionCallback, commandSink, stateMachineSink);
   }
 
   private CancelExternalStateMachine(
       RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes,
-      Functions.Proc2<Void, RuntimeException> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, RuntimeException> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.requestCancelAttributes = requestCancelAttributes;
     this.completionCallback = completionCallback;
@@ -96,7 +97,7 @@ final class CancelExternalStateMachine
   }
 
   private void notifyCompleted() {
-    completionCallback.apply(null, null);
+    completionCallback.accept(null, null);
   }
 
   private void notifyFailed() {
@@ -105,7 +106,7 @@ final class CancelExternalStateMachine
             .setWorkflowId(requestCancelAttributes.getWorkflowId())
             .setRunId(requestCancelAttributes.getRunId())
             .build();
-    completionCallback.apply(
+    completionCallback.accept(
         null,
         new CancelExternalWorkflowException(
             "Workflow not found: " + execution, execution, "", null));

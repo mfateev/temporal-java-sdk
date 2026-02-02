@@ -5,7 +5,7 @@ import io.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttribute
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 final class UpsertSearchAttributesStateMachine
     extends EntityStateMachineInitialCommand<
@@ -17,15 +17,15 @@ final class UpsertSearchAttributesStateMachine
 
   public static void newInstance(
       SearchAttributes searchAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new UpsertSearchAttributesStateMachine(searchAttributes, commandSink, stateMachineSink);
   }
 
   private UpsertSearchAttributesStateMachine(
       SearchAttributes searchAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.searchAttributes = searchAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);

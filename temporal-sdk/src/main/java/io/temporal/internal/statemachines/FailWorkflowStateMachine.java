@@ -5,7 +5,7 @@ import io.temporal.api.command.v1.FailWorkflowExecutionCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 final class FailWorkflowStateMachine
     extends EntityStateMachineInitialCommand<
@@ -17,8 +17,8 @@ final class FailWorkflowStateMachine
 
   public static void newInstance(
       Failure failure,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     FailWorkflowExecutionCommandAttributes attributes =
         FailWorkflowExecutionCommandAttributes.newBuilder().setFailure(failure).build();
     new FailWorkflowStateMachine(attributes, commandSink, stateMachineSink);
@@ -26,8 +26,8 @@ final class FailWorkflowStateMachine
 
   private FailWorkflowStateMachine(
       FailWorkflowExecutionCommandAttributes failWorkflowAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.failWorkflowAttributes = failWorkflowAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);

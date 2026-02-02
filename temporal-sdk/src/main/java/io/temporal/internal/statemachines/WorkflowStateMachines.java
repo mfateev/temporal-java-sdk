@@ -31,10 +31,13 @@ import io.temporal.worker.MetricsType;
 import io.temporal.worker.NonDeterministicException;
 import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.ChildWorkflowCancellationType;
-import io.temporal.workflow.Functions;
 import io.temporal.workflow.NexusOperationCancellationType;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -97,7 +100,7 @@ public final class WorkflowStateMachines {
   private final StatesMachinesCallback callbacks;
 
   /** Callback to send new commands to. */
-  private final Functions.Proc1<CancellableCommand> commandSink;
+  private final Consumer<CancellableCommand> commandSink;
 
   /**
    * currentRunId is used as seed by Workflow.newRandom and randomUUID. It allows to generate them
@@ -164,8 +167,8 @@ public final class WorkflowStateMachines {
 
   private List<ExecuteLocalActivityParameters> localActivityRequests = new ArrayList<>();
 
-  private final Functions.Proc1<ExecuteLocalActivityParameters> localActivityRequestSink;
-  private final Functions.Proc1<StateMachine> stateMachineSink;
+  private final Consumer<ExecuteLocalActivityParameters> localActivityRequestSink;
+  private final Consumer<StateMachine> stateMachineSink;
 
   private final WFTBuffer wftBuffer = new WFTBuffer();
 
@@ -202,7 +205,7 @@ public final class WorkflowStateMachines {
   @VisibleForTesting
   public WorkflowStateMachines(
       StatesMachinesCallback callbacks,
-      Functions.Proc1<StateMachine> stateMachineSink,
+      Consumer<StateMachine> stateMachineSink,
       GetSystemInfoResponse.Capabilities capabilities,
       WorkflowImplementationOptions workflowImplOptions) {
     this.callbacks = Objects.requireNonNull(callbacks);
@@ -215,7 +218,7 @@ public final class WorkflowStateMachines {
 
   @VisibleForTesting
   public WorkflowStateMachines(
-      StatesMachinesCallback callbacks, Functions.Proc1<StateMachine> stateMachineSink) {
+      StatesMachinesCallback callbacks, Consumer<StateMachine> stateMachineSink) {
     this.callbacks = Objects.requireNonNull(callbacks);
     this.commandSink = cancellableCommands::add;
     this.stateMachineSink = stateMachineSink;
@@ -777,8 +780,8 @@ public final class WorkflowStateMachines {
 
   /**
    * Local activity is different from all other entities. It doesn't schedule a marker command when
-   * the {@link #scheduleLocalActivityTask(ExecuteLocalActivityParameters, Functions.Proc2)} is
-   * called. The marker is scheduled only when activity completes through ({@link
+   * the {@link #scheduleLocalActivityTask(ExecuteLocalActivityParameters, BiConsumer)} is called.
+   * The marker is scheduled only when activity completes through ({@link
    * #handleLocalActivityCompletion(LocalActivityResult)}). That's why the normal logic of {@link
    * #handleCommandEvent(HistoryEvent)}, which assumes that each event has a correspondent command
    * during replay, doesn't work. Instead, local activities are matched by their id using
@@ -895,15 +898,15 @@ public final class WorkflowStateMachines {
    * @param callback completion callback
    * @return an instance of ActivityCommands
    */
-  public Functions.Proc scheduleActivityTask(
-      ExecuteActivityParameters attributes, Functions.Proc2<Optional<Payloads>, Failure> callback) {
+  public Runnable scheduleActivityTask(
+      ExecuteActivityParameters attributes, BiConsumer<Optional<Payloads>, Failure> callback) {
     checkEventLoopExecuting();
     ActivityStateMachine activityStateMachine =
         ActivityStateMachine.newInstance(
             attributes,
             (p, f) -> {
               Failure failure = f != null ? f.getFailure() : null;
-              callback.apply(p, failure);
+              callback.accept(p, failure);
 
               if (f != null
                   && !f.isFromEvent()
@@ -929,17 +932,17 @@ public final class WorkflowStateMachines {
    *     TimerFiredEvent, TimerCanceledEvent.
    * @return cancellation callback that should be invoked to initiate timer cancellation
    */
-  public Functions.Proc newTimer(
+  public Runnable newTimer(
       StartTimerCommandAttributes attributes,
       UserMetadata metadata,
-      Functions.Proc1<HistoryEvent> completionCallback) {
+      Consumer<HistoryEvent> completionCallback) {
     checkEventLoopExecuting();
     TimerStateMachine timer =
         TimerStateMachine.newInstance(
             attributes,
             metadata,
             (event) -> {
-              completionCallback.apply(event);
+              completionCallback.accept(event);
               // Needed due to immediate cancellation
               if (event.getEventType() == EventType.EVENT_TYPE_TIMER_CANCELED) {
                 eventLoop();
@@ -958,10 +961,10 @@ public final class WorkflowStateMachines {
    * @param completionCallback invoked when child reports completion or failure
    * @return cancellation callback that should be invoked to cancel the child
    */
-  public Functions.Proc startChildWorkflow(
+  public Runnable startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      Functions.Proc2<WorkflowExecution, Exception> startedCallback,
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback) {
+      BiConsumer<WorkflowExecution, Exception> startedCallback,
+      BiConsumer<Optional<Payloads>, Exception> completionCallback) {
     checkEventLoopExecuting();
     StartChildWorkflowExecutionCommandAttributes attributes = parameters.getRequest().build();
     ChildWorkflowCancellationType cancellationType = parameters.getCancellationType();
@@ -1003,10 +1006,10 @@ public final class WorkflowStateMachines {
     };
   }
 
-  public Functions.Proc startNexusOperation(
+  public Runnable startNexusOperation(
       StartNexusOperationParameters parameters,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback) {
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback) {
     checkEventLoopExecuting();
     NexusOperationCancellationType cancellationType = parameters.getCancellationType();
     NexusOperationStateMachine operation =
@@ -1047,8 +1050,8 @@ public final class WorkflowStateMachines {
 
   private void notifyNexusOperationCanceled(
       NexusOperationStateMachine operation,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback) {
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback) {
     Failure cause =
         Failure.newBuilder()
             .setMessage("operation canceled")
@@ -1060,19 +1063,18 @@ public final class WorkflowStateMachines {
   private void notifyNexusOperationCanceled(
       Failure cause,
       NexusOperationStateMachine operation,
-      Functions.Proc2<Optional<String>, Failure> startedCallback,
-      Functions.Proc2<Optional<Payload>, Failure> completionCallback) {
+      BiConsumer<Optional<String>, Failure> startedCallback,
+      BiConsumer<Optional<Payload>, Failure> completionCallback) {
     Failure failure = operation.createCancelNexusOperationFailure(cause);
     if (!operation.isAsync()) {
-      startedCallback.apply(Optional.empty(), failure);
+      startedCallback.accept(Optional.empty(), failure);
     }
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
   }
 
-  private void notifyChildCanceled(
-      Functions.Proc2<Optional<Payloads>, Exception> completionCallback) {
+  private void notifyChildCanceled(BiConsumer<Optional<Payloads>, Exception> completionCallback) {
     CanceledFailure failure = new CanceledFailure("Child canceled");
-    completionCallback.apply(Optional.empty(), failure);
+    completionCallback.accept(Optional.empty(), failure);
     eventLoop();
   }
 
@@ -1080,9 +1082,9 @@ public final class WorkflowStateMachines {
    * @param attributes
    * @param completionCallback invoked when signal delivery completes of fails. The following types
    */
-  public Functions.Proc signalExternalWorkflowExecution(
+  public Runnable signalExternalWorkflowExecution(
       SignalExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc2<Void, Failure> completionCallback) {
+      BiConsumer<Void, Failure> completionCallback) {
     checkEventLoopExecuting();
     return SignalExternalStateMachine.newInstance(
         attributes, completionCallback, commandSink, stateMachineSink);
@@ -1094,7 +1096,7 @@ public final class WorkflowStateMachines {
    */
   public void requestCancelExternalWorkflowExecution(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      Functions.Proc2<Void, RuntimeException> completionCallback) {
+      BiConsumer<Void, RuntimeException> completionCallback) {
     checkEventLoopExecuting();
     CancelExternalStateMachine.newInstance(
         attributes, completionCallback, commandSink, stateMachineSink);
@@ -1107,7 +1109,7 @@ public final class WorkflowStateMachines {
    */
   public void requestCancelNexusOperation(
       RequestCancelNexusOperationCommandAttributes attributes,
-      Functions.Proc2<Void, Failure> completionCallback) {
+      BiConsumer<Void, Failure> completionCallback) {
     checkEventLoopExecuting();
     CancelNexusOperationStateMachine.newInstance(
         attributes, completionCallback, commandSink, stateMachineSink);
@@ -1180,16 +1182,16 @@ public final class WorkflowStateMachines {
   }
 
   public void sideEffect(
-      Functions.Func<Optional<Payloads>> func,
+      Supplier<Optional<Payloads>> func,
       UserMetadata userMetadata,
-      Functions.Proc1<Optional<Payloads>> callback) {
+      Consumer<Optional<Payloads>> callback) {
     checkEventLoopExecuting();
     SideEffectStateMachine.newInstance(
         userMetadata,
         this::isReplaying,
         func,
         (payloads) -> {
-          callback.apply(payloads);
+          callback.accept(payloads);
           // callback unblocked sideEffect call. Give workflow code chance to make progress.
           eventLoop();
         },
@@ -1206,8 +1208,8 @@ public final class WorkflowStateMachines {
   public void mutableSideEffect(
       String id,
       UserMetadata userMetadata,
-      Functions.Func1<Optional<Payloads>, Optional<Payloads>> func,
-      Functions.Proc1<Optional<Payloads>> callback) {
+      Function<Optional<Payloads>, Optional<Payloads>> func,
+      Consumer<Optional<Payloads>> callback) {
     checkEventLoopExecuting();
     MutableSideEffectStateMachine stateMachine =
         mutableSideEffects.computeIfAbsent(
@@ -1218,7 +1220,7 @@ public final class WorkflowStateMachines {
     stateMachine.mutableSideEffect(
         func,
         (r) -> {
-          callback.apply(r);
+          callback.accept(r);
           // callback unblocked mutableSideEffect call. Give workflow code chance to make progress.
           eventLoop();
         },
@@ -1229,7 +1231,7 @@ public final class WorkflowStateMachines {
       String changeId,
       int minSupported,
       int maxSupported,
-      Functions.Proc2<Integer, RuntimeException> callback) {
+      BiConsumer<Integer, RuntimeException> callback) {
     VersionStateMachine stateMachine =
         versions.computeIfAbsent(
             changeId,
@@ -1261,7 +1263,7 @@ public final class WorkflowStateMachines {
           return sa;
         },
         (v, e) -> {
-          callback.apply(v, e);
+          callback.accept(v, e);
           // without this getVersion call will trigger the end of WFT,
           // instead we want to prepare subsequent commands and unblock the execution one more
           // time.
@@ -1289,10 +1291,9 @@ public final class WorkflowStateMachines {
     prepareCommands();
   }
 
-  public Functions.Proc scheduleLocalActivityTask(
+  public Runnable scheduleLocalActivityTask(
       ExecuteLocalActivityParameters parameters,
-      Functions.Proc2<Optional<Payloads>, LocalActivityCallback.LocalActivityFailedException>
-          callback) {
+      BiConsumer<Optional<Payloads>, LocalActivityCallback.LocalActivityFailedException> callback) {
     checkEventLoopExecuting();
     String activityId = parameters.getActivityId();
     if (Strings.isNullOrEmpty(activityId)) {
@@ -1307,7 +1308,7 @@ public final class WorkflowStateMachines {
             this::setCurrentTimeMillis,
             parameters,
             (r, e) -> {
-              callback.apply(r, e);
+              callback.accept(r, e);
               // callback unblocked local activity call. Give workflow code chance to make progress.
               eventLoop();
             },

@@ -5,7 +5,8 @@ import io.temporal.api.command.v1.RequestCancelNexusOperationCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.workflow.Functions;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** CancelNexusOperationStateMachine manges a request to cancel a nexus operation. */
 final class CancelNexusOperationStateMachine
@@ -16,7 +17,7 @@ final class CancelNexusOperationStateMachine
 
   private final RequestCancelNexusOperationCommandAttributes requestCancelNexusAttributes;
 
-  private final Functions.Proc2<Void, Failure> completionCallback;
+  private final BiConsumer<Void, Failure> completionCallback;
 
   /**
    * @param attributes attributes to use to cancel a nexus operation
@@ -24,18 +25,18 @@ final class CancelNexusOperationStateMachine
    */
   public static void newInstance(
       RequestCancelNexusOperationCommandAttributes attributes,
-      Functions.Proc2<Void, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new CancelNexusOperationStateMachine(
         attributes, completionCallback, commandSink, stateMachineSink);
   }
 
   private CancelNexusOperationStateMachine(
       RequestCancelNexusOperationCommandAttributes attributes,
-      Functions.Proc2<Void, Failure> completionCallback,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      BiConsumer<Void, Failure> completionCallback,
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.requestCancelNexusAttributes = attributes;
     this.completionCallback = completionCallback;
@@ -96,12 +97,12 @@ final class CancelNexusOperationStateMachine
   }
 
   private void notifyCompleted() {
-    completionCallback.apply(null, null);
+    completionCallback.accept(null, null);
   }
 
   private void notifyFailed() {
     Failure failure =
         currentEvent.getNexusOperationCancelRequestFailedEventAttributes().getFailure();
-    completionCallback.apply(null, failure);
+    completionCallback.accept(null, failure);
   }
 }

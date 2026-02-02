@@ -4,7 +4,7 @@ import io.temporal.api.command.v1.Command;
 import io.temporal.api.command.v1.ModifyWorkflowPropertiesCommandAttributes;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 final class WorkflowPropertiesModifiedStateMachine
     extends EntityStateMachineInitialCommand<
@@ -16,16 +16,16 @@ final class WorkflowPropertiesModifiedStateMachine
 
   public static void newInstance(
       ModifyWorkflowPropertiesCommandAttributes modifiedPropertiesAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     new WorkflowPropertiesModifiedStateMachine(
         modifiedPropertiesAttributes, commandSink, stateMachineSink);
   }
 
   private WorkflowPropertiesModifiedStateMachine(
       ModifyWorkflowPropertiesCommandAttributes modifiedPropertiesAttributes,
-      Functions.Proc1<CancellableCommand> commandSink,
-      Functions.Proc1<StateMachine> stateMachineSink) {
+      Consumer<CancellableCommand> commandSink,
+      Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
     this.modifiedPropertiesAttributes = modifiedPropertiesAttributes;
     explicitEvent(ExplicitEvent.SCHEDULE);
