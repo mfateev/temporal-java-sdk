@@ -5,6 +5,7 @@ dependencies {
     api(platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion"))
     api(platform("io.micrometer:micrometer-bom:$micrometerVersion"))
 
+    api project(':temporal-core')
     api project(':temporal-serviceclient')
     api "com.google.code.gson:gson:$gsonVersion"
     api "io.micrometer:micrometer-core"
