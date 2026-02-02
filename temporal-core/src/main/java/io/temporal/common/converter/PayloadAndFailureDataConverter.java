@@ -7,7 +7,6 @@ import com.google.common.base.Preconditions;
 import io.temporal.api.common.v1.Payload;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.failure.v1.Failure;
-import io.temporal.failure.DefaultFailureConverter;
 import io.temporal.payload.context.SerializationContext;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -28,7 +27,7 @@ class PayloadAndFailureDataConverter implements DataConverter {
     this(
         Collections.unmodifiableList(converters),
         createConvertersMap(converters),
-        new DefaultFailureConverter(),
+        DefaultFailureConverterProvider.get(),
         null);
   }
 
