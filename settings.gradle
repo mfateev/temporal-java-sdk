@@ -1,6 +1,7 @@
 rootProject.name='temporal-java-sdk'
 include 'temporal-bom'
 include 'temporal-serviceclient'
+include 'temporal-core'
 include 'temporal-sdk'
 include 'temporal-testing'
 include 'temporal-test-server'

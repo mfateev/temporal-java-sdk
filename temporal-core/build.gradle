@@ -1,0 +1,17 @@
+description = '''Temporal Core - Minimal runtime for Temporal SDK'''
+
+dependencies {
+    api(platform("io.grpc:grpc-bom:$grpcVersion"))
+    api(platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion"))
+
+    api project(':temporal-serviceclient')
+
+    implementation "com.google.guava:guava:$guavaVersion"
+    api "com.fasterxml.jackson.core:jackson-databind"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8"
+
+    testImplementation "junit:junit:${junitVersion}"
+    testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logbackVersion}"
+}
