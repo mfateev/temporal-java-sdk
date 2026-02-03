@@ -1351,8 +1351,8 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
       }
       if (options.getRetryOptions() != null) {
         attributes.setRetryPolicy(toRetryPolicy(options.getRetryOptions()));
-      } else if (replayContext.getRetryOptions() != null) {
-        attributes.setRetryPolicy(toRetryPolicy(replayContext.getRetryOptions()));
+      } else if (replayContext.getRetryPolicy() != null) {
+        attributes.setRetryPolicy(replayContext.getRetryPolicy());
       }
       Map<String, Object> searchAttributes = options.getSearchAttributes();
       if (searchAttributes != null && !searchAttributes.isEmpty()) {
@@ -1387,9 +1387,9 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
       }
     }
 
-    if (options == null && replayContext.getRetryOptions() != null) {
+    if (options == null && replayContext.getRetryPolicy() != null) {
       // Have to copy certain options as server doesn't copy them.
-      attributes.setRetryPolicy(toRetryPolicy(replayContext.getRetryOptions()));
+      attributes.setRetryPolicy(replayContext.getRetryPolicy());
     }
 
     if (options == null && replayContext.getSearchAttributes() != null) {

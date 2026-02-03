@@ -163,11 +163,12 @@ public interface ReplayWorkflow {
    * Returns the workflow context.
    *
    * <p>Provides access to the fullest context of the workflow, which may be needed for certain
-   * operations or diagnostics.
+   * operations or diagnostics. The returned object is expected to be an instance of {@code
+   * io.temporal.internal.replay.WorkflowContext} when used with the Java SDK implementation.
    *
-   * @return the workflow context
+   * @return the workflow context as an Object (to avoid circular dependency with temporal-sdk)
    */
   // TODO we should inverse the control. WorkflowContext should have and expose a reference to
   //  ReplayWorkflow, not the other way around.
-  WorkflowContext getWorkflowContext();
+  Object getWorkflowContext();
 }

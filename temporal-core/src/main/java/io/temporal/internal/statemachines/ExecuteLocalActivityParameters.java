@@ -6,7 +6,6 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.internal.common.ProtobufTimeUtils;
-import io.temporal.workflow.Workflow;
 import java.time.Duration;
 import java.util.Objects;
 import javax.annotation.Nonnull;
@@ -20,9 +19,9 @@ public class ExecuteLocalActivityParameters {
   private final @Nonnull PollActivityTaskQueueResponse.Builder activityTaskBuilder;
 
   /**
-   * This timestamp is a Workflow Time ({@link Workflow#currentTimeMillis()}) at the moment of
-   * scheduling of the first attempt. Comes into play when localRetryThreshold is reached. This
-   * mechanic requires reasonably synchronized worker clocks to work properly.
+   * This timestamp is a Workflow Time ({@code io.temporal.workflow.Workflow#currentTimeMillis()})
+   * at the moment of scheduling of the first attempt. Comes into play when localRetryThreshold is
+   * reached. This mechanic requires reasonably synchronized worker clocks to work properly.
    */
   private final long originalScheduledTimestamp;
 

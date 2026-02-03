@@ -140,6 +140,14 @@ final class BasicWorkflowContext {
     return toRetryOptions(startedAttributes.getRetryPolicy());
   }
 
+  @Nullable
+  public io.temporal.api.common.v1.RetryPolicy getRetryPolicy() {
+    if (!startedAttributes.hasRetryPolicy()) {
+      return null;
+    }
+    return startedAttributes.getRetryPolicy();
+  }
+
   @Nonnull
   public Priority getPriority() {
     return startedAttributes.getPriority();

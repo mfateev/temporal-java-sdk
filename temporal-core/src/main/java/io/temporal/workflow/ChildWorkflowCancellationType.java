@@ -1,7 +1,6 @@
 package io.temporal.workflow;
 
 import io.temporal.api.enums.v1.ParentClosePolicy;
-import io.temporal.failure.CanceledFailure;
 
 /**
  * Defines behaviour of the parent workflow when {@link CancellationScope} that wraps child workflow

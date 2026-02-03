@@ -5,6 +5,7 @@ dependencies {
     api(platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion"))
 
     api project(':temporal-serviceclient')
+    api "com.uber.m3:tally-core:$tallyVersion"
 
     implementation "com.google.guava:guava:$guavaVersion"
     api "com.fasterxml.jackson.core:jackson-databind"

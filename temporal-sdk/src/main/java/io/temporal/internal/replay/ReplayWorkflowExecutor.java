@@ -85,7 +85,7 @@ final class ReplayWorkflowExecutor {
       if (!context.isCancelRequested()) {
         failure =
             new WorkflowExecutionException(
-                workflow.getWorkflowContext().mapWorkflowExceptionToFailure(e));
+                ((WorkflowContext) workflow.getWorkflowContext()).mapWorkflowExceptionToFailure(e));
       }
       completed = true;
     }
@@ -99,7 +99,7 @@ final class ReplayWorkflowExecutor {
     // If the workflow is failed we do not log any warnings about unfinished handlers.
     if (log.isWarnEnabled() && (failure == null || context.isCancelRequested())) {
       Map<Long, SignalHandlerInfo> runningSignalHandlers =
-          workflow.getWorkflowContext().getRunningSignalHandlers();
+          ((WorkflowContext) workflow.getWorkflowContext()).getRunningSignalHandlers();
       List<SignalHandlerInfo> unfinishedSignalHandlers =
           runningSignalHandlers.values().stream()
               .filter(a -> a.getPolicy() == HandlerUnfinishedPolicy.WARN_AND_ABANDON)
@@ -111,7 +111,7 @@ final class ReplayWorkflowExecutor {
       }
 
       Map<String, UpdateHandlerInfo> runningUpdateHandlers =
-          workflow.getWorkflowContext().getRunningUpdateHandlers();
+          ((WorkflowContext) workflow.getWorkflowContext()).getRunningUpdateHandlers();
       List<UpdateHandlerInfo> unfinishedUpdateHandlers =
           runningUpdateHandlers.values().stream()
               .filter(a -> a.getPolicy() == HandlerUnfinishedPolicy.WARN_AND_ABANDON)

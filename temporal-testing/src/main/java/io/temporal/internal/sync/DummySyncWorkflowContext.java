@@ -7,7 +7,6 @@ import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttribut
 import io.temporal.api.common.v1.*;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.common.RetryOptions;
 import io.temporal.common.converter.DefaultDataConverter;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.SdkFlag;
@@ -104,7 +103,7 @@ public class DummySyncWorkflowContext {
 
     @Nullable
     @Override
-    public RetryOptions getRetryOptions() {
+    public io.temporal.api.common.v1.RetryPolicy getRetryPolicy() {
       return null;
     }
 

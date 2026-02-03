@@ -99,7 +99,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
             capabilities,
             workflow.getWorkflowContext() == null
                 ? WorkflowImplementationOptions.newBuilder().build()
-                : workflow.getWorkflowContext().getWorkflowImplementationOptions());
+                : ((WorkflowContext) workflow.getWorkflowContext())
+                    .getWorkflowImplementationOptions());
     String fullReplayDirectQueryType =
         workflowTask.hasQuery() ? workflowTask.getQuery().getQueryType() : null;
     this.context =
@@ -183,7 +184,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
         result.setWriteSdkVersion(workflowStateMachines.sdkVersionToWrite());
       }
       if (workflow.getWorkflowContext() != null) {
-        result.setVersioningBehavior(workflow.getWorkflowContext().getVersioningBehavior());
+        result.setVersioningBehavior(
+            ((WorkflowContext) workflow.getWorkflowContext()).getVersioningBehavior());
       }
       // Setup post-completion metrics to be applied after task response accepted
       String postCompleteCounter = workflowStateMachines.getPostCompletionMetricCounter();
@@ -262,7 +264,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
         } catch (Throwable e) {
           // Fail workflow if exception is of the specified type
           WorkflowImplementationOptions implementationOptions =
-              workflow.getWorkflowContext().getWorkflowImplementationOptions();
+              ((WorkflowContext) workflow.getWorkflowContext()).getWorkflowImplementationOptions();
           Class<? extends Throwable>[] failTypes =
               implementationOptions.getFailWorkflowExceptionTypes();
           for (Class<? extends Throwable> failType : failTypes) {
@@ -271,7 +273,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
                 metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
               }
               throw new WorkflowExecutionException(
-                  workflow.getWorkflowContext().mapWorkflowExceptionToFailure(e));
+                  ((WorkflowContext) workflow.getWorkflowContext())
+                      .mapWorkflowExceptionToFailure(e));
             }
           }
           if (e instanceof WorkflowExecutionException

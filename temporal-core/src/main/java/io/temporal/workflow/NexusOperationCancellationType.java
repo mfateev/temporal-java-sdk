@@ -1,7 +1,6 @@
 package io.temporal.workflow;
 
 import io.temporal.common.Experimental;
-import io.temporal.failure.CanceledFailure;
 
 /**
  * Defines behavior of the parent workflow when {@link CancellationScope} that wraps Nexus operation

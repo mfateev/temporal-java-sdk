@@ -1,7 +1,5 @@
 package io.temporal.activity;
 
-import io.temporal.client.ActivityCompletionException;
-
 /**
  * In case of an activity's call scope cancellation the corresponding activity stub call fails with
  * a {@link io.temporal.failure.CanceledFailure}. The different modes of this behavior are available

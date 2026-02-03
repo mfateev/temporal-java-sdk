@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-class ReplayAwareScope implements Scope {
+public class ReplayAwareScope implements Scope {
   private final Scope scope;
   private final ReplayAware context;
   private final Supplier<Long> clock;

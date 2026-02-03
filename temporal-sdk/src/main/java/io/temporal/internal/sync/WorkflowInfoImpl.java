@@ -1,5 +1,7 @@
 package io.temporal.internal.sync;
 
+import static io.temporal.internal.common.RetryOptionsUtils.toRetryOptions;
+
 import io.temporal.api.common.v1.SearchAttributes;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.common.Priority;
@@ -66,7 +68,7 @@ final class WorkflowInfoImpl implements WorkflowInfo {
   @Nullable
   @Override
   public RetryOptions getRetryOptions() {
-    return context.getRetryOptions();
+    return context.getRetryPolicy() != null ? toRetryOptions(context.getRetryPolicy()) : null;
   }
 
   @Override

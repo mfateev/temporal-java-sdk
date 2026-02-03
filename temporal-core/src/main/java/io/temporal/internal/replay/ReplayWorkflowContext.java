@@ -24,10 +24,10 @@ import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes;
 import io.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes;
 import io.temporal.api.common.v1.*;
+import io.temporal.api.common.v1.RetryPolicy;
 import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
-import io.temporal.common.RetryOptions;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.statemachines.*;
 import io.temporal.internal.worker.WorkflowImplementationFactory;
@@ -151,7 +151,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
   String getTaskQueue();
 
   @Nullable
-  RetryOptions getRetryOptions();
+  RetryPolicy getRetryPolicy();
 
   /** Workflow namespace. */
   String getNamespace();
@@ -159,13 +159,13 @@ public interface ReplayWorkflowContext extends ReplayAware {
   String getWorkflowId();
 
   /**
-   * @return Timeout for a Workflow Run specified during Workflow start in {@link
+   * @return Timeout for a Workflow Run specified during Workflow start in {@code
    *     io.temporal.client.WorkflowOptions.Builder#setWorkflowRunTimeout(Duration)}
    */
   Duration getWorkflowRunTimeout();
 
   /**
-   * @return Timeout for the Workflow Execution specified during Workflow start in {@link
+   * @return Timeout for the Workflow Execution specified during Workflow start in {@code
    *     io.temporal.client.WorkflowOptions.Builder#setWorkflowExecutionTimeout(Duration)}
    */
   Duration getWorkflowExecutionTimeout();
