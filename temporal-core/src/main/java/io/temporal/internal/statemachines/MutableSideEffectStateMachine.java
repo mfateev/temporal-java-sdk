@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ * Copyright (C) 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this material except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.temporal.internal.statemachines;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -9,8 +29,7 @@ import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.common.converter.DefaultDataConverter;
-import io.temporal.common.converter.StdConverterBackwardsCompatAdapter;
+import io.temporal.internal.common.CorePayloadConverter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -133,28 +152,25 @@ final class MutableSideEffectStateMachine {
     }
 
     @Override
-    public WorkflowStateMachines.HandleEventStatus handleEvent(
-        HistoryEvent event, boolean hasNextEvent) {
+    public HandleEventStatus handleEvent(HistoryEvent event, boolean hasNextEvent) {
       if (event.getEventType() != EventType.EVENT_TYPE_MARKER_RECORDED
           || !event
               .getMarkerRecordedEventAttributes()
               .getMarkerName()
               .equals(MUTABLE_SIDE_EFFECT_MARKER_NAME)) {
         explicitEvent(ExplicitEvent.NON_MATCHING_EVENT);
-        return WorkflowStateMachines.HandleEventStatus.NON_MATCHING_EVENT;
+        return HandleEventStatus.NON_MATCHING_EVENT;
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-      String expectedId =
-          StdConverterBackwardsCompatAdapter.fromPayloads(
-              0, idPayloads, String.class, String.class);
+      String expectedId = CorePayloadConverter.INSTANCE.fromPayloads(0, idPayloads, String.class);
       if (Strings.isNullOrEmpty(expectedId)) {
         throw new IllegalStateException(
             "Marker details map missing required key: " + MARKER_ID_KEY);
       }
       if (!id.equals(expectedId)) {
         explicitEvent(ExplicitEvent.NON_MATCHING_EVENT);
-        return WorkflowStateMachines.HandleEventStatus.NON_MATCHING_EVENT;
+        return HandleEventStatus.NON_MATCHING_EVENT;
       }
       return super.handleEvent(event, hasNextEvent);
     }
@@ -168,11 +184,11 @@ final class MutableSideEffectStateMachine {
       } else {
         result = updated;
         Map<String, Payloads> details = new HashMap<>();
-        details.put(MARKER_ID_KEY, DefaultDataConverter.STANDARD_INSTANCE.toPayloads(id).get());
+        details.put(MARKER_ID_KEY, CorePayloadConverter.INSTANCE.toPayloads(id).get());
         details.put(MARKER_DATA_KEY, updated.get());
         details.put(
             MARKER_SKIP_COUNT_KEY,
-            DefaultDataConverter.STANDARD_INSTANCE.toPayloads(currentSkipCount).get());
+            CorePayloadConverter.INSTANCE.toPayloads(currentSkipCount).get());
         RecordMarkerCommandAttributes markerAttributes =
             RecordMarkerCommandAttributes.newBuilder()
                 .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
@@ -215,14 +231,12 @@ final class MutableSideEffectStateMachine {
             "Marker details detailsMap missing required key: " + MARKER_SKIP_COUNT_KEY);
       }
       Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-      String idFromMarker =
-          StdConverterBackwardsCompatAdapter.fromPayloads(0, oid, String.class, String.class);
+      String idFromMarker = CorePayloadConverter.INSTANCE.fromPayloads(0, oid, String.class);
       if (!id.equals(idFromMarker)) {
         throw new IllegalArgumentException("Ids doesnt match: " + id + "<>" + idFromMarker);
       }
       skipCountFromMarker =
-          StdConverterBackwardsCompatAdapter.fromPayloads(
-              0, skipCountPayloads, Integer.class, Integer.class);
+          CorePayloadConverter.INSTANCE.fromPayloads(0, skipCountPayloads, Integer.class);
       if (++currentSkipCount < skipCountFromMarker) {
         skipCountFromMarker = Integer.MAX_VALUE;
         return State.SKIPPED_NOTIFIED;

@@ -209,9 +209,7 @@ public class DummySyncWorkflowContext {
 
     @Override
     public void requestCancelExternalWorkflowExecution(
-        WorkflowExecution execution,
-        @Nullable String reason,
-        BiConsumer<Void, RuntimeException> callback) {
+        WorkflowExecution execution, @Nullable String reason, BiConsumer<Void, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 

@@ -1422,10 +1422,13 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
     replayContext.requestCancelExternalWorkflowExecution(
         input.getExecution(),
         input.getReason(),
-        (r, exception) -> {
-          if (exception == null) {
+        (r, failure) -> {
+          if (failure == null) {
             result.complete(null);
           } else {
+            CancelExternalWorkflowException exception =
+                new CancelExternalWorkflowException(
+                    failure.getMessage(), input.getExecution(), null, null);
             result.completeExceptionally(exception);
           }
         });

@@ -45,11 +45,6 @@ import org.slf4j.LoggerFactory;
 
 public final class WorkflowStateMachines {
 
-  enum HandleEventStatus {
-    OK,
-    NON_MATCHING_EVENT
-  }
-
   private static final Logger log = LoggerFactory.getLogger(WorkflowStateMachines.class);
 
   /** Initial set of SDK flags that will be set on all new workflow executions. */
@@ -1096,7 +1091,7 @@ public final class WorkflowStateMachines {
    */
   public void requestCancelExternalWorkflowExecution(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      BiConsumer<Void, RuntimeException> completionCallback) {
+      BiConsumer<Void, Failure> completionCallback) {
     checkEventLoopExecuting();
     CancelExternalStateMachine.newInstance(
         attributes, completionCallback, commandSink, stateMachineSink);

@@ -238,9 +238,7 @@ public interface ReplayWorkflowContext extends ReplayAware {
    * @param callback callback notified about the operation result
    */
   void requestCancelExternalWorkflowExecution(
-      WorkflowExecution execution,
-      @Nullable String reason,
-      BiConsumer<Void, RuntimeException> callback);
+      WorkflowExecution execution, @Nullable String reason, BiConsumer<Void, Failure> callback);
 
   /**
    * @return time of the {@link PollWorkflowTaskQueueResponse} start event of the workflow task

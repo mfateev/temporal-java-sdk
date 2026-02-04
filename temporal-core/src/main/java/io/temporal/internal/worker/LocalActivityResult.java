@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ * Copyright (C) 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this material except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.temporal.internal.worker;
 
 import io.temporal.api.enums.v1.RetryState;
@@ -8,6 +28,11 @@ import java.time.Duration;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+/**
+ * Represents the result of a local activity execution. This class is part of temporal-core and
+ * contains only protobuf types. SDK-specific factory methods that depend on ActivityTaskHandler are
+ * provided in LocalActivityResultFactory in temporal-sdk.
+ */
 public final class LocalActivityResult {
   private final @Nonnull String activityId;
   private final int lastAttempt;
@@ -21,29 +46,36 @@ public final class LocalActivityResult {
    */
   private final @Nullable ProcessingErrorResult processingError;
 
-  static LocalActivityResult completed(ActivityTaskHandler.Result ahResult, int attempt) {
-    return new LocalActivityResult(
-        ahResult.getActivityId(), attempt, ahResult.getTaskCompleted(), null, null, null);
-  }
-
-  static LocalActivityResult failed(
+  /**
+   * Creates a new LocalActivityResult for a failed execution.
+   *
+   * @param activityId the activity ID
+   * @param attempt the attempt number
+   * @param retryState the retry state
+   * @param failure the failure
+   * @param backoff optional backoff duration
+   * @return the result
+   */
+  public static LocalActivityResult failed(
       String activityId,
       int attempt,
       RetryState retryState,
-      Failure timeoutFailure,
+      Failure failure,
       @Nullable Duration backoff) {
-    ExecutionFailedResult failedResult =
-        new ExecutionFailedResult(retryState, timeoutFailure, backoff);
+    ExecutionFailedResult failedResult = new ExecutionFailedResult(retryState, failure, backoff);
     return new LocalActivityResult(activityId, attempt, null, failedResult, null, null);
   }
 
-  static LocalActivityResult cancelled(ActivityTaskHandler.Result ahResult, int attempt) {
-    return new LocalActivityResult(
-        ahResult.getActivityId(), attempt, null, null, ahResult.getTaskCanceled(), null);
-  }
-
-  /** result created by this factory method will lead to as immediate WFT failure as possible. */
-  static LocalActivityResult processingFailed(String activityId, int attempt, Throwable ex) {
+  /**
+   * Creates a new LocalActivityResult for a processing failure. This result will lead to an
+   * immediate WFT failure.
+   *
+   * @param activityId the activity ID
+   * @param attempt the attempt number
+   * @param ex the exception that caused the processing failure
+   * @return the result
+   */
+  public static LocalActivityResult processingFailed(String activityId, int attempt, Throwable ex) {
     return new LocalActivityResult(
         activityId, attempt, null, null, null, new ProcessingErrorResult(ex));
   }

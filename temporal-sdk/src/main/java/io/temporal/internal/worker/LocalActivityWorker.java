@@ -2,6 +2,8 @@ package io.temporal.internal.worker;
 
 import static io.temporal.internal.worker.LocalActivityResult.failed;
 import static io.temporal.internal.worker.LocalActivityResult.processingFailed;
+import static io.temporal.internal.worker.LocalActivityResultFactory.cancelled;
+import static io.temporal.internal.worker.LocalActivityResultFactory.completed;
 
 import com.google.common.base.Preconditions;
 import com.uber.m3.tally.Scope;
@@ -503,8 +505,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
       // Success
       if (activityHandlerResult.getTaskCompleted() != null) {
         boolean completedByThisInvocation =
-            executionContext.callback(
-                LocalActivityResult.completed(activityHandlerResult, currentAttempt));
+            executionContext.callback(completed(activityHandlerResult, currentAttempt));
         if (completedByThisInvocation) {
           // We report this metric only if the execution was completed by us right now, not by any
           // timeout earlier.
@@ -520,8 +521,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
 
       // Cancellation
       if (activityHandlerResult.getTaskCanceled() != null) {
-        executionContext.callback(
-            LocalActivityResult.cancelled(activityHandlerResult, currentAttempt));
+        executionContext.callback(cancelled(activityHandlerResult, currentAttempt));
         return releaseReason;
       }
 

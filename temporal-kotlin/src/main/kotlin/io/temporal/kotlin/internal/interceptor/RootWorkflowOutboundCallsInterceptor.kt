@@ -206,8 +206,11 @@ internal class RootWorkflowOutboundCallsInterceptor(
       context.replayContext.requestCancelExternalWorkflowExecution(
         input.execution,
         input.reason
-      ) { _, exception ->
-        if (exception != null) {
+      ) { _, failure ->
+        if (failure != null) {
+          val exception = io.temporal.workflow.CancelExternalWorkflowException(
+            failure.message, input.execution, null, null
+          )
           cont.resumeWithException(exception)
         } else {
           cont.resume(Unit) {}

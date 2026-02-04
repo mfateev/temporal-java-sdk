@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ * Copyright (C) 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this material except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.temporal.internal.statemachines;
 
 import io.temporal.api.command.v1.Command;
@@ -5,7 +25,7 @@ import io.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandA
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
-import io.temporal.workflow.CancelExternalWorkflowException;
+import io.temporal.api.failure.v1.Failure;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -15,9 +35,12 @@ final class CancelExternalStateMachine
         CancelExternalStateMachine.ExplicitEvent,
         CancelExternalStateMachine> {
 
+  static final String CANCEL_EXTERNAL_WORKFLOW_FAILED_MESSAGE =
+      "Request to cancel external workflow execution failed";
+
   private final RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes;
 
-  private final BiConsumer<Void, RuntimeException> completionCallback;
+  private final BiConsumer<Void, Failure> completionCallback;
 
   /**
    * @param attributes attributes to use to cancel external workflow
@@ -27,7 +50,7 @@ final class CancelExternalStateMachine
    */
   public static void newInstance(
       RequestCancelExternalWorkflowExecutionCommandAttributes attributes,
-      BiConsumer<Void, RuntimeException> completionCallback,
+      BiConsumer<Void, Failure> completionCallback,
       Consumer<CancellableCommand> commandSink,
       Consumer<StateMachine> stateMachineSink) {
     new CancelExternalStateMachine(attributes, completionCallback, commandSink, stateMachineSink);
@@ -35,7 +58,7 @@ final class CancelExternalStateMachine
 
   private CancelExternalStateMachine(
       RequestCancelExternalWorkflowExecutionCommandAttributes requestCancelAttributes,
-      BiConsumer<Void, RuntimeException> completionCallback,
+      BiConsumer<Void, Failure> completionCallback,
       Consumer<CancellableCommand> commandSink,
       Consumer<StateMachine> stateMachineSink) {
     super(STATE_MACHINE_DEFINITION, commandSink, stateMachineSink);
@@ -106,9 +129,10 @@ final class CancelExternalStateMachine
             .setWorkflowId(requestCancelAttributes.getWorkflowId())
             .setRunId(requestCancelAttributes.getRunId())
             .build();
-    completionCallback.accept(
-        null,
-        new CancelExternalWorkflowException(
-            "Workflow not found: " + execution, execution, "", null));
+    Failure failure =
+        Failure.newBuilder()
+            .setMessage(CANCEL_EXTERNAL_WORKFLOW_FAILED_MESSAGE + ": " + execution)
+            .build();
+    completionCallback.accept(null, failure);
   }
 }

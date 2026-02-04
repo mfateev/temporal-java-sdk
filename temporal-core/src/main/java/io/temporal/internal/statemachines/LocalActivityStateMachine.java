@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2022 Temporal Technologies, Inc. All Rights Reserved.
+ *
+ * Copyright (C) 2012-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Modifications copyright (C) 2017 Uber Technologies, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this material except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.temporal.internal.statemachines;
 
 import com.google.common.base.Preconditions;
@@ -14,7 +34,7 @@ import io.temporal.api.history.v1.MarkerRecordedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
-import io.temporal.common.converter.DefaultDataConverter;
+import io.temporal.internal.common.CorePayloadConverter;
 import io.temporal.internal.history.LocalActivityMarkerMetadata;
 import io.temporal.internal.history.LocalActivityMarkerUtils;
 import io.temporal.internal.worker.LocalActivityResult;
@@ -246,17 +266,16 @@ final class LocalActivityStateMachine
     Map<String, Payloads> details = new HashMap<>();
     if (!replaying.get()) {
       markerAttributes.setMarkerName(LocalActivityMarkerUtils.MARKER_NAME);
-      Payloads id = DefaultDataConverter.STANDARD_INSTANCE.toPayloads(activityId).get();
+      Payloads id = CorePayloadConverter.INSTANCE.toPayloads(activityId).get();
       details.put(LocalActivityMarkerUtils.MARKER_ACTIVITY_ID_KEY, id);
-      Payloads type =
-          DefaultDataConverter.STANDARD_INSTANCE.toPayloads(activityType.getName()).get();
+      Payloads type = CorePayloadConverter.INSTANCE.toPayloads(activityType.getName()).get();
       details.put(LocalActivityMarkerUtils.MARKER_ACTIVITY_TYPE_KEY, type);
 
       long elapsedNanoseconds = System.nanoTime() - systemNanoTimeWhenStarted;
       long currentTime =
           setCurrentTimeCallback.apply(
               workflowTimeMillisWhenStarted + TimeUnit.NANOSECONDS.toMillis(elapsedNanoseconds));
-      Payloads t = DefaultDataConverter.STANDARD_INSTANCE.toPayloads(currentTime).get();
+      Payloads t = CorePayloadConverter.INSTANCE.toPayloads(currentTime).get();
       details.put(LocalActivityMarkerUtils.MARKER_TIME_KEY, t);
 
       if (localActivityParameters != null
@@ -324,7 +343,7 @@ final class LocalActivityStateMachine
 
       details.put(
           LocalActivityMarkerUtils.MARKER_METADATA_KEY,
-          DefaultDataConverter.STANDARD_INSTANCE.toPayloads(localActivityMarkerMetadata).get());
+          CorePayloadConverter.INSTANCE.toPayloads(localActivityMarkerMetadata).get());
       markerAttributes.putAllDetails(details);
     }
     Command.Builder command =
