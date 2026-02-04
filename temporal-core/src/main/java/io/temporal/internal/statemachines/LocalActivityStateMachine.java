@@ -266,16 +266,16 @@ final class LocalActivityStateMachine
     Map<String, Payloads> details = new HashMap<>();
     if (!replaying.get()) {
       markerAttributes.setMarkerName(LocalActivityMarkerUtils.MARKER_NAME);
-      Payloads id = CorePayloadConverter.INSTANCE.toPayloads(activityId).get();
+      Payloads id = CorePayloadConverter.toPayloads(activityId).get();
       details.put(LocalActivityMarkerUtils.MARKER_ACTIVITY_ID_KEY, id);
-      Payloads type = CorePayloadConverter.INSTANCE.toPayloads(activityType.getName()).get();
+      Payloads type = CorePayloadConverter.toPayloads(activityType.getName()).get();
       details.put(LocalActivityMarkerUtils.MARKER_ACTIVITY_TYPE_KEY, type);
 
       long elapsedNanoseconds = System.nanoTime() - systemNanoTimeWhenStarted;
       long currentTime =
           setCurrentTimeCallback.apply(
               workflowTimeMillisWhenStarted + TimeUnit.NANOSECONDS.toMillis(elapsedNanoseconds));
-      Payloads t = CorePayloadConverter.INSTANCE.toPayloads(currentTime).get();
+      Payloads t = CorePayloadConverter.toPayloads(currentTime).get();
       details.put(LocalActivityMarkerUtils.MARKER_TIME_KEY, t);
 
       if (localActivityParameters != null
@@ -343,7 +343,7 @@ final class LocalActivityStateMachine
 
       details.put(
           LocalActivityMarkerUtils.MARKER_METADATA_KEY,
-          CorePayloadConverter.INSTANCE.toPayloads(localActivityMarkerMetadata).get());
+          CorePayloadConverter.toPayloads(localActivityMarkerMetadata).get());
       markerAttributes.putAllDetails(details);
     }
     Command.Builder command =

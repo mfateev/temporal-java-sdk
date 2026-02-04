@@ -73,6 +73,6 @@ public class MarkerUtils {
   public static <T> T getValueFromMarker(
       MarkerRecordedEventAttributes markerAttributes, String key, Class<T> simpleValueType) {
     Optional<Payloads> payloads = Optional.ofNullable(markerAttributes.getDetailsMap().get(key));
-    return CorePayloadConverter.INSTANCE.fromPayloads(0, payloads, simpleValueType);
+    return CorePayloadConverter.fromPayloads(0, payloads, simpleValueType);
   }
 }

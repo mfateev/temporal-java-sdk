@@ -31,89 +31,87 @@ import org.junit.Test;
 
 public class CorePayloadConverterTest {
 
-  private final CorePayloadConverter converter = CorePayloadConverter.INSTANCE;
-
   @Test
   public void testNullRoundTrip() {
-    Payload payload = converter.toPayload(null);
+    Payload payload = CorePayloadConverter.toPayload(null);
     assertEquals("binary/null", payload.getMetadataOrThrow("encoding").toStringUtf8());
 
-    String result = converter.fromPayload(payload, String.class);
+    String result = CorePayloadConverter.fromPayload(payload, String.class);
     assertNull(result);
   }
 
   @Test
   public void testStringRoundTrip() {
     String original = "hello world";
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     assertEquals("json/plain", payload.getMetadataOrThrow("encoding").toStringUtf8());
     assertEquals("\"hello world\"", payload.getData().toStringUtf8());
 
-    String result = converter.fromPayload(payload, String.class);
+    String result = CorePayloadConverter.fromPayload(payload, String.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testStringWithSpecialChars() {
     String original = "hello \"world\" with\nnewline\tand\\backslash";
-    Payload payload = converter.toPayload(original);
-    String result = converter.fromPayload(payload, String.class);
+    Payload payload = CorePayloadConverter.toPayload(original);
+    String result = CorePayloadConverter.fromPayload(payload, String.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testStringWithUnicode() {
     String original = "hello \u0000 control char";
-    Payload payload = converter.toPayload(original);
-    String result = converter.fromPayload(payload, String.class);
+    Payload payload = CorePayloadConverter.toPayload(original);
+    String result = CorePayloadConverter.fromPayload(payload, String.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testIntegerRoundTrip() {
     Integer original = 42;
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     assertEquals("42", payload.getData().toStringUtf8());
 
-    Integer result = converter.fromPayload(payload, Integer.class);
+    Integer result = CorePayloadConverter.fromPayload(payload, Integer.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testNegativeInteger() {
     Integer original = -12345;
-    Payload payload = converter.toPayload(original);
-    Integer result = converter.fromPayload(payload, Integer.class);
+    Payload payload = CorePayloadConverter.toPayload(original);
+    Integer result = CorePayloadConverter.fromPayload(payload, Integer.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testLongRoundTrip() {
     Long original = 9876543210L;
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     assertEquals("9876543210", payload.getData().toStringUtf8());
 
-    Long result = converter.fromPayload(payload, Long.class);
+    Long result = CorePayloadConverter.fromPayload(payload, Long.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testBooleanTrue() {
     Boolean original = true;
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     assertEquals("true", payload.getData().toStringUtf8());
 
-    Boolean result = converter.fromPayload(payload, Boolean.class);
+    Boolean result = CorePayloadConverter.fromPayload(payload, Boolean.class);
     assertEquals(original, result);
   }
 
   @Test
   public void testBooleanFalse() {
     Boolean original = false;
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     assertEquals("false", payload.getData().toStringUtf8());
 
-    Boolean result = converter.fromPayload(payload, Boolean.class);
+    Boolean result = CorePayloadConverter.fromPayload(payload, Boolean.class);
     assertEquals(original, result);
   }
 
@@ -122,7 +120,7 @@ public class CorePayloadConverterTest {
     LocalActivityMarkerMetadata original = new LocalActivityMarkerMetadata(3, 1234567890L);
     original.setBackoff(Duration.ofMillis(5000));
 
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     String json = payload.getData().toStringUtf8();
 
     // Verify JSON format matches what Jackson would produce
@@ -131,7 +129,7 @@ public class CorePayloadConverterTest {
     assertTrue(json.contains("\"backoff\":5000"));
 
     LocalActivityMarkerMetadata result =
-        converter.fromPayload(payload, LocalActivityMarkerMetadata.class);
+        CorePayloadConverter.fromPayload(payload, LocalActivityMarkerMetadata.class);
     assertEquals(original.getOriginalScheduledTimestamp(), result.getOriginalScheduledTimestamp());
     assertEquals(original.getAttempt(), result.getAttempt());
     assertEquals(original.getBackoff(), result.getBackoff());
@@ -142,14 +140,14 @@ public class CorePayloadConverterTest {
     LocalActivityMarkerMetadata original = new LocalActivityMarkerMetadata(1, 999L);
     // backoff is null
 
-    Payload payload = converter.toPayload(original);
+    Payload payload = CorePayloadConverter.toPayload(original);
     String json = payload.getData().toStringUtf8();
 
     // Should not contain backoff field when null
     assertFalse(json.contains("backoff"));
 
     LocalActivityMarkerMetadata result =
-        converter.fromPayload(payload, LocalActivityMarkerMetadata.class);
+        CorePayloadConverter.fromPayload(payload, LocalActivityMarkerMetadata.class);
     assertEquals(original.getOriginalScheduledTimestamp(), result.getOriginalScheduledTimestamp());
     assertEquals(original.getAttempt(), result.getAttempt());
     assertNull(result.getBackoff());
@@ -157,7 +155,7 @@ public class CorePayloadConverterTest {
 
   @Test
   public void testToPayloads() {
-    Optional<Payloads> payloads = converter.toPayloads("test");
+    Optional<Payloads> payloads = CorePayloadConverter.toPayloads("test");
     assertTrue(payloads.isPresent());
     assertEquals(1, payloads.get().getPayloadsCount());
     assertEquals("\"test\"", payloads.get().getPayloads(0).getData().toStringUtf8());
@@ -167,30 +165,33 @@ public class CorePayloadConverterTest {
   public void testFromPayloadsAtIndex() {
     Payloads payloads =
         Payloads.newBuilder()
-            .addPayloads(converter.toPayload("first"))
-            .addPayloads(converter.toPayload("second"))
+            .addPayloads(CorePayloadConverter.toPayload("first"))
+            .addPayloads(CorePayloadConverter.toPayload("second"))
             .build();
 
-    assertEquals("first", converter.fromPayloads(0, Optional.of(payloads), String.class));
-    assertEquals("second", converter.fromPayloads(1, Optional.of(payloads), String.class));
+    assertEquals(
+        "first", CorePayloadConverter.fromPayloads(0, Optional.of(payloads), String.class));
+    assertEquals(
+        "second", CorePayloadConverter.fromPayloads(1, Optional.of(payloads), String.class));
   }
 
   @Test
   public void testFromPayloadsOutOfBounds() {
-    Payloads payloads = Payloads.newBuilder().addPayloads(converter.toPayload("only")).build();
+    Payloads payloads =
+        Payloads.newBuilder().addPayloads(CorePayloadConverter.toPayload("only")).build();
 
-    assertNull(converter.fromPayloads(1, Optional.of(payloads), String.class));
-    assertNull(converter.fromPayloads(5, Optional.of(payloads), String.class));
+    assertNull(CorePayloadConverter.fromPayloads(1, Optional.of(payloads), String.class));
+    assertNull(CorePayloadConverter.fromPayloads(5, Optional.of(payloads), String.class));
   }
 
   @Test
   public void testFromPayloadsEmpty() {
-    assertNull(converter.fromPayloads(0, Optional.empty(), String.class));
+    assertNull(CorePayloadConverter.fromPayloads(0, Optional.empty(), String.class));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testUnsupportedTypeThrows() {
-    converter.toPayload(new Object());
+    CorePayloadConverter.toPayload(new Object());
   }
 
   @Test
@@ -204,7 +205,7 @@ public class CorePayloadConverterTest {
             .build();
 
     LocalActivityMarkerMetadata result =
-        converter.fromPayload(payload, LocalActivityMarkerMetadata.class);
+        CorePayloadConverter.fromPayload(payload, LocalActivityMarkerMetadata.class);
     assertEquals(100L, result.getOriginalScheduledTimestamp());
     assertEquals(2, result.getAttempt());
     assertEquals(Duration.ofMillis(3000), result.getBackoff());

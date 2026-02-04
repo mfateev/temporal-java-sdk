@@ -1,0 +1,34 @@
+` PlantUML <plantuml.com> State Diagram.
+` Generated from src/test/java/io/temporal/internal/statemachines/MutableSideEffectStateMachine.java
+` by io.temporal.internal.statemachines.CommandsGeneratePlantUMLStateDiagramsTest.
+
+
+@startuml
+title Test Coverage of MutableSideEffect State Transitions
+skinparam {
+  ArrowColor green
+  ArrowThickness 2
+}
+
+skinparam state {
+ BackgroundColor green
+ BorderColor black
+ BackgroundColor<<NotCovered>> red
+}
+[*] --> CREATED
+CREATED --> REPLAYING: CHECK_EXECUTION_STATE
+CREATED --> EXECUTING: CHECK_EXECUTION_STATE
+EXECUTING --> MARKER_COMMAND_CREATED: SCHEDULE
+EXECUTING --> SKIPPED: SCHEDULE
+MARKER_COMMAND_CREATED --> RESULT_NOTIFIED: RECORD_MARKER
+MARKER_COMMAND_CREATED_REPLAYING --> RESULT_NOTIFIED_REPLAYING: RECORD_MARKER
+REPLAYING --> MARKER_COMMAND_CREATED_REPLAYING: SCHEDULE
+RESULT_NOTIFIED --> MARKER_COMMAND_RECORDED: MARKER_RECORDED
+RESULT_NOTIFIED_REPLAYING -[#red]-> SKIPPED_NOTIFIED: NON_MATCHING_EVENT
+RESULT_NOTIFIED_REPLAYING --> MARKER_COMMAND_RECORDED: MARKER_RECORDED
+RESULT_NOTIFIED_REPLAYING --> SKIPPED_NOTIFIED: MARKER_RECORDED
+SKIPPED --> SKIPPED_NOTIFIED: RECORD_MARKER
+MARKER_COMMAND_RECORDED --> [*]
+SKIPPED_NOTIFIED --> [*]
+center footer Copyright (C) 2020 Temporal Technologies, Inc. All Rights Reserved.
+@enduml

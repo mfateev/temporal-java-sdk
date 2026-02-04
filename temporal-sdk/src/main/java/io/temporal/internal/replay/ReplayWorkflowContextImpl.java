@@ -230,9 +230,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
 
   @Override
   public void requestCancelExternalWorkflowExecution(
-      WorkflowExecution execution,
-      @Nullable String reason,
-      BiConsumer<Void, RuntimeException> callback) {
+      WorkflowExecution execution, @Nullable String reason, BiConsumer<Void, Failure> callback) {
     RequestCancelExternalWorkflowExecutionCommandAttributes.Builder attributes =
         RequestCancelExternalWorkflowExecutionCommandAttributes.newBuilder()
             .setWorkflowId(execution.getWorkflowId())

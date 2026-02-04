@@ -37,8 +37,6 @@ import javax.annotation.Nullable;
  */
 public final class CorePayloadConverter {
 
-  public static final CorePayloadConverter INSTANCE = new CorePayloadConverter();
-
   private static final String ENCODING_KEY = "encoding";
   private static final ByteString ENCODING_JSON = ByteString.copyFromUtf8("json/plain");
   private static final ByteString ENCODING_NULL = ByteString.copyFromUtf8("binary/null");
@@ -52,7 +50,7 @@ public final class CorePayloadConverter {
    *     LocalActivityMarkerMetadata)
    * @return Payloads containing the serialized value
    */
-  public Optional<Payloads> toPayloads(Object value) {
+  public static Optional<Payloads> toPayloads(Object value) {
     return Optional.of(Payloads.newBuilder().addPayloads(toPayload(value)).build());
   }
 
@@ -62,7 +60,7 @@ public final class CorePayloadConverter {
    * @param value the value to convert
    * @return the serialized Payload
    */
-  public Payload toPayload(Object value) {
+  public static Payload toPayload(Object value) {
     if (value == null) {
       return Payload.newBuilder().putMetadata(ENCODING_KEY, ENCODING_NULL).build();
     }
@@ -83,7 +81,7 @@ public final class CorePayloadConverter {
    * @return the deserialized value, or null if not present
    */
   @Nullable
-  public <T> T fromPayloads(int index, Optional<Payloads> content, Class<T> type) {
+  public static <T> T fromPayloads(int index, Optional<Payloads> content, Class<T> type) {
     if (!content.isPresent() || content.get().getPayloadsCount() <= index) {
       return null;
     }
@@ -98,7 +96,7 @@ public final class CorePayloadConverter {
    * @return the deserialized value
    */
   @Nullable
-  public <T> T fromPayload(Payload payload, Class<T> type) {
+  public static <T> T fromPayload(Payload payload, Class<T> type) {
     String encoding = payload.getMetadataOrDefault(ENCODING_KEY, ENCODING_NULL).toStringUtf8();
 
     if ("binary/null".equals(encoding)) {
@@ -109,7 +107,7 @@ public final class CorePayloadConverter {
     return fromJson(json, type);
   }
 
-  private String toJson(Object value) {
+  private static String toJson(Object value) {
     if (value instanceof String) {
       return escapeJsonString((String) value);
     } else if (value instanceof Integer) {
@@ -127,7 +125,7 @@ public final class CorePayloadConverter {
 
   @SuppressWarnings("unchecked")
   @Nullable
-  private <T> T fromJson(String json, Class<T> type) {
+  private static <T> T fromJson(String json, Class<T> type) {
     if (json == null || json.isEmpty()) {
       return null;
     }
@@ -148,7 +146,7 @@ public final class CorePayloadConverter {
   }
 
   /** Escapes a string value as a JSON string literal (with surrounding quotes). */
-  private String escapeJsonString(String value) {
+  private static String escapeJsonString(String value) {
     StringBuilder sb = new StringBuilder(value.length() + 2);
     sb.append('"');
     for (int i = 0; i < value.length(); i++) {
@@ -188,7 +186,7 @@ public final class CorePayloadConverter {
   }
 
   /** Parses a JSON string literal (with surrounding quotes) to a String. */
-  private String parseJsonString(String json) {
+  private static String parseJsonString(String json) {
     json = json.trim();
     if (json.length() < 2 || json.charAt(0) != '"' || json.charAt(json.length() - 1) != '"') {
       throw new IllegalArgumentException("Invalid JSON string: " + json);
@@ -245,7 +243,7 @@ public final class CorePayloadConverter {
    * Serializes LocalActivityMarkerMetadata to JSON. Format matches Jackson output:
    * {"firstSkd":123,"atpt":1,"backoff":5000}
    */
-  private String serializeMetadata(LocalActivityMarkerMetadata metadata) {
+  private static String serializeMetadata(LocalActivityMarkerMetadata metadata) {
     StringBuilder sb = new StringBuilder();
     sb.append("{\"firstSkd\":");
     sb.append(metadata.getOriginalScheduledTimestamp());
@@ -261,7 +259,7 @@ public final class CorePayloadConverter {
   }
 
   /** Parses LocalActivityMarkerMetadata from JSON. */
-  private LocalActivityMarkerMetadata parseMetadata(String json) {
+  private static LocalActivityMarkerMetadata parseMetadata(String json) {
     json = json.trim();
     if (!json.startsWith("{") || !json.endsWith("}")) {
       throw new IllegalArgumentException("Invalid JSON object: " + json);

@@ -96,10 +96,10 @@ public class VersionMarkerUtils {
       String changeId, Integer version, Boolean upsertVersionSA) {
     Preconditions.checkNotNull(version, "version");
     Map<String, Payloads> details = new HashMap<>();
-    details.put(MARKER_CHANGE_ID_KEY, CorePayloadConverter.INSTANCE.toPayloads(changeId).get());
-    details.put(MARKER_VERSION_KEY, CorePayloadConverter.INSTANCE.toPayloads(version).get());
+    details.put(MARKER_CHANGE_ID_KEY, CorePayloadConverter.toPayloads(changeId).get());
+    details.put(MARKER_VERSION_KEY, CorePayloadConverter.toPayloads(version).get());
     if (upsertVersionSA) {
-      details.put(VERSION_SA_UPDATED_KEY, CorePayloadConverter.INSTANCE.toPayloads(true).get());
+      details.put(VERSION_SA_UPDATED_KEY, CorePayloadConverter.toPayloads(true).get());
     }
     return RecordMarkerCommandAttributes.newBuilder()
         .setMarkerName(MARKER_NAME)

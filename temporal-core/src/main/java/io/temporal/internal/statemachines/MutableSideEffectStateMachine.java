@@ -163,7 +163,7 @@ final class MutableSideEffectStateMachine {
       }
       Map<String, Payloads> detailsMap = event.getMarkerRecordedEventAttributes().getDetailsMap();
       Optional<Payloads> idPayloads = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-      String expectedId = CorePayloadConverter.INSTANCE.fromPayloads(0, idPayloads, String.class);
+      String expectedId = CorePayloadConverter.fromPayloads(0, idPayloads, String.class);
       if (Strings.isNullOrEmpty(expectedId)) {
         throw new IllegalStateException(
             "Marker details map missing required key: " + MARKER_ID_KEY);
@@ -184,11 +184,9 @@ final class MutableSideEffectStateMachine {
       } else {
         result = updated;
         Map<String, Payloads> details = new HashMap<>();
-        details.put(MARKER_ID_KEY, CorePayloadConverter.INSTANCE.toPayloads(id).get());
+        details.put(MARKER_ID_KEY, CorePayloadConverter.toPayloads(id).get());
         details.put(MARKER_DATA_KEY, updated.get());
-        details.put(
-            MARKER_SKIP_COUNT_KEY,
-            CorePayloadConverter.INSTANCE.toPayloads(currentSkipCount).get());
+        details.put(MARKER_SKIP_COUNT_KEY, CorePayloadConverter.toPayloads(currentSkipCount).get());
         RecordMarkerCommandAttributes markerAttributes =
             RecordMarkerCommandAttributes.newBuilder()
                 .setMarkerName(MUTABLE_SIDE_EFFECT_MARKER_NAME)
@@ -231,12 +229,11 @@ final class MutableSideEffectStateMachine {
             "Marker details detailsMap missing required key: " + MARKER_SKIP_COUNT_KEY);
       }
       Optional<Payloads> oid = Optional.ofNullable(detailsMap.get(MARKER_ID_KEY));
-      String idFromMarker = CorePayloadConverter.INSTANCE.fromPayloads(0, oid, String.class);
+      String idFromMarker = CorePayloadConverter.fromPayloads(0, oid, String.class);
       if (!id.equals(idFromMarker)) {
         throw new IllegalArgumentException("Ids doesnt match: " + id + "<>" + idFromMarker);
       }
-      skipCountFromMarker =
-          CorePayloadConverter.INSTANCE.fromPayloads(0, skipCountPayloads, Integer.class);
+      skipCountFromMarker = CorePayloadConverter.fromPayloads(0, skipCountPayloads, Integer.class);
       if (++currentSkipCount < skipCountFromMarker) {
         skipCountFromMarker = Integer.MAX_VALUE;
         return State.SKIPPED_NOTIFIED;
