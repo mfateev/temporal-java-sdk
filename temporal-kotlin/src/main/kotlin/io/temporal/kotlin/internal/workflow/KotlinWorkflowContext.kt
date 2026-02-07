@@ -314,7 +314,7 @@ internal class KotlinWorkflowContext(
     }
 
     cont.invokeOnCancellation { cause ->
-      cancellationHandle.apply(
+      cancellationHandle.accept(
         cause as? RuntimeException
           ?: RuntimeException(cause?.message ?: "Timer cancelled")
       )
@@ -344,7 +344,7 @@ internal class KotlinWorkflowContext(
     }
 
     cont.invokeOnCancellation { cause ->
-      output.cancellationHandle.apply(
+      output.cancellationHandle.accept(
         cause as? Exception
           ?: RuntimeException(cause?.message ?: "Activity cancelled")
       )
@@ -375,7 +375,7 @@ internal class KotlinWorkflowContext(
     )
 
     cont.invokeOnCancellation { cause ->
-      cancellationHandle.apply()
+      cancellationHandle.run()
     }
   }
 
@@ -422,7 +422,7 @@ internal class KotlinWorkflowContext(
       )
 
       startCont.invokeOnCancellation { cause ->
-        cancellationHandle.apply(
+        cancellationHandle.accept(
           cause as? Exception
             ?: RuntimeException(cause?.message ?: "Child workflow cancelled")
         )
@@ -975,7 +975,7 @@ internal class KotlinWorkflowContext(
     // If condition was satisfied before timer fired, cancel the timer
     val conditionSatisfied = !timerFired.get()
     if (conditionSatisfied) {
-      cancellationHandle.apply(RuntimeException("await condition satisfied"))
+      cancellationHandle.accept(RuntimeException("await condition satisfied"))
     }
 
     return conditionSatisfied || condition()
@@ -1183,7 +1183,7 @@ internal class KotlinWorkflowContext(
       )
 
       startCont.invokeOnCancellation { cause ->
-        cancellationHandle.apply(
+        cancellationHandle.accept(
           cause as? Exception
             ?: RuntimeException(cause?.message ?: "Child workflow cancelled")
         )

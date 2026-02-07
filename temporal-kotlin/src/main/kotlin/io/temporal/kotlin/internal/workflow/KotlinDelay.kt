@@ -86,7 +86,7 @@ internal object KotlinDelay {
     // Handle cancellation from the coroutine side
     continuation.invokeOnCancellation { cause ->
       if (cancelled.compareAndSet(false, true)) {
-        cancellationHandle.apply(
+        cancellationHandle.accept(
           cause as? RuntimeException
             ?: RuntimeException(cause?.message ?: "Delay cancelled")
         )
@@ -138,7 +138,7 @@ internal object KotlinDelay {
     return object : DisposableHandle {
       override fun dispose() {
         if (cancelled.compareAndSet(false, true)) {
-          cancellationHandle.apply(RuntimeException("Timeout disposed"))
+          cancellationHandle.accept(RuntimeException("Timeout disposed"))
         }
       }
     }

@@ -234,7 +234,10 @@ public class KChildWorkflowHandle<T, R> @InternalTemporalApi internal constructo
       ) { _, failure ->
         if (failure != null) {
           val exception = io.temporal.workflow.CancelExternalWorkflowException(
-            failure.message, execution, null, null
+            failure.message,
+            execution,
+            null,
+            null
           )
           cont.resumeWithException(exception)
         } else {

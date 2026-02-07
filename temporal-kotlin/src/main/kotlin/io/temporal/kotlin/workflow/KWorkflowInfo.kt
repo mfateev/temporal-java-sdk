@@ -23,6 +23,7 @@
 package io.temporal.kotlin.workflow
 
 import io.temporal.internal.common.ProtoConverters
+import io.temporal.internal.common.RetryOptionsUtils
 import io.temporal.internal.replay.ReplayWorkflowContext
 import io.temporal.kotlin.common.KPriority
 import io.temporal.kotlin.common.KRetryOptions
@@ -273,7 +274,7 @@ internal class KWorkflowInfoFromContext(private val context: KotlinWorkflowConte
     get() = replayContext.taskQueue
 
   override val retryOptions: KRetryOptions?
-    get() = replayContext.retryOptions?.toKotlin()
+    get() = replayContext.retryPolicy?.let { RetryOptionsUtils.toRetryOptions(it).toKotlin() }
 
   override val workflowRunTimeout: Duration
     get() = replayContext.workflowRunTimeout.toKotlin()
