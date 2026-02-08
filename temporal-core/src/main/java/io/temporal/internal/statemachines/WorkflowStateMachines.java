@@ -20,16 +20,12 @@ import io.temporal.api.history.v1.*;
 import io.temporal.api.protocol.v1.Message;
 import io.temporal.api.sdk.v1.UserMetadata;
 import io.temporal.api.workflowservice.v1.GetSystemInfoResponse;
-import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.*;
 import io.temporal.internal.history.LocalActivityMarkerUtils;
 import io.temporal.internal.history.VersionMarkerUtils;
-import io.temporal.internal.sync.WorkflowThread;
 import io.temporal.internal.worker.LocalActivityResult;
 import io.temporal.serviceclient.Version;
-import io.temporal.worker.MetricsType;
 import io.temporal.worker.NonDeterministicException;
-import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.ChildWorkflowCancellationType;
 import io.temporal.workflow.NexusOperationCancellationType;
 import java.nio.charset.StandardCharsets;
@@ -176,7 +172,15 @@ public final class WorkflowStateMachines {
   private final Set<String> acceptedUpdates = new HashSet<>();
 
   private final SdkFlags flags;
-  private final WorkflowImplementationOptions workflowImplOptions;
+  private final WorkflowStateMachinesConfig config;
+  private final WorkflowStateMachinesSdkCallbacks sdkCallbacks;
+
+  /**
+   * Optional callback to check if the workflow thread should be destroyed. This is SDK-specific
+   * (used by the Java sync model). If null, the check is skipped.
+   */
+  @Nullable private final Runnable destroyCheckCallback;
+
   @Nonnull private String lastSeenSdkName = "";
   @Nonnull private String lastSeenSdkVersion = "";
 
@@ -193,8 +197,18 @@ public final class WorkflowStateMachines {
   public WorkflowStateMachines(
       StatesMachinesCallback callbacks,
       GetSystemInfoResponse.Capabilities capabilities,
-      WorkflowImplementationOptions workflowImplOptions) {
-    this(callbacks, (stateMachine) -> {}, capabilities, workflowImplOptions);
+      WorkflowStateMachinesConfig config,
+      WorkflowStateMachinesSdkCallbacks sdkCallbacks) {
+    this(callbacks, (stateMachine) -> {}, capabilities, config, null, sdkCallbacks);
+  }
+
+  public WorkflowStateMachines(
+      StatesMachinesCallback callbacks,
+      GetSystemInfoResponse.Capabilities capabilities,
+      WorkflowStateMachinesConfig config,
+      @Nullable Runnable destroyCheckCallback,
+      WorkflowStateMachinesSdkCallbacks sdkCallbacks) {
+    this(callbacks, (stateMachine) -> {}, capabilities, config, destroyCheckCallback, sdkCallbacks);
   }
 
   @VisibleForTesting
@@ -202,13 +216,18 @@ public final class WorkflowStateMachines {
       StatesMachinesCallback callbacks,
       Consumer<StateMachine> stateMachineSink,
       GetSystemInfoResponse.Capabilities capabilities,
-      WorkflowImplementationOptions workflowImplOptions) {
+      WorkflowStateMachinesConfig config,
+      @Nullable Runnable destroyCheckCallback,
+      WorkflowStateMachinesSdkCallbacks sdkCallbacks) {
     this.callbacks = Objects.requireNonNull(callbacks);
     this.commandSink = cancellableCommands::add;
     this.stateMachineSink = stateMachineSink;
     this.localActivityRequestSink = (request) -> localActivityRequests.add(request);
     this.flags = new SdkFlags(capabilities.getSdkMetadata(), this::isReplaying);
-    this.workflowImplOptions = workflowImplOptions;
+    this.config = config != null ? config : WorkflowStateMachinesConfig.DEFAULT;
+    this.destroyCheckCallback = destroyCheckCallback;
+    this.sdkCallbacks =
+        sdkCallbacks != null ? sdkCallbacks : WorkflowStateMachinesSdkCallbacks.DEFAULT;
   }
 
   @VisibleForTesting
@@ -219,7 +238,9 @@ public final class WorkflowStateMachines {
     this.stateMachineSink = stateMachineSink;
     this.localActivityRequestSink = (request) -> localActivityRequests.add(request);
     this.flags = new SdkFlags(false, this::isReplaying);
-    this.workflowImplOptions = WorkflowImplementationOptions.newBuilder().build();
+    this.config = WorkflowStateMachinesConfig.DEFAULT;
+    this.destroyCheckCallback = null;
+    this.sdkCallbacks = WorkflowStateMachinesSdkCallbacks.DEFAULT;
   }
 
   // TODO revisit and potentially remove workflowTaskStartedEventId at all from the state machines.
@@ -671,7 +692,7 @@ public final class WorkflowStateMachines {
         && event
             .getUpsertWorkflowSearchAttributesEventAttributes()
             .getSearchAttributes()
-            .containsIndexedFields(TEMPORAL_CHANGE_VERSION.getName())) {
+            .containsIndexedFields(sdkCallbacks.getVersionChangeSearchAttributeName())) {
       return true;
     }
     return false;
@@ -958,8 +979,8 @@ public final class WorkflowStateMachines {
    */
   public Runnable startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      BiConsumer<WorkflowExecution, Exception> startedCallback,
-      BiConsumer<Optional<Payloads>, Exception> completionCallback) {
+      BiConsumer<WorkflowExecution, Failure> startedCallback,
+      BiConsumer<Optional<Payloads>, Failure> completionCallback) {
     checkEventLoopExecuting();
     StartChildWorkflowExecutionCommandAttributes attributes = parameters.getRequest().build();
     ChildWorkflowCancellationType cancellationType = parameters.getCancellationType();
@@ -1067,8 +1088,12 @@ public final class WorkflowStateMachines {
     completionCallback.accept(Optional.empty(), failure);
   }
 
-  private void notifyChildCanceled(BiConsumer<Optional<Payloads>, Exception> completionCallback) {
-    CanceledFailure failure = new CanceledFailure("Child canceled");
+  private void notifyChildCanceled(BiConsumer<Optional<Payloads>, Failure> completionCallback) {
+    Failure failure =
+        Failure.newBuilder()
+            .setMessage("Child canceled")
+            .setCanceledFailureInfo(CanceledFailureInfo.getDefaultInstance())
+            .build();
     completionCallback.accept(Optional.empty(), failure);
     eventLoop();
   }
@@ -1126,14 +1151,14 @@ public final class WorkflowStateMachines {
   public void completeWorkflow(Optional<Payloads> workflowOutput) {
     checkEventLoopExecuting();
     CompleteWorkflowStateMachine.newInstance(workflowOutput, commandSink, stateMachineSink);
-    postCompletionMetricCounter = MetricsType.WORKFLOW_COMPLETED_COUNTER;
+    postCompletionMetricCounter = WorkflowMetrics.WORKFLOW_COMPLETED_COUNTER;
   }
 
   public void failWorkflow(Failure failure) {
     checkEventLoopExecuting();
     FailWorkflowStateMachine.newInstance(failure, commandSink, stateMachineSink);
-    if (!FailureUtils.isBenignApplicationFailure(failure)) {
-      postCompletionMetricCounter = MetricsType.WORKFLOW_FAILED_COUNTER;
+    if (!sdkCallbacks.isBenignApplicationFailure(failure)) {
+      postCompletionMetricCounter = WorkflowMetrics.WORKFLOW_FAILED_COUNTER;
     }
   }
 
@@ -1143,13 +1168,13 @@ public final class WorkflowStateMachines {
         CancelWorkflowExecutionCommandAttributes.getDefaultInstance(),
         commandSink,
         stateMachineSink);
-    postCompletionMetricCounter = MetricsType.WORKFLOW_CANCELED_COUNTER;
+    postCompletionMetricCounter = WorkflowMetrics.WORKFLOW_CANCELED_COUNTER;
   }
 
   public void continueAsNewWorkflow(ContinueAsNewWorkflowExecutionCommandAttributes attributes) {
     checkEventLoopExecuting();
     ContinueAsNewWorkflowStateMachine.newInstance(attributes, commandSink, stateMachineSink);
-    postCompletionMetricCounter = MetricsType.WORKFLOW_CONTINUE_AS_NEW_COUNTER;
+    postCompletionMetricCounter = WorkflowMetrics.WORKFLOW_CONTINUE_AS_NEW_COUNTER;
   }
 
   public boolean isReplaying() {
@@ -1237,21 +1262,24 @@ public final class WorkflowStateMachines {
         minSupported,
         maxSupported,
         (version) -> {
-          if (!workflowImplOptions.isEnableUpsertVersionSearchAttributes()) {
+          if (!config.isEnableUpsertVersionSearchAttributes()) {
             return null;
           }
           if (version == null) {
             throw new IllegalStateException("Version is null");
           }
           SearchAttributes sa =
-              VersionMarkerUtils.createVersionMarkerSearchAttributes(
-                  changeId, version, changeVersions);
+              sdkCallbacks.createVersionMarkerSearchAttributes(changeId, version, changeVersions);
+          if (sa == null) {
+            return null;
+          }
           changeVersions.put(changeId, version);
-          if (sa.getIndexedFieldsMap().get(TEMPORAL_CHANGE_VERSION.getName()).getSerializedSize()
-              >= CHANGE_VERSION_SEARCH_ATTRIBUTE_SIZE_LIMIT) {
+          String saName = sdkCallbacks.getVersionChangeSearchAttributeName();
+          if (sa.getIndexedFieldsMap().get(saName).getSerializedSize()
+              >= VersionMarkerUtils.CHANGE_VERSION_SEARCH_ATTRIBUTE_SIZE_LIMIT) {
             log.warn(
                 "Serialized size of {} search attribute update would exceed the maximum value size. Skipping this upsert. Be aware that your visibility records will not include the following patch: {}",
-                TEMPORAL_CHANGE_VERSION,
+                saName,
                 VersionMarkerUtils.createChangeId(changeId, version));
             return null;
           }
@@ -1652,9 +1680,10 @@ public final class WorkflowStateMachines {
    */
   private void checkEventLoopExecuting() {
     if (!eventLoopExecuting) {
-      // this call doesn't yield or await, because the await function returns true,
-      // but it checks if the workflow thread needs to be destroyed
-      WorkflowThread.await("kill workflow thread if destroy requested", () -> true);
+      // Check if the workflow thread needs to be destroyed (SDK-specific callback)
+      if (destroyCheckCallback != null) {
+        destroyCheckCallback.run();
+      }
       throw new IllegalStateException("Operation allowed only while eventLoop is running");
     }
   }

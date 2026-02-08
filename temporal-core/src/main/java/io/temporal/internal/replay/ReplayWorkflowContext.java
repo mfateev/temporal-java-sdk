@@ -196,14 +196,16 @@ public interface ReplayWorkflowContext extends ReplayAware {
    *
    * @param parameters encapsulates all the information required to schedule a child workflow for
    *     execution
-   * @param startCallback callback that is called upon child start or failure to start
-   * @param completionCallback callback that is called upon child workflow completion or failure
+   * @param startCallback callback that is called upon child start or failure to start. The second
+   *     parameter is a protobuf Failure if start failed, null otherwise.
+   * @param completionCallback callback that is called upon child workflow completion or failure.
+   *     The second parameter is a protobuf Failure if execution failed, null on success.
    * @return cancellation handle. Invoke {@link Consumer#accept(Object)} to cancel child workflow.
    */
   Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      BiConsumer<WorkflowExecution, Exception> startCallback,
-      BiConsumer<Optional<Payloads>, Exception> completionCallback);
+      BiConsumer<WorkflowExecution, Failure> startCallback,
+      BiConsumer<Optional<Payloads>, Failure> completionCallback);
 
   /**
    * Start a Nexus operation.

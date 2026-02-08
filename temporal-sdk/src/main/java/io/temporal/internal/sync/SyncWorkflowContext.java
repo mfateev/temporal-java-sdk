@@ -31,6 +31,7 @@ import io.temporal.api.sdk.v1.WorkflowMetadata;
 import io.temporal.api.taskqueue.v1.TaskQueue;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.client.WorkflowException;
+import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.common.RetryOptions;
 import io.temporal.common.SearchAttributeUpdate;
 import io.temporal.common.VersioningBehavior;
@@ -954,37 +955,61 @@ final class SyncWorkflowContext implements WorkflowContext, WorkflowOutboundCall
   }
 
   private static RuntimeException mapChildWorkflowException(
-      Exception failure, DataConverter dataConverterWithChildWorkflowContext) {
+      Failure failure, DataConverter dataConverterWithChildWorkflowContext) {
     if (failure == null) {
       return null;
     }
-    if (failure instanceof TemporalFailure) {
-      ((TemporalFailure) failure).setDataConverter(dataConverterWithChildWorkflowContext);
+    // Convert protobuf Failure to Java Exception
+    RuntimeException exception = dataConverterWithChildWorkflowContext.failureToException(failure);
+    if (exception instanceof TemporalFailure) {
+      ((TemporalFailure) exception).setDataConverter(dataConverterWithChildWorkflowContext);
     }
-    if (failure instanceof CanceledFailure) {
-      return (CanceledFailure) failure;
+    if (exception instanceof CanceledFailure) {
+      return (CanceledFailure) exception;
     }
-    if (failure instanceof WorkflowException) {
-      return (RuntimeException) failure;
+    if (exception instanceof WorkflowException) {
+      return exception;
     }
-    if (failure instanceof ChildWorkflowFailure) {
-      return (ChildWorkflowFailure) failure;
+    if (exception instanceof ChildWorkflowFailure) {
+      ChildWorkflowFailure cwf = (ChildWorkflowFailure) exception;
+      // Check if the cause is a WorkflowExecutionAlreadyStarted failure
+      // This happens when a child workflow fails to start because the workflow ID already exists
+      // The type string must match
+      // ChildWorkflowStateMachine.WORKFLOW_EXECUTION_ALREADY_STARTED_FAILURE_TYPE
+      Throwable cause = cwf.getCause();
+      if (cause instanceof ApplicationFailure) {
+        ApplicationFailure appFailure = (ApplicationFailure) cause;
+        if ("WorkflowExecutionAlreadyStarted".equals(appFailure.getType())) {
+          // Convert to WorkflowExecutionAlreadyStarted exception
+          WorkflowExecutionAlreadyStarted alreadyStarted =
+              new WorkflowExecutionAlreadyStarted(cwf.getExecution(), cwf.getWorkflowType(), cause);
+          return new ChildWorkflowFailure(
+              cwf.getInitiatedEventId(),
+              cwf.getStartedEventId(),
+              cwf.getWorkflowType(),
+              cwf.getExecution(),
+              cwf.getNamespace(),
+              cwf.getRetryState(),
+              alreadyStarted);
+        }
+      }
+      return cwf;
     }
-    if (!(failure instanceof ChildWorkflowTaskFailedException)) {
-      return new IllegalArgumentException("Unexpected exception type: ", failure);
+    if (!(exception instanceof ChildWorkflowTaskFailedException)) {
+      return new IllegalArgumentException("Unexpected exception type: ", exception);
     }
-    ChildWorkflowTaskFailedException taskFailed = (ChildWorkflowTaskFailedException) failure;
+    ChildWorkflowTaskFailedException taskFailed = (ChildWorkflowTaskFailedException) exception;
     Throwable cause =
         dataConverterWithChildWorkflowContext.failureToException(
             taskFailed.getOriginalCauseFailure());
-    ChildWorkflowFailure exception = taskFailed.getException();
+    ChildWorkflowFailure childWorkflowFailure = taskFailed.getException();
     return new ChildWorkflowFailure(
-        exception.getInitiatedEventId(),
-        exception.getStartedEventId(),
-        exception.getWorkflowType(),
-        exception.getExecution(),
-        exception.getNamespace(),
-        exception.getRetryState(),
+        childWorkflowFailure.getInitiatedEventId(),
+        childWorkflowFailure.getStartedEventId(),
+        childWorkflowFailure.getWorkflowType(),
+        childWorkflowFailure.getExecution(),
+        childWorkflowFailure.getNamespace(),
+        childWorkflowFailure.getRetryState(),
         cause);
   }
 

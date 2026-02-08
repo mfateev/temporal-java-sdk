@@ -13,6 +13,7 @@ import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.*;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest;
@@ -358,10 +359,10 @@ public class LocalActivityStateMachineTest {
         // framework.
         // The test framework has no support for state machines with multiple callbacks.
         AtomicReference<Runnable> cc = new AtomicReference<>();
-        AtomicReference<BiConsumer<Optional<Payloads>, Exception>> completionCallback =
+        AtomicReference<BiConsumer<Optional<Payloads>, Failure>> completionCallback =
             new AtomicReference<>();
         builder
-            .<WorkflowExecution, Exception>add2(
+            .<WorkflowExecution, Failure>add2(
                 (r, c) ->
                     cc.set(
                         stateMachines.startChildWorkflow(
@@ -371,7 +372,7 @@ public class LocalActivityStateMachineTest {
                               completionCallback.get().accept(r1, c1);
                             })))
             .add((r) -> cc.get().run())
-            .<Optional<Payloads>, Exception>add2(
+            .<Optional<Payloads>, Failure>add2(
                 (r, c) -> {
                   completionCallback.set(c);
                 })

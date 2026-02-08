@@ -202,8 +202,8 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   @Override
   public Consumer<Exception> startChildWorkflow(
       StartChildWorkflowExecutionParameters parameters,
-      BiConsumer<WorkflowExecution, Exception> startCallback,
-      BiConsumer<Optional<Payloads>, Exception> completionCallback) {
+      BiConsumer<WorkflowExecution, Failure> startCallback,
+      BiConsumer<Optional<Payloads>, Failure> completionCallback) {
     Runnable cancellationHandler =
         workflowStateMachines.startChildWorkflow(parameters, startCallback, completionCallback);
     return (exception) -> cancellationHandler.run();

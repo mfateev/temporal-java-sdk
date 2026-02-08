@@ -28,6 +28,7 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.enums.v1.RetryState;
 import io.temporal.api.enums.v1.TimeoutType;
+import io.temporal.api.failure.v1.ApplicationFailureInfo;
 import io.temporal.api.failure.v1.CanceledFailureInfo;
 import io.temporal.api.failure.v1.ChildWorkflowExecutionFailureInfo;
 import io.temporal.api.failure.v1.Failure;
@@ -57,6 +58,14 @@ final class ChildWorkflowStateMachine
   static final String CHILD_WORKFLOW_TERMINATED_MESSAGE = "Child workflow execution terminated";
   static final String CHILD_WORKFLOW_START_FAILED_MESSAGE =
       "Child workflow execution failed to start";
+
+  /**
+   * Type used for ApplicationFailureInfo to indicate the child workflow failed to start because the
+   * workflow ID already exists. This type is recognized by the SDK to create a
+   * WorkflowExecutionAlreadyStarted exception.
+   */
+  public static final String WORKFLOW_EXECUTION_ALREADY_STARTED_FAILURE_TYPE =
+      "WorkflowExecutionAlreadyStarted";
 
   private String workflowType;
   private String namespace;
@@ -256,6 +265,11 @@ final class ChildWorkflowStateMachine
         Failure.newBuilder()
             .setSource(JAVA_SDK)
             .setMessage("Workflow execution already started with ID: " + attributes.getWorkflowId())
+            .setApplicationFailureInfo(
+                ApplicationFailureInfo.newBuilder()
+                    .setType(WORKFLOW_EXECUTION_ALREADY_STARTED_FAILURE_TYPE)
+                    .setNonRetryable(true)
+                    .build())
             .build();
 
     ChildWorkflowExecutionFailureInfo failureInfo =

@@ -187,8 +187,8 @@ public class DummySyncWorkflowContext {
     @Override
     public Consumer<Exception> startChildWorkflow(
         StartChildWorkflowExecutionParameters parameters,
-        BiConsumer<WorkflowExecution, Exception> executionCallback,
-        BiConsumer<Optional<Payloads>, Exception> callback) {
+        BiConsumer<WorkflowExecution, Failure> executionCallback,
+        BiConsumer<Optional<Payloads>, Failure> callback) {
       throw new UnsupportedOperationException("not implemented");
     }
 

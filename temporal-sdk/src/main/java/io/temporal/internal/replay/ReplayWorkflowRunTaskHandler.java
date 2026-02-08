@@ -28,6 +28,9 @@ import io.temporal.internal.common.UpdateMessage;
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters;
 import io.temporal.internal.statemachines.StatesMachinesCallback;
 import io.temporal.internal.statemachines.WorkflowStateMachines;
+import io.temporal.internal.statemachines.WorkflowStateMachinesConfig;
+import io.temporal.internal.statemachines.WorkflowStateMachinesSdkCallbacksImpl;
+import io.temporal.internal.sync.WorkflowThread;
 import io.temporal.internal.worker.*;
 import io.temporal.worker.MetricsType;
 import io.temporal.worker.WorkflowImplementationOptions;
@@ -93,14 +96,28 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
     this.localActivityDispatcher = localActivityDispatcher;
     this.workflow = workflow;
 
+    WorkflowImplementationOptions implOptions = null;
+    if (workflow.getWorkflowContext() != null) {
+      implOptions =
+          ((WorkflowContext) workflow.getWorkflowContext()).getWorkflowImplementationOptions();
+    }
+    if (implOptions == null) {
+      implOptions = WorkflowImplementationOptions.newBuilder().build();
+    }
+    // Adapt WorkflowImplementationOptions to WorkflowStateMachinesConfig
+    final WorkflowImplementationOptions finalImplOptions = implOptions;
+    WorkflowStateMachinesConfig config = finalImplOptions::isEnableUpsertVersionSearchAttributes;
+    // The destroyCheckCallback uses WorkflowThread.await to check if the workflow thread should be
+    // destroyed
+    Runnable destroyCheckCallback =
+        () -> WorkflowThread.await("kill workflow thread if destroy requested", () -> true);
     this.workflowStateMachines =
         new WorkflowStateMachines(
             new StatesMachinesCallbackImpl(),
             capabilities,
-            workflow.getWorkflowContext() == null
-                ? WorkflowImplementationOptions.newBuilder().build()
-                : ((WorkflowContext) workflow.getWorkflowContext())
-                    .getWorkflowImplementationOptions());
+            config,
+            destroyCheckCallback,
+            WorkflowStateMachinesSdkCallbacksImpl.INSTANCE);
     String fullReplayDirectQueryType =
         workflowTask.hasQuery() ? workflowTask.getQuery().getQueryType() : null;
     this.context =
