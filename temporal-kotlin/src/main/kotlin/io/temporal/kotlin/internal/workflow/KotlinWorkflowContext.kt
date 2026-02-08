@@ -390,7 +390,7 @@ internal class KotlinWorkflowContext(
   ): Pair<WorkflowExecution, Optional<Payloads>> {
     // Use a holder to pass the completion result/exception between callbacks
     var completionResult: Optional<Payloads>? = null
-    var completionException: Exception? = null
+    var completionFailure: Failure? = null
     var completionCont: CancellableContinuation<Optional<Payloads>>? = null
     var completed = false
 
@@ -398,22 +398,22 @@ internal class KotlinWorkflowContext(
     val execution = suspendCancellableCoroutine<WorkflowExecution> { startCont ->
       val cancellationHandle = replayContext.startChildWorkflow(
         parameters,
-        { execution: WorkflowExecution?, startException: Exception? ->
-          if (startException != null) {
-            startCont.resumeWithException(startException)
+        { execution: WorkflowExecution?, startFailure: Failure? ->
+          if (startFailure != null) {
+            startCont.resumeWithException(dataConverter.failureToException(startFailure))
           } else if (execution != null) {
             startCont.resume(execution)
           }
         },
-        { result: Optional<Payloads>, exception: Exception? ->
+        { result: Optional<Payloads>, failure: Failure? ->
           // Store completion data
           completionResult = result
-          completionException = exception
+          completionFailure = failure
           completed = true
           // If completion continuation is already waiting, resume it
           completionCont?.let { cont ->
-            if (exception != null) {
-              cont.resumeWithException(exception)
+            if (failure != null) {
+              cont.resumeWithException(dataConverter.failureToException(failure))
             } else {
               cont.resume(result)
             }
@@ -433,8 +433,8 @@ internal class KotlinWorkflowContext(
     val result = suspendCancellableCoroutine<Optional<Payloads>> { cont ->
       // If already completed (e.g., during replay), resume immediately
       if (completed) {
-        if (completionException != null) {
-          cont.resumeWithException(completionException!!)
+        if (completionFailure != null) {
+          cont.resumeWithException(dataConverter.failureToException(completionFailure!!))
         } else {
           cont.resume(completionResult!!)
         }
@@ -1151,7 +1151,7 @@ internal class KotlinWorkflowContext(
 
     // Use a holder to pass the completion result/exception between callbacks
     var completionResult: Optional<Payloads>? = null
-    var completionException: Exception? = null
+    var completionFailure: Failure? = null
     var completionCont: CancellableContinuation<Optional<Payloads>>? = null
     var completed = false
 
@@ -1159,22 +1159,22 @@ internal class KotlinWorkflowContext(
     val execution = suspendCancellableCoroutine<WorkflowExecution> { startCont ->
       val cancellationHandle = replayContext.startChildWorkflow(
         parameters,
-        { execution: WorkflowExecution?, startException: Exception? ->
-          if (startException != null) {
-            startCont.resumeWithException(startException)
+        { execution: WorkflowExecution?, startFailure: Failure? ->
+          if (startFailure != null) {
+            startCont.resumeWithException(dataConverter.failureToException(startFailure))
           } else if (execution != null) {
             startCont.resume(execution)
           }
         },
-        { result: Optional<Payloads>, exception: Exception? ->
+        { result: Optional<Payloads>, failure: Failure? ->
           // Store completion data
           completionResult = result
-          completionException = exception
+          completionFailure = failure
           completed = true
           // If completion continuation is already waiting, resume it
           completionCont?.let { cont ->
-            if (exception != null) {
-              cont.resumeWithException(exception)
+            if (failure != null) {
+              cont.resumeWithException(dataConverter.failureToException(failure))
             } else {
               cont.resume(result)
             }
@@ -1193,8 +1193,8 @@ internal class KotlinWorkflowContext(
     // Create a suspend function that waits for completion
     val resultProvider: suspend () -> Optional<Payloads> = {
       if (completed) {
-        if (completionException != null) {
-          throw completionException!!
+        if (completionFailure != null) {
+          throw dataConverter.failureToException(completionFailure!!)
         }
         completionResult!!
       } else {

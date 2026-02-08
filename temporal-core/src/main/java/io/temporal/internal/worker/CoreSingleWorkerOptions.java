@@ -5,7 +5,9 @@ import com.uber.m3.tally.Scope;
 import java.time.Duration;
 import javax.annotation.Nullable;
 
-/** Core single worker options containing infrastructure fields shared between Java and Kotlin SDKs. */
+/**
+ * Core single worker options containing infrastructure fields shared between Java and Kotlin SDKs.
+ */
 public final class CoreSingleWorkerOptions {
 
   public static Builder newBuilder() {
