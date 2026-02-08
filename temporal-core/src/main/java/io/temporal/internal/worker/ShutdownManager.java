@@ -9,6 +9,7 @@ import io.temporal.api.workflowservice.v1.ShutdownWorkerResponse;
 import java.io.Closeable;
 import java.time.Duration;
 import java.util.concurrent.*;
+import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,9 +56,10 @@ public class ShutdownManager implements Closeable {
   }
 
   public CompletableFuture<Void> waitForSupplierPermitsReleasedUnlimited(
-      TrackingSlotSupplier<?> slotSupplier, String name) {
+      IntSupplier issuedSlotsSupplier, String name) {
     CompletableFuture<Void> future = new CompletableFuture<>();
-    scheduledExecutorService.submit(new SlotSupplierDelayShutdown(slotSupplier, name, future));
+    scheduledExecutorService.submit(
+        new SlotSupplierDelayShutdown(issuedSlotsSupplier, name, future));
     return future;
   }
 
@@ -284,19 +286,19 @@ public class ShutdownManager implements Closeable {
   }
 
   private class SlotSupplierDelayShutdown extends ReportingDelayShutdown {
-    private final TrackingSlotSupplier<?> slotSupplier;
+    private final IntSupplier issuedSlotsSupplier;
     private final String name;
 
     public SlotSupplierDelayShutdown(
-        TrackingSlotSupplier<?> supplier, String name, CompletableFuture<Void> promise) {
+        IntSupplier issuedSlotsSupplier, String name, CompletableFuture<Void> promise) {
       super(promise);
-      this.slotSupplier = supplier;
+      this.issuedSlotsSupplier = issuedSlotsSupplier;
       this.name = name;
     }
 
     @Override
     boolean isTerminated() {
-      return slotSupplier.getIssuedSlots() == 0;
+      return issuedSlotsSupplier.getAsInt() == 0;
     }
 
     @Override

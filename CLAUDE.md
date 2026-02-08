@@ -37,6 +37,10 @@ This rule applies even when the path forward seems obvious. The user may have co
 
 **Ask Before Modifying Tests**: When investigating test execution problems and you believe the solution requires modifying a test, always ask the user and wait for explicit confirmation before changing the test. Explain why you think the test needs to change.
 
+## Committing
+
+**Run Tests Before Committing**: Never create a commit before verifying that unit tests pass. Run `./gradlew :temporal-sdk:test :temporal-kotlin:test` (or the relevant module tests) and confirm they pass before committing.
+
 ## GitHub PR Reviews
 
 **Include Comment IDs When Saving PR Comments**: When downloading or saving PR review comments to a file for later processing, always include the comment ID. This allows replying to specific comments later:

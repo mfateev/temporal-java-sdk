@@ -143,7 +143,7 @@ final class ActivityWorker implements SuspendableWorker {
             ignore ->
                 !interruptTasks
                     ? shutdownManager.waitForSupplierPermitsReleasedUnlimited(
-                        slotSupplier, supplierName)
+                        slotSupplier::getIssuedSlots, supplierName)
                     : CompletableFuture.completedFuture(null))
         .thenCompose(
             ignore ->
