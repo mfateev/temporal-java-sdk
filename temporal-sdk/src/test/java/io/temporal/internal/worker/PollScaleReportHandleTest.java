@@ -2,7 +2,7 @@ package io.temporal.internal.worker;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -11,7 +11,8 @@ public class PollScaleReportHandleTest {
   @Test
   public void handleResourceExhaustedError() {
     // Mock dependencies
-    Functions.Proc1<Integer> mockScaleCallback = Mockito.mock(Functions.Proc1.class);
+    @SuppressWarnings("unchecked")
+    Consumer<Integer> mockScaleCallback = Mockito.mock(Consumer.class);
     ScalingTask mockTask = Mockito.mock(ScalingTask.class);
     ScalingTask.ScalingDecision mockDecision = Mockito.mock(ScalingTask.ScalingDecision.class);
     Mockito.when(mockTask.getScalingDecision()).thenReturn(mockDecision);
@@ -25,13 +26,14 @@ public class PollScaleReportHandleTest {
     handle.report(null, exception);
 
     // Verify target poller count is halved and callback is invoked
-    Mockito.verify(mockScaleCallback).apply(4);
+    Mockito.verify(mockScaleCallback).accept(4);
   }
 
   @Test
   public void handleGenericError() {
     // Mock dependencies
-    Functions.Proc1<Integer> mockScaleCallback = Mockito.mock(Functions.Proc1.class);
+    @SuppressWarnings("unchecked")
+    Consumer<Integer> mockScaleCallback = Mockito.mock(Consumer.class);
     ScalingTask mockTask = Mockito.mock(ScalingTask.class);
     ScalingTask.ScalingDecision mockDecision = Mockito.mock(ScalingTask.ScalingDecision.class);
     Mockito.when(mockTask.getScalingDecision()).thenReturn(mockDecision);
@@ -44,13 +46,14 @@ public class PollScaleReportHandleTest {
     handle.report(null, new RuntimeException("Generic error"));
 
     // Verify target poller count is decremented and callback is invoked
-    Mockito.verify(mockScaleCallback).apply(4);
+    Mockito.verify(mockScaleCallback).accept(4);
   }
 
   @Test
   public void applyScalingDecisionDeltaWhenAllowed() {
     // Mock dependencies
-    Functions.Proc1<Integer> mockScaleCallback = Mockito.mock(Functions.Proc1.class);
+    @SuppressWarnings("unchecked")
+    Consumer<Integer> mockScaleCallback = Mockito.mock(Consumer.class);
     ScalingTask mockTask = Mockito.mock(ScalingTask.class);
     ScalingTask.ScalingDecision mockDecision = Mockito.mock(ScalingTask.ScalingDecision.class);
     Mockito.when(mockTask.getScalingDecision()).thenReturn(mockDecision);
@@ -64,6 +67,6 @@ public class PollScaleReportHandleTest {
     handle.report(mockTask, null);
 
     // Verify target poller count is updated and callback is invoked
-    Mockito.verify(mockScaleCallback).apply(8);
+    Mockito.verify(mockScaleCallback).accept(8);
   }
 }

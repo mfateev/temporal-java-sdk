@@ -24,6 +24,7 @@ import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.HistoryEventOrBuilder;
+import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 
 /**
  * Core workflow execution utilities used by state machines. These methods have no SDK dependencies
@@ -133,5 +134,11 @@ public final class WorkflowExecutionUtils {
         return EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED;
     }
     throw new IllegalArgumentException("Unknown commandType");
+  }
+
+  public static boolean isFullHistory(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {
+    return workflowTask.getHistory() != null
+        && workflowTask.getHistory().getEventsCount() > 0
+        && workflowTask.getHistory().getEvents(0).getEventId() == 1;
   }
 }

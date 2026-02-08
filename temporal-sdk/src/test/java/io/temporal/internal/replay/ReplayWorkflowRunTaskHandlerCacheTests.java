@@ -52,8 +52,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
   public void whenHistoryIsFullNewWorkflowExecutorIsReturnedAndCached_InitiallyEmpty()
       throws Exception {
     // Arrange
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(10, new WorkflowRunLockManager(), new NoopScope());
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(10, new WorkflowRunLockManager(), new NoopScope());
     PollWorkflowTaskQueueResponse workflowTask =
         HistoryUtils.generateWorkflowTaskWithInitialHistory();
 
@@ -76,8 +76,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
     assumeFalse("skipping for docker tests", SDKTestWorkflowRule.useExternalService);
 
     // Arrange
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(10, new WorkflowRunLockManager(), new NoopScope());
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(10, new WorkflowRunLockManager(), new NoopScope());
     PollWorkflowTaskQueueResponse workflowTask1 =
         HistoryUtils.generateWorkflowTaskWithInitialHistory(
             "namespace", "taskQueue", "workflowType", testWorkflowRule.getWorkflowServiceStubs());
@@ -122,8 +122,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
             .build();
     Scope scope = metricsScope.tagged(tags);
 
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(10, new WorkflowRunLockManager(), scope);
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(10, new WorkflowRunLockManager(), scope);
     PollWorkflowTaskQueueResponse workflowTask =
         HistoryUtils.generateWorkflowTaskWithInitialHistory(
             "namespace", "taskQueue", "workflowType", testWorkflowRule.getWorkflowServiceStubs());
@@ -160,8 +160,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
             .put(MetricsTag.TASK_QUEUE, "stickyTaskQueue")
             .build();
     Scope scope = metricsScope.tagged(tags);
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(10, new WorkflowRunLockManager(), scope);
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(10, new WorkflowRunLockManager(), scope);
 
     // Act
     PollWorkflowTaskQueueResponse workflowTask =
@@ -190,8 +190,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
     Scope scope = metricsScope.tagged(tags);
 
     // Arrange
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(50, new WorkflowRunLockManager(), scope);
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(50, new WorkflowRunLockManager(), scope);
     PollWorkflowTaskQueueResponse workflowTask1 =
         HistoryUtils.generateWorkflowTaskWithInitialHistory();
     PollWorkflowTaskQueueResponse workflowTask2 =
@@ -226,8 +226,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
   @Test
   public void evictAnyWillNotInvalidateItself() throws Exception {
     // Arrange
-    WorkflowExecutorCache cache =
-        new WorkflowExecutorCache(50, new WorkflowRunLockManager(), new NoopScope());
+    WorkflowExecutorCache<WorkflowRunTaskHandler> cache =
+        new WorkflowExecutorCache<>(50, new WorkflowRunLockManager(), new NoopScope());
     PollWorkflowTaskQueueResponse workflowTask1 =
         HistoryUtils.generateWorkflowTaskWithInitialHistory();
 
@@ -245,7 +245,8 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
     assertEquals(1, cache.size());
   }
 
-  private void assertCacheIsEmpty(WorkflowExecutorCache cache, String runId) throws Exception {
+  private void assertCacheIsEmpty(WorkflowExecutorCache<WorkflowRunTaskHandler> cache, String runId)
+      throws Exception {
     Throwable ex = null;
     try {
       PollWorkflowTaskQueueResponse workflowTask =

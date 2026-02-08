@@ -14,6 +14,7 @@ import io.temporal.internal.logging.LoggerTag;
 import io.temporal.internal.replay.ReplayWorkflow;
 import io.temporal.internal.replay.ReplayWorkflowContext;
 import io.temporal.internal.replay.WorkflowContext;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.statemachines.UpdateProtocolCallback;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowExecutorCache;
@@ -40,7 +41,7 @@ class SyncWorkflow implements ReplayWorkflow {
   private final WorkflowThreadExecutor workflowThreadExecutor;
   private final SyncWorkflowDefinition workflow;
   @Nonnull private final WorkflowImplementationOptions workflowImplementationOptions;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
   private final long defaultDeadlockDetectionTimeout;
   private final WorkflowMethodThreadNameStrategy workflowMethodThreadNameStrategy =
       ExecutionInfoStrategy.INSTANCE;
@@ -60,7 +61,7 @@ class SyncWorkflow implements ReplayWorkflow {
       @Nullable WorkflowImplementationOptions workflowImplementationOptions,
       DataConverter dataConverter,
       WorkflowThreadExecutor workflowThreadExecutor,
-      WorkflowExecutorCache cache,
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       List<ContextPropagator> contextPropagators,
       long defaultDeadlockDetectionTimeout) {
     this.workflow = Objects.requireNonNull(workflow);

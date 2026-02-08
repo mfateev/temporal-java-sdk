@@ -2,6 +2,7 @@ package io.temporal.internal.replay;
 
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
 import io.temporal.worker.NonDeterministicException;
+import java.io.Closeable;
 
 /**
  * Task handler that encapsulates a cached workflow and can handle multiple calls to
@@ -9,7 +10,7 @@ import io.temporal.worker.NonDeterministicException;
  *
  * <p>Instances of this object can be cached in between workflow tasks.
  */
-public interface WorkflowRunTaskHandler {
+public interface WorkflowRunTaskHandler extends Closeable {
 
   /**
    * Handles a single new workflow task of the workflow.

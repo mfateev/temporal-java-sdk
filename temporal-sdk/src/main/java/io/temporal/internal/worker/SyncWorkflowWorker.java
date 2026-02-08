@@ -12,6 +12,7 @@ import io.temporal.internal.activity.ActivityTaskHandlerImpl;
 import io.temporal.internal.activity.LocalActivityExecutionContextFactoryImpl;
 import io.temporal.internal.replay.ReplayWorkflowFactory;
 import io.temporal.internal.replay.ReplayWorkflowTaskHandler;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.sync.POJOWorkflowImplementationFactory;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
 import io.temporal.worker.WorkflowImplementationOptions;
@@ -65,7 +66,7 @@ public class SyncWorkflowWorker implements SuspendableWorker {
       @Nonnull SingleWorkerOptions singleWorkerOptions,
       @Nonnull SingleWorkerOptions localActivityOptions,
       @Nonnull WorkflowRunLockManager runLocks,
-      @Nonnull WorkflowExecutorCache cache,
+      @Nonnull WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       String stickyTaskQueueName,
       @Nonnull WorkflowThreadExecutor workflowThreadExecutor,
       @Nonnull EagerActivityDispatcher eagerActivityDispatcher,

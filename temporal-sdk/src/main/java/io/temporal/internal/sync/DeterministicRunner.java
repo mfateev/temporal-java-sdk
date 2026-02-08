@@ -1,5 +1,6 @@
 package io.temporal.internal.sync;
 
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import io.temporal.workflow.CancellationScope;
 import java.util.Optional;
@@ -28,7 +29,7 @@ interface DeterministicRunner {
       WorkflowThreadExecutor workflowThreadExecutor,
       SyncWorkflowContext workflowContext,
       Runnable root,
-      WorkflowExecutorCache cache) {
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache) {
     return new DeterministicRunnerImpl(workflowThreadExecutor, workflowContext, root, cache);
   }
 

@@ -45,7 +45,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
 
   private final ReplayWorkflowFactory workflowFactory;
   private final String namespace;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
   private final SingleWorkerOptions options;
   private final Duration stickyTaskQueueScheduleToStartTimeout;
   private final WorkflowServiceStubs service;
@@ -55,7 +55,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
   public ReplayWorkflowTaskHandler(
       String namespace,
       ReplayWorkflowFactory asyncWorkflowFactory,
-      WorkflowExecutorCache cache,
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       SingleWorkerOptions options,
       TaskQueue stickyTaskQueue,
       Duration stickyTaskQueueScheduleToStartTimeout,

@@ -9,6 +9,7 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.internal.client.WorkflowClientInternal;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
 import io.temporal.internal.task.VirtualThreadDelegate;
 import io.temporal.internal.worker.ShutdownManager;
@@ -45,7 +46,7 @@ public final class WorkerFactory {
   private final AtomicInteger workflowThreadCounter = new AtomicInteger();
   private final WorkerFactoryOptions factoryOptions;
 
-  private final @Nonnull WorkflowExecutorCache cache;
+  private final @Nonnull WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
 
   private State state = State.Initial;
 
@@ -343,7 +344,7 @@ public final class WorkerFactory {
   // TODO we should hide an actual implementation of WorkerFactory under WorkerFactory interface and
   // expose this method on the implementation only
   @VisibleForTesting
-  WorkflowExecutorCache getCache() {
+  WorkflowExecutorCache<WorkflowRunTaskHandler> getCache() {
     return this.cache;
   }
 

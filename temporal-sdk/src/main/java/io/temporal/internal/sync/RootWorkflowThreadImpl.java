@@ -1,6 +1,7 @@
 package io.temporal.internal.sync;
 
 import io.temporal.common.context.ContextPropagator;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ public class RootWorkflowThreadImpl extends WorkflowThreadImpl {
       boolean detached,
       CancellationScopeImpl parentCancellationScope,
       Runnable runnable,
-      WorkflowExecutorCache cache,
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       List<ContextPropagator> contextPropagators,
       Map<String, Object> propagatedContexts) {
     super(

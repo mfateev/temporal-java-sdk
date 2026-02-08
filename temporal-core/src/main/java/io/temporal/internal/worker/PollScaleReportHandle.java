@@ -2,7 +2,8 @@ package io.temporal.internal.worker;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,7 @@ public class PollScaleReportHandle<T extends ScalingTask> implements Runnable {
   private final int minPollerCount;
   private final int maxPollerCount;
   private int targetPollerCount;
-  private final Functions.Proc1<Integer> scaleCallback;
+  private final Consumer<Integer> scaleCallback;
   private boolean everSawScalingDecision;
   private int ingestedThisPeriod;
   private int ingestedLastPeriod;
@@ -27,7 +28,7 @@ public class PollScaleReportHandle<T extends ScalingTask> implements Runnable {
       int minPollerCount,
       int maxPollerCount,
       int initialPollerCount,
-      Functions.Proc1<Integer> scaleCallback) {
+      Consumer<Integer> scaleCallback) {
     this.minPollerCount = minPollerCount;
     this.maxPollerCount = maxPollerCount;
     this.targetPollerCount = initialPollerCount;
@@ -75,7 +76,7 @@ public class PollScaleReportHandle<T extends ScalingTask> implements Runnable {
     }
   }
 
-  private void updateTarget(Functions.Func1<Integer, Integer> func) {
+  private void updateTarget(UnaryOperator<Integer> func) {
     Integer target = targetPollerCount;
     Integer newTarget = func.apply(target);
     if (newTarget < minPollerCount) {
@@ -88,7 +89,7 @@ public class PollScaleReportHandle<T extends ScalingTask> implements Runnable {
     }
     targetPollerCount = newTarget;
     if (scaleCallback != null) {
-      scaleCallback.apply(targetPollerCount);
+      scaleCallback.accept(targetPollerCount);
     }
   }
 

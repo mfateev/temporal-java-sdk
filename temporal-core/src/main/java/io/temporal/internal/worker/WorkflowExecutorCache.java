@@ -8,8 +8,8 @@ import com.google.common.cache.CacheBuilder;
 import com.uber.m3.tally.Scope;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
-import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.worker.MetricsType;
+import java.io.Closeable;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
@@ -18,10 +18,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ThreadSafe
-public final class WorkflowExecutorCache {
+public final class WorkflowExecutorCache<T extends Closeable> {
   private final Logger log = LoggerFactory.getLogger(WorkflowExecutorCache.class);
   private final WorkflowRunLockManager runLockManager;
-  private final Cache<String, WorkflowRunTaskHandler> cache;
+  private final Cache<String, T> cache;
   private final Scope metricsScope;
 
   public WorkflowExecutorCache(
@@ -37,7 +37,7 @@ public final class WorkflowExecutorCache {
             .concurrencyLevel(128)
             .removalListener(
                 e -> {
-                  WorkflowRunTaskHandler entry = (WorkflowRunTaskHandler) e.getValue();
+                  Closeable entry = (Closeable) e.getValue();
                   if (entry != null) {
                     try {
                       log.trace(
@@ -46,9 +46,12 @@ public final class WorkflowExecutorCache {
                           e.getCause());
                       entry.close();
                       log.trace("Workflow execution for runId {} closed", e);
-                    } catch (Throwable t) {
+                    } catch (RuntimeException | Error t) {
                       log.error("Workflow execution closure failed with an exception", t);
                       throw t;
+                    } catch (Exception t) {
+                      log.error("Workflow execution closure failed with an exception", t);
+                      throw new RuntimeException(t);
                     }
                   }
                 })
@@ -57,10 +60,10 @@ public final class WorkflowExecutorCache {
     this.metricsScope.gauge(MetricsType.STICKY_CACHE_SIZE).update(size());
   }
 
-  public WorkflowRunTaskHandler getOrCreate(
+  public T getOrCreate(
       PollWorkflowTaskQueueResponseOrBuilder workflowTask,
       Scope workflowTypeScope,
-      Callable<WorkflowRunTaskHandler> workflowExecutorFn)
+      Callable<T> workflowExecutorFn)
       throws Exception {
     WorkflowExecution execution = workflowTask.getWorkflowExecution();
     String runId = execution.getRunId();
@@ -73,11 +76,11 @@ public final class WorkflowExecutorCache {
       return workflowExecutorFn.call();
     }
 
-    @Nullable WorkflowRunTaskHandler workflowRunTaskHandler = cache.getIfPresent(runId);
+    @Nullable T cachedValue = cache.getIfPresent(runId);
 
-    if (workflowRunTaskHandler != null) {
+    if (cachedValue != null) {
       workflowTypeScope.counter(MetricsType.STICKY_CACHE_HIT).inc(1);
-      return workflowRunTaskHandler;
+      return cachedValue;
     }
 
     log.trace(
@@ -89,9 +92,8 @@ public final class WorkflowExecutorCache {
     return workflowExecutorFn.call();
   }
 
-  public void addToCache(
-      WorkflowExecution workflowExecution, WorkflowRunTaskHandler workflowRunTaskHandler) {
-    cache.put(workflowExecution.getRunId(), workflowRunTaskHandler);
+  public void addToCache(WorkflowExecution workflowExecution, T value) {
+    cache.put(workflowExecution.getRunId(), value);
     log.trace(
         "Workflow Execution {}-{} has been added to cache",
         workflowExecution.getWorkflowId(),
@@ -141,7 +143,7 @@ public final class WorkflowExecutorCache {
   public void invalidate(
       WorkflowExecution execution, Scope workflowTypeScope, String reason, Throwable cause) {
     String runId = execution.getRunId();
-    @Nullable WorkflowRunTaskHandler present = cache.getIfPresent(runId);
+    @Nullable T present = cache.getIfPresent(runId);
     if (log.isTraceEnabled()) {
       log.trace(
           "Invalidating {}-{} because of '{}', value is present in the cache: {}",

@@ -13,6 +13,7 @@ import io.temporal.common.context.ContextPropagator;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.common.converter.EncodedValues;
 import io.temporal.failure.TemporalFailure;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.sync.WorkflowInternal;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
 import io.temporal.internal.worker.*;
@@ -83,7 +84,7 @@ public final class Worker {
       WorkerOptions options,
       Scope metricsScope,
       @Nonnull WorkflowRunLockManager runLocks,
-      @Nonnull WorkflowExecutorCache cache,
+      @Nonnull WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       boolean useStickyTaskQueue,
       WorkflowThreadExecutor workflowThreadExecutor,
       List<ContextPropagator> contextPropagators,

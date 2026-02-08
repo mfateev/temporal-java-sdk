@@ -21,6 +21,7 @@ import io.temporal.common.metadata.POJOWorkflowMethodMetadata;
 import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.env.ReflectionUtils;
 import io.temporal.internal.replay.ReplayWorkflow;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.worker.SingleWorkerOptions;
 import io.temporal.internal.worker.WorkflowExecutionException;
 import io.temporal.internal.worker.WorkflowExecutorCache;
@@ -83,7 +84,7 @@ public final class POJOWorkflowImplementationFactory implements WorkflowImplemen
       Collections.synchronizedMap(new HashMap<>());
 
   private final WorkflowThreadExecutor workflowThreadExecutor;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
 
   private final String namespace;
   private final VersioningBehavior defaultVersioningBehavior;
@@ -93,7 +94,7 @@ public final class POJOWorkflowImplementationFactory implements WorkflowImplemen
       SingleWorkerOptions singleWorkerOptions,
       WorkflowThreadExecutor workflowThreadExecutor,
       WorkerInterceptor[] workerInterceptors,
-      WorkflowExecutorCache cache,
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       @Nonnull String namespace) {
     Objects.requireNonNull(singleWorkerOptions);
     this.dataConverter = singleWorkerOptions.getDataConverter();

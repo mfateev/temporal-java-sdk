@@ -6,6 +6,7 @@ import io.temporal.common.context.ContextPropagator;
 import io.temporal.internal.WorkflowThreadMarker;
 import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.context.ContextThreadLocal;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import io.temporal.serviceclient.CheckedExceptionWrapper;
 import io.temporal.workflow.Promise;
@@ -64,7 +65,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
   private final Runnable rootRunnable;
   private final WorkflowThreadExecutor workflowThreadExecutor;
   private final SyncWorkflowContext workflowContext;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
 
   // always accessed under the runner lock
   private final List<NamedRunnable> toExecuteInWorkflowThread = new ArrayList<>();
@@ -151,7 +152,7 @@ class DeterministicRunnerImpl implements DeterministicRunner {
       WorkflowThreadExecutor workflowThreadExecutor,
       @Nonnull SyncWorkflowContext workflowContext,
       Runnable root,
-      WorkflowExecutorCache cache) {
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache) {
     this.workflowThreadExecutor = workflowThreadExecutor;
     this.workflowContext = Preconditions.checkNotNull(workflowContext, "workflowContext");
     // TODO this should be refactored, publishing of this in an constructor into external objects is

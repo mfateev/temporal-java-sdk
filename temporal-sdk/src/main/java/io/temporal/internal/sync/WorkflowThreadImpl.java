@@ -8,6 +8,7 @@ import io.temporal.internal.common.SdkFlag;
 import io.temporal.internal.context.ContextThreadLocal;
 import io.temporal.internal.logging.LoggerTag;
 import io.temporal.internal.replay.ReplayWorkflowContext;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.worker.WorkflowExecutorCache;
 import io.temporal.workflow.Functions;
 import io.temporal.workflow.Promise;
@@ -138,7 +139,7 @@ class WorkflowThreadImpl implements WorkflowThread {
 
   private final WorkflowThreadExecutor workflowThreadExecutor;
   private final WorkflowThreadContext context;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
   private final SyncWorkflowContext syncWorkflowContext;
 
   private final DeterministicRunnerImpl runner;
@@ -156,7 +157,7 @@ class WorkflowThreadImpl implements WorkflowThread {
       boolean detached,
       CancellationScopeImpl parentCancellationScope,
       Runnable runnable,
-      WorkflowExecutorCache cache,
+      WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       List<ContextPropagator> contextPropagators,
       Map<String, Object> propagatedContexts) {
     this.workflowThreadExecutor = workflowThreadExecutor;

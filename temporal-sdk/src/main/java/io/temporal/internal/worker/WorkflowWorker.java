@@ -18,6 +18,7 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.workflowservice.v1.*;
 import io.temporal.failure.ApplicationFailure;
 import io.temporal.internal.logging.LoggerTag;
+import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.retryer.GrpcMessageTooLargeException;
 import io.temporal.internal.retryer.GrpcRetryer;
 import io.temporal.payload.context.WorkflowSerializationContext;
@@ -46,7 +47,7 @@ final class WorkflowWorker implements SuspendableWorker {
   private final String namespace;
   private final String taskQueue;
   private final SingleWorkerOptions options;
-  private final WorkflowExecutorCache cache;
+  private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
   private final WorkflowTaskHandler handler;
   private final String stickyTaskQueueName;
   private final PollerOptions pollerOptions;
@@ -70,7 +71,7 @@ final class WorkflowWorker implements SuspendableWorker {
       @Nullable String stickyTaskQueueName,
       @Nonnull SingleWorkerOptions options,
       @Nonnull WorkflowRunLockManager runLocks,
-      @Nonnull WorkflowExecutorCache cache,
+      @Nonnull WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
       @Nonnull WorkflowTaskHandler handler,
       @Nonnull EagerActivityDispatcher eagerActivityDispatcher,
       @Nonnull SlotSupplier<WorkflowSlotInfo> slotSupplier) {
