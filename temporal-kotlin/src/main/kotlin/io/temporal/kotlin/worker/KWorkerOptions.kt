@@ -22,7 +22,9 @@ package io.temporal.kotlin.worker
 
 import io.temporal.kotlin.activity.KDynamicActivity
 import io.temporal.kotlin.workflow.KDynamicWorkflow
+import io.temporal.worker.WorkerDeploymentOptions
 import io.temporal.worker.WorkerOptions
+import io.temporal.worker.tuning.PollerBehavior
 import io.temporal.worker.tuning.WorkerTuner
 import java.time.Duration
 import kotlin.reflect.KClass
@@ -76,6 +78,10 @@ import kotlin.reflect.KClass
  * @property stickyTaskQueueDrainTimeout Timeout for draining sticky task queue on shutdown
  * @property workerTuner Custom worker tuner for resource management
  * @property identity Worker identity override
+ * @property deploymentOptions Options for configuring the Worker Deployment Versioning feature
+ * @property workflowTaskPollersBehavior Poller behavior for workflow task pollers
+ * @property activityTaskPollersBehavior Poller behavior for activity task pollers
+ * @property nexusTaskPollersBehavior Poller behavior for nexus task pollers
  */
 public data class KWorkerOptions(
   val taskQueue: String,
@@ -113,7 +119,11 @@ public data class KWorkerOptions(
   val useBuildIdForVersioning: Boolean? = null,
   val stickyTaskQueueDrainTimeout: Duration? = null,
   val workerTuner: WorkerTuner? = null,
-  val identity: String? = null
+  val identity: String? = null,
+  val deploymentOptions: WorkerDeploymentOptions? = null,
+  val workflowTaskPollersBehavior: PollerBehavior? = null,
+  val activityTaskPollersBehavior: PollerBehavior? = null,
+  val nexusTaskPollersBehavior: PollerBehavior? = null
 ) {
   /**
    * Converts this KWorkerOptions to Java WorkerOptions.
@@ -143,6 +153,10 @@ public data class KWorkerOptions(
     stickyTaskQueueDrainTimeout?.let { builder.setStickyTaskQueueDrainTimeout(it) }
     workerTuner?.let { builder.setWorkerTuner(it) }
     identity?.let { builder.setIdentity(it) }
+    deploymentOptions?.let { builder.setDeploymentOptions(it) }
+    workflowTaskPollersBehavior?.let { builder.setWorkflowTaskPollersBehavior(it) }
+    activityTaskPollersBehavior?.let { builder.setActivityTaskPollersBehavior(it) }
+    nexusTaskPollersBehavior?.let { builder.setNexusTaskPollersBehavior(it) }
 
     return builder.build()
   }

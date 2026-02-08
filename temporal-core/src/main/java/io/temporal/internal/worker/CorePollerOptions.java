@@ -1,31 +1,35 @@
 package io.temporal.internal.worker;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.temporal.worker.tuning.PollerBehavior;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Options for component that polls Temporal task queues for tasks. */
-public final class PollerOptions {
+/** Core options for components that poll Temporal task queues for tasks. */
+public final class CorePollerOptions {
 
   public static final String UNHANDLED_COMMAND_EXCEPTION_MESSAGE =
-      CorePollerOptions.UNHANDLED_COMMAND_EXCEPTION_MESSAGE;
+      "Failed workflow task due to unhandled command. This error is likely recoverable.";
 
   public static Builder newBuilder() {
     return new Builder();
   }
 
-  public static Builder newBuilder(PollerOptions options) {
+  public static Builder newBuilder(CorePollerOptions options) {
     return new Builder(options);
   }
 
-  public static PollerOptions getDefaultInstance() {
+  public static CorePollerOptions getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
-  private static final PollerOptions DEFAULT_INSTANCE;
+  private static final CorePollerOptions DEFAULT_INSTANCE;
 
   static {
-    DEFAULT_INSTANCE = PollerOptions.newBuilder().build();
+    DEFAULT_INSTANCE = CorePollerOptions.newBuilder().build();
   }
 
   public static final class Builder {
@@ -45,7 +49,7 @@ public final class PollerOptions {
 
     private Builder() {}
 
-    private Builder(PollerOptions options) {
+    private Builder(CorePollerOptions options) {
       if (options == null) {
         return;
       }
@@ -136,7 +140,7 @@ public final class PollerOptions {
       return this;
     }
 
-    /** Use virtual threads polling threads. */
+    /** Use virtual threads for polling threads. */
     public Builder setUsingVirtualThreads(boolean usingVirtualThreads) {
       this.usingVirtualThreads = usingVirtualThreads;
       return this;
@@ -148,94 +152,152 @@ public final class PollerOptions {
       return this;
     }
 
-    public PollerOptions build() {
-      CorePollerOptions.Builder coreBuilder =
-          CorePollerOptions.newBuilder()
-              .setMaximumPollRateIntervalMilliseconds(maximumPollRateIntervalMilliseconds)
-              .setMaximumPollRatePerSecond(maximumPollRatePerSecond)
-              .setBackoffCoefficient(backoffCoefficient)
-              .setBackoffInitialInterval(backoffInitialInterval)
-              .setBackoffCongestionInitialInterval(backoffCongestionInitialInterval)
-              .setBackoffMaximumInterval(backoffMaximumInterval)
-              .setBackoffMaximumJitterCoefficient(backoffMaximumJitterCoefficient)
-              .setUsingVirtualThreads(usingVirtualThreads);
-      if (pollerBehavior != null) {
-        coreBuilder.setPollerBehavior(pollerBehavior);
+    public CorePollerOptions build() {
+      if (uncaughtExceptionHandler == null) {
+        uncaughtExceptionHandler =
+            (t, e) -> {
+              if (e instanceof RuntimeException && e.getCause() instanceof StatusRuntimeException) {
+                StatusRuntimeException sre = (StatusRuntimeException) e.getCause();
+                if (sre.getStatus().getCode() == Status.Code.INVALID_ARGUMENT
+                    && sre.getMessage().startsWith("INVALID_ARGUMENT: UnhandledCommand")) {
+                  log.info(UNHANDLED_COMMAND_EXCEPTION_MESSAGE, e);
+                }
+              } else {
+                log.error("uncaught exception", e);
+              }
+            };
       }
-      if (uncaughtExceptionHandler != null) {
-        coreBuilder.setUncaughtExceptionHandler(uncaughtExceptionHandler);
-      }
-      if (pollThreadNamePrefix != null) {
-        coreBuilder.setPollThreadNamePrefix(pollThreadNamePrefix);
-      }
-      if (pollerTaskExecutorOverride != null) {
-        coreBuilder.setPollerTaskExecutorOverride(pollerTaskExecutorOverride);
-      }
-      CorePollerOptions coreOptions = coreBuilder.build();
-      return new PollerOptions(coreOptions);
+
+      return new CorePollerOptions(
+          maximumPollRateIntervalMilliseconds,
+          maximumPollRatePerSecond,
+          backoffCoefficient,
+          backoffInitialInterval,
+          backoffCongestionInitialInterval,
+          backoffMaximumInterval,
+          backoffMaximumJitterCoefficient,
+          pollerBehavior,
+          uncaughtExceptionHandler,
+          pollThreadNamePrefix,
+          usingVirtualThreads,
+          pollerTaskExecutorOverride);
     }
   }
 
-  private final CorePollerOptions coreOptions;
+  private static final Logger log = LoggerFactory.getLogger(CorePollerOptions.class);
 
-  private PollerOptions(CorePollerOptions coreOptions) {
-    this.coreOptions = coreOptions;
-  }
+  private final int maximumPollRateIntervalMilliseconds;
+  private final double maximumPollRatePerSecond;
+  private final double backoffCoefficient;
+  private final double backoffMaximumJitterCoefficient;
+  private final Duration backoffInitialInterval;
+  private final Duration backoffCongestionInitialInterval;
+  private final Duration backoffMaximumInterval;
+  private final Thread.UncaughtExceptionHandler uncaughtExceptionHandler;
+  private final String pollThreadNamePrefix;
+  private final boolean usingVirtualThreads;
+  private final ExecutorService pollerTaskExecutorOverride;
+  private final PollerBehavior pollerBehavior;
 
-  public CorePollerOptions getCoreOptions() {
-    return coreOptions;
+  private CorePollerOptions(
+      int maximumPollRateIntervalMilliseconds,
+      double maximumPollRatePerSecond,
+      double backoffCoefficient,
+      Duration backoffInitialInterval,
+      Duration backoffCongestionInitialInterval,
+      Duration backoffMaximumInterval,
+      double backoffMaximumJitterCoefficient,
+      PollerBehavior pollerBehavior,
+      Thread.UncaughtExceptionHandler uncaughtExceptionHandler,
+      String pollThreadNamePrefix,
+      boolean usingVirtualThreads,
+      ExecutorService pollerTaskExecutorOverride) {
+    this.maximumPollRateIntervalMilliseconds = maximumPollRateIntervalMilliseconds;
+    this.maximumPollRatePerSecond = maximumPollRatePerSecond;
+    this.backoffCoefficient = backoffCoefficient;
+    this.backoffInitialInterval = backoffInitialInterval;
+    this.backoffCongestionInitialInterval = backoffCongestionInitialInterval;
+    this.backoffMaximumInterval = backoffMaximumInterval;
+    this.backoffMaximumJitterCoefficient = backoffMaximumJitterCoefficient;
+    this.pollerBehavior = pollerBehavior;
+    this.uncaughtExceptionHandler = uncaughtExceptionHandler;
+    this.pollThreadNamePrefix = pollThreadNamePrefix;
+    this.usingVirtualThreads = usingVirtualThreads;
+    this.pollerTaskExecutorOverride = pollerTaskExecutorOverride;
   }
 
   public int getMaximumPollRateIntervalMilliseconds() {
-    return coreOptions.getMaximumPollRateIntervalMilliseconds();
+    return maximumPollRateIntervalMilliseconds;
   }
 
   public double getMaximumPollRatePerSecond() {
-    return coreOptions.getMaximumPollRatePerSecond();
+    return maximumPollRatePerSecond;
   }
 
   public double getBackoffCoefficient() {
-    return coreOptions.getBackoffCoefficient();
+    return backoffCoefficient;
   }
 
   public Duration getBackoffInitialInterval() {
-    return coreOptions.getBackoffInitialInterval();
+    return backoffInitialInterval;
   }
 
   public Duration getBackoffCongestionInitialInterval() {
-    return coreOptions.getBackoffCongestionInitialInterval();
+    return backoffCongestionInitialInterval;
   }
 
   public Duration getBackoffMaximumInterval() {
-    return coreOptions.getBackoffMaximumInterval();
+    return backoffMaximumInterval;
   }
 
   public double getBackoffMaximumJitterCoefficient() {
-    return coreOptions.getBackoffMaximumJitterCoefficient();
+    return backoffMaximumJitterCoefficient;
   }
 
   public PollerBehavior getPollerBehavior() {
-    return coreOptions.getPollerBehavior();
+    return pollerBehavior;
   }
 
   public Thread.UncaughtExceptionHandler getUncaughtExceptionHandler() {
-    return coreOptions.getUncaughtExceptionHandler();
+    return uncaughtExceptionHandler;
   }
 
   public String getPollThreadNamePrefix() {
-    return coreOptions.getPollThreadNamePrefix();
+    return pollThreadNamePrefix;
   }
 
   public boolean isUsingVirtualThreads() {
-    return coreOptions.isUsingVirtualThreads();
+    return usingVirtualThreads;
   }
 
   public ExecutorService getPollerTaskExecutorOverride() {
-    return coreOptions.getPollerTaskExecutorOverride();
+    return pollerTaskExecutorOverride;
   }
 
   @Override
   public String toString() {
-    return "PollerOptions{" + "coreOptions=" + coreOptions + '}';
+    return "CorePollerOptions{"
+        + "maximumPollRateIntervalMilliseconds="
+        + maximumPollRateIntervalMilliseconds
+        + ", maximumPollRatePerSecond="
+        + maximumPollRatePerSecond
+        + ", backoffCoefficient="
+        + backoffCoefficient
+        + ", backoffInitialInterval="
+        + backoffInitialInterval
+        + ", backoffCongestionInitialInterval="
+        + backoffCongestionInitialInterval
+        + ", backoffMaximumInterval="
+        + backoffMaximumInterval
+        + ", backoffMaximumJitterCoefficient="
+        + backoffMaximumJitterCoefficient
+        + ", pollerBehavior="
+        + pollerBehavior
+        + ", pollThreadNamePrefix='"
+        + pollThreadNamePrefix
+        + ", usingVirtualThreads='"
+        + usingVirtualThreads
+        + '\''
+        + '}';
   }
 }

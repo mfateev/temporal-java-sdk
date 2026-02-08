@@ -176,85 +176,121 @@ public final class SingleWorkerOptions {
         drainStickyTaskQueueTimeout = Duration.ofSeconds(0);
       }
 
+      // Build core deployment options from SDK deployment options.
+      CoreWorkerDeploymentOptions coreDeploymentOptions = null;
+      if (this.deploymentOptions != null) {
+        coreDeploymentOptions =
+            CoreWorkerDeploymentOptions.newBuilder()
+                .setUseVersioning(this.deploymentOptions.isUsingVersioning())
+                .setVersion(this.deploymentOptions.getVersion())
+                .setDefaultVersioningBehavior(this.deploymentOptions.getDefaultVersioningBehavior())
+                .build();
+      }
+
+      // Build core versioning options.
+      String effectiveBuildId = this.buildId != null ? this.buildId : this.binaryChecksum;
+      CoreWorkerVersioningOptions coreVersioningOptions =
+          new CoreWorkerVersioningOptions(
+              effectiveBuildId, this.useBuildIdForVersioning, coreDeploymentOptions);
+
+      // Build core single worker options.
+      CoreSingleWorkerOptions coreOptions =
+          CoreSingleWorkerOptions.newBuilder()
+              .setIdentity(this.identity)
+              .setPollerOptions(pollerOptions.getCoreOptions())
+              .setMetricsScope(metricsScope)
+              .setStickyQueueScheduleToStartTimeout(this.stickyQueueScheduleToStartTimeout)
+              .setStickyTaskQueueDrainTimeout(drainStickyTaskQueueTimeout)
+              .setMaxHeartbeatThrottleInterval(this.maxHeartbeatThrottleInterval)
+              .setDefaultHeartbeatThrottleInterval(this.defaultHeartbeatThrottleInterval)
+              .setDefaultDeadlockDetectionTimeout(this.defaultDeadlockDetectionTimeout)
+              .setUsingVirtualThreads(this.usingVirtualThreads)
+              .setVersioningOptions(coreVersioningOptions)
+              .build();
+
       return new SingleWorkerOptions(
-          this.identity,
+          coreOptions,
           this.binaryChecksum,
           this.buildId,
           this.useBuildIdForVersioning,
           dataConverter,
           pollerOptions,
-          metricsScope,
           this.enableLoggingInReplay,
           this.contextPropagators,
           this.workerInterceptors,
-          this.stickyQueueScheduleToStartTimeout,
-          this.defaultDeadlockDetectionTimeout,
-          this.maxHeartbeatThrottleInterval,
-          this.defaultHeartbeatThrottleInterval,
-          drainStickyTaskQueueTimeout,
-          usingVirtualThreads,
           this.deploymentOptions);
     }
   }
 
-  private final String identity;
+  private final CoreSingleWorkerOptions coreOptions;
   private final String binaryChecksum;
   private final String buildId;
   private final boolean useBuildIdForVersioning;
   private final DataConverter dataConverter;
   private final PollerOptions pollerOptions;
-  private final Scope metricsScope;
   private final boolean enableLoggingInReplay;
   private final List<ContextPropagator> contextPropagators;
   private final WorkerInterceptor[] workerInterceptors;
-  private final Duration stickyQueueScheduleToStartTimeout;
-  private final long defaultDeadlockDetectionTimeout;
-  private final Duration maxHeartbeatThrottleInterval;
-  private final Duration defaultHeartbeatThrottleInterval;
-  private final Duration drainStickyTaskQueueTimeout;
-  private final boolean usingVirtualThreads;
   private final WorkerDeploymentOptions deploymentOptions;
 
   private SingleWorkerOptions(
-      String identity,
+      CoreSingleWorkerOptions coreOptions,
       String binaryChecksum,
       String buildId,
       boolean useBuildIdForVersioning,
       DataConverter dataConverter,
       PollerOptions pollerOptions,
-      Scope metricsScope,
       boolean enableLoggingInReplay,
       List<ContextPropagator> contextPropagators,
       WorkerInterceptor[] workerInterceptors,
-      Duration stickyQueueScheduleToStartTimeout,
-      long defaultDeadlockDetectionTimeout,
-      Duration maxHeartbeatThrottleInterval,
-      Duration defaultHeartbeatThrottleInterval,
-      Duration drainStickyTaskQueueTimeout,
-      boolean usingVirtualThreads,
       WorkerDeploymentOptions deploymentOptions) {
-    this.identity = identity;
+    this.coreOptions = coreOptions;
     this.binaryChecksum = binaryChecksum;
     this.buildId = buildId;
     this.useBuildIdForVersioning = useBuildIdForVersioning;
     this.dataConverter = dataConverter;
     this.pollerOptions = pollerOptions;
-    this.metricsScope = metricsScope;
     this.enableLoggingInReplay = enableLoggingInReplay;
     this.contextPropagators = contextPropagators;
     this.workerInterceptors = workerInterceptors;
-    this.stickyQueueScheduleToStartTimeout = stickyQueueScheduleToStartTimeout;
-    this.defaultDeadlockDetectionTimeout = defaultDeadlockDetectionTimeout;
-    this.maxHeartbeatThrottleInterval = maxHeartbeatThrottleInterval;
-    this.defaultHeartbeatThrottleInterval = defaultHeartbeatThrottleInterval;
-    this.drainStickyTaskQueueTimeout = drainStickyTaskQueueTimeout;
-    this.usingVirtualThreads = usingVirtualThreads;
     this.deploymentOptions = deploymentOptions;
   }
 
+  // Infrastructure getters delegate to coreOptions.
+
   public String getIdentity() {
-    return identity;
+    return coreOptions.getIdentity();
   }
+
+  public Scope getMetricsScope() {
+    return coreOptions.getMetricsScope();
+  }
+
+  public Duration getStickyQueueScheduleToStartTimeout() {
+    return coreOptions.getStickyQueueScheduleToStartTimeout();
+  }
+
+  public Duration getDrainStickyTaskQueueTimeout() {
+    return coreOptions.getDrainStickyTaskQueueTimeout();
+  }
+
+  public Duration getMaxHeartbeatThrottleInterval() {
+    return coreOptions.getMaxHeartbeatThrottleInterval();
+  }
+
+  public Duration getDefaultHeartbeatThrottleInterval() {
+    return coreOptions.getDefaultHeartbeatThrottleInterval();
+  }
+
+  public long getDefaultDeadlockDetectionTimeout() {
+    return coreOptions.getDefaultDeadlockDetectionTimeout();
+  }
+
+  public boolean isUsingVirtualThreads() {
+    return coreOptions.isUsingVirtualThreads();
+  }
+
+  // SDK-specific getters stay as direct field access.
 
   @Deprecated
   public String getBinaryChecksum() {
@@ -272,24 +308,12 @@ public final class SingleWorkerOptions {
     return useBuildIdForVersioning;
   }
 
-  public boolean isUsingVirtualThreads() {
-    return usingVirtualThreads;
-  }
-
-  public Duration getDrainStickyTaskQueueTimeout() {
-    return drainStickyTaskQueueTimeout;
-  }
-
   public DataConverter getDataConverter() {
     return dataConverter;
   }
 
   public PollerOptions getPollerOptions() {
     return pollerOptions;
-  }
-
-  public Scope getMetricsScope() {
-    return metricsScope;
   }
 
   public boolean getEnableLoggingInReplay() {
@@ -304,20 +328,8 @@ public final class SingleWorkerOptions {
     return workerInterceptors;
   }
 
-  public Duration getStickyQueueScheduleToStartTimeout() {
-    return stickyQueueScheduleToStartTimeout;
-  }
-
-  public long getDefaultDeadlockDetectionTimeout() {
-    return defaultDeadlockDetectionTimeout;
-  }
-
-  public Duration getMaxHeartbeatThrottleInterval() {
-    return maxHeartbeatThrottleInterval;
-  }
-
-  public Duration getDefaultHeartbeatThrottleInterval() {
-    return defaultHeartbeatThrottleInterval;
+  public WorkerDeploymentOptions getDeploymentOptions() {
+    return deploymentOptions;
   }
 
   public WorkerVersionStamp workerVersionStamp() {
@@ -327,12 +339,12 @@ public final class SingleWorkerOptions {
         .build();
   }
 
-  public WorkerDeploymentOptions getDeploymentOptions() {
-    return deploymentOptions;
-  }
-
   public WorkerVersioningOptions getWorkerVersioningOptions() {
     return new WorkerVersioningOptions(
         this.getBuildId(), this.isUsingBuildIdForVersioning(), this.getDeploymentOptions());
+  }
+
+  public CoreSingleWorkerOptions getCoreOptions() {
+    return coreOptions;
   }
 }

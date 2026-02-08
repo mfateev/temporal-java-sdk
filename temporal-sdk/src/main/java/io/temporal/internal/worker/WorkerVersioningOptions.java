@@ -5,35 +5,41 @@ import javax.annotation.Nullable;
 
 /** Contains old and new worker versioning options together. */
 public final class WorkerVersioningOptions {
-  private final @Nullable String buildId;
-  private final boolean useBuildIdForVersioning;
   private final @Nullable WorkerDeploymentOptions workerDeploymentOptions;
+  private final CoreWorkerVersioningOptions coreOptions;
 
   public WorkerVersioningOptions(
       @Nullable String buildId,
       boolean useBuildIdForVersioning,
       @Nullable WorkerDeploymentOptions workerDeploymentOptions) {
-    this.buildId = buildId;
-    this.useBuildIdForVersioning = useBuildIdForVersioning;
     this.workerDeploymentOptions = workerDeploymentOptions;
+    CoreWorkerDeploymentOptions coreDeploymentOptions = null;
+    if (workerDeploymentOptions != null) {
+      coreDeploymentOptions =
+          CoreWorkerDeploymentOptions.newBuilder()
+              .setUseVersioning(workerDeploymentOptions.isUsingVersioning())
+              .setVersion(workerDeploymentOptions.getVersion())
+              .setDefaultVersioningBehavior(workerDeploymentOptions.getDefaultVersioningBehavior())
+              .build();
+    }
+    this.coreOptions =
+        new CoreWorkerVersioningOptions(buildId, useBuildIdForVersioning, coreDeploymentOptions);
   }
 
   public String getBuildId() {
-    if (workerDeploymentOptions != null
-        && workerDeploymentOptions.getVersion() != null
-        && workerDeploymentOptions.getVersion().getBuildId() != null) {
-      return workerDeploymentOptions.getVersion().getBuildId();
-    }
-    return buildId;
+    return coreOptions.getBuildId();
   }
 
   public boolean isUsingVersioning() {
-    return useBuildIdForVersioning
-        || (workerDeploymentOptions != null && workerDeploymentOptions.isUsingVersioning());
+    return coreOptions.isUsingVersioning();
   }
 
   @Nullable
   public WorkerDeploymentOptions getWorkerDeploymentOptions() {
     return workerDeploymentOptions;
+  }
+
+  public CoreWorkerVersioningOptions getCoreOptions() {
+    return coreOptions;
   }
 }

@@ -1,14 +1,11 @@
 package io.temporal.common;
 
-import io.temporal.worker.WorkerDeploymentOptions;
-
 /** Specifies when a workflow might move from a worker of one Build Id to another. */
 @Experimental
 public enum VersioningBehavior {
   /**
    * An unspecified versioning behavior. By default, workers opting into worker versioning will be
-   * required to specify a behavior. See {@link
-   * io.temporal.worker.WorkerOptions.Builder#setDeploymentOptions(WorkerDeploymentOptions)}.
+   * required to specify a behavior. See WorkerOptions.Builder.setDeploymentOptions.
    */
   UNSPECIFIED,
   /** The workflow will be pinned to the current Build ID unless manually moved. */
