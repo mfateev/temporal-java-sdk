@@ -1,13 +1,14 @@
 # Contributor Quickstart Guide
 
 ## Repository Layout
-- `temporal-sdk`: core SDK implementation.
+- `temporal-core`: minimal shared runtime for Java and Kotlin SDKs (state machines, replay infrastructure, polling). See `temporal-core/WORKER_POLLER_REFACTORING.md` for the refactoring plan.
+- `temporal-sdk`: Java SDK implementation.
+- `temporal-kotlin`: Kotlin SDK implementation.
 - `temporal-testing`: utilities to help write workflow and activity tests.
 - `temporal-test-server`: in-memory Temporal server for fast tests.
 - `temporal-serviceclient`: gRPC client for communicating with the service.
 - `temporal-shaded`: prepackaged version of the SDK with shaded dependencies.
 - `temporal-spring-boot-autoconfigure`: Spring Boot auto configuration.
-- `temporal-kotlin`: Kotlin DSL for the SDK.
 - `temporal-opentracing`: OpenTracing interceptor integration.
 
 ## General Guidance
