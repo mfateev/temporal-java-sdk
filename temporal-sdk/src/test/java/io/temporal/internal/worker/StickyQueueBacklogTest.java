@@ -68,7 +68,7 @@ public class StickyQueueBacklogTest {
             "taskqueue",
             "stickytaskqueue",
             "",
-            new WorkerVersioningOptions("", false, null),
+            new CoreWorkerVersioningOptions("", false, null),
             slotSupplier,
             stickyQueueBalancer,
             metricsScope,

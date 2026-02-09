@@ -96,7 +96,7 @@ final class NexusWorker implements SuspendableWorker {
                     namespace,
                     taskQueue,
                     options.getIdentity(),
-                    options.getWorkerVersioningOptions(),
+                    options.getWorkerVersioningOptions().getCoreOptions(),
                     workerMetricsScope,
                     service.getServerCapabilities(),
                     this.slotSupplier),
@@ -112,7 +112,7 @@ final class NexusWorker implements SuspendableWorker {
                     namespace,
                     taskQueue,
                     options.getIdentity(),
-                    options.getWorkerVersioningOptions(),
+                    options.getWorkerVersioningOptions().getCoreOptions(),
                     this.slotSupplier,
                     workerMetricsScope,
                     service.getServerCapabilities()),
@@ -259,7 +259,7 @@ final class NexusWorker implements SuspendableWorker {
       try {
         handleNexusTask(task, metricsScope);
       } finally {
-        task.getCompletionCallback().apply();
+        task.getCompletionCallback().run();
         MDC.remove(LoggerTag.NEXUS_SERVICE);
         MDC.remove(LoggerTag.NEXUS_OPERATION);
       }

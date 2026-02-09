@@ -77,7 +77,7 @@ public class SlotSupplierTest {
             TASK_QUEUE,
             "stickytaskqueue",
             "",
-            new WorkerVersioningOptions("", false, null),
+            new CoreWorkerVersioningOptions("", false, null),
             trackingSS,
             stickyQueueBalancer,
             metricsScope,

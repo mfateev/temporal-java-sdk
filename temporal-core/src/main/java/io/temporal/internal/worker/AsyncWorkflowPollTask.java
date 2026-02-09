@@ -53,7 +53,7 @@ public class AsyncWorkflowPollTask
       @Nonnull String taskQueue,
       @Nullable String stickyTaskQueue,
       @Nonnull String identity,
-      @Nonnull WorkerVersioningOptions versioningOptions,
+      @Nonnull CoreWorkerVersioningOptions versioningOptions,
       @Nonnull TrackingSlotSupplier<WorkflowSlotInfo> slotSupplier,
       @Nonnull Scope metricsScope,
       @Nonnull Supplier<GetSystemInfoResponse.Capabilities> serverCapabilities) {

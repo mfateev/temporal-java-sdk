@@ -35,7 +35,7 @@ final class NexusPollTask implements MultiThreadedPoller.PollTask<NexusTask> {
       @Nonnull String namespace,
       @Nonnull String taskQueue,
       @Nonnull String identity,
-      @Nonnull WorkerVersioningOptions versioningOptions,
+      @Nonnull CoreWorkerVersioningOptions versioningOptions,
       @Nonnull TrackingSlotSupplier<NexusSlotInfo> slotSupplier,
       @Nonnull Scope metricsScope,
       @Nonnull Supplier<GetSystemInfoResponse.Capabilities> serverCapabilities) {

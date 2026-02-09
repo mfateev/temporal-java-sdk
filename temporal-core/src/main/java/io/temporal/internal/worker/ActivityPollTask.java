@@ -16,6 +16,7 @@ import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.worker.MetricsType;
 import io.temporal.worker.PollerTypeMetricsTag;
 import io.temporal.worker.tuning.*;
+import io.temporal.worker.tuning.SlotInfo;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -27,7 +28,7 @@ final class ActivityPollTask implements MultiThreadedPoller.PollTask<ActivityTas
   private static final Logger log = LoggerFactory.getLogger(ActivityPollTask.class);
 
   private final WorkflowServiceStubs service;
-  private final TrackingSlotSupplier<ActivitySlotInfo> slotSupplier;
+  private final TrackingSlotSupplier<? extends SlotInfo> slotSupplier;
   private final Scope metricsScope;
   private final PollActivityTaskQueueRequest pollRequest;
   private final AtomicInteger pollGauge = new AtomicInteger();
@@ -38,9 +39,9 @@ final class ActivityPollTask implements MultiThreadedPoller.PollTask<ActivityTas
       @Nonnull String namespace,
       @Nonnull String taskQueue,
       @Nonnull String identity,
-      @Nonnull WorkerVersioningOptions versioningOptions,
+      @Nonnull CoreWorkerVersioningOptions versioningOptions,
       double activitiesPerSecond,
-      @Nonnull TrackingSlotSupplier<ActivitySlotInfo> slotSupplier,
+      @Nonnull TrackingSlotSupplier<? extends SlotInfo> slotSupplier,
       @Nonnull Scope metricsScope,
       @Nonnull Supplier<GetSystemInfoResponse.Capabilities> serverCapabilities) {
     this.service = Objects.requireNonNull(service);

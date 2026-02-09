@@ -1,36 +1,34 @@
 package io.temporal.internal.worker;
 
-import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponseOrBuilder;
+import io.temporal.api.workflowservice.v1.PollNexusTaskQueueResponseOrBuilder;
 import io.temporal.worker.tuning.SlotPermit;
-import io.temporal.workflow.Functions;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-public final class ActivityTask implements ScalingTask {
-  private final @Nonnull PollActivityTaskQueueResponseOrBuilder response;
+public final class NexusTask implements ScalingTask {
+  private final @Nonnull PollNexusTaskQueueResponseOrBuilder response;
   private final @Nonnull SlotPermit permit;
-  private final @Nonnull Functions.Proc completionCallback;
+  private final @Nonnull Runnable completionCallback;
 
-  public ActivityTask(
-      @Nonnull PollActivityTaskQueueResponseOrBuilder response,
+  public NexusTask(
+      @Nonnull PollNexusTaskQueueResponseOrBuilder response,
       @Nonnull SlotPermit permit,
-      @Nonnull Functions.Proc completionCallback) {
+      @Nonnull Runnable completionCallback) {
     this.response = response;
     this.permit = permit;
     this.completionCallback = completionCallback;
   }
 
   @Nonnull
-  public PollActivityTaskQueueResponseOrBuilder getResponse() {
+  public PollNexusTaskQueueResponseOrBuilder getResponse() {
     return response;
   }
 
   /**
-   * Completion handle function that must be called by the handler whenever activity processing is
-   * completed.
+   * Completion handle function that must be called by the handler whenever the nexus task
+   * processing is completed.
    */
   @Nonnull
-  public Functions.Proc getCompletionCallback() {
+  public Runnable getCompletionCallback() {
     return completionCallback;
   }
 
@@ -39,7 +37,6 @@ public final class ActivityTask implements ScalingTask {
     return permit;
   }
 
-  @Nullable
   @Override
   public ScalingDecision getScalingDecision() {
     if (!response.hasPollerScalingDecision()) {

@@ -99,7 +99,7 @@ final class ActivityWorker implements SuspendableWorker {
                     namespace,
                     taskQueue,
                     options.getIdentity(),
-                    options.getWorkerVersioningOptions(),
+                    options.getWorkerVersioningOptions().getCoreOptions(),
                     taskQueueActivitiesPerSecond,
                     this.slotSupplier,
                     workerMetricsScope,
@@ -117,7 +117,7 @@ final class ActivityWorker implements SuspendableWorker {
                     namespace,
                     taskQueue,
                     options.getIdentity(),
-                    options.getWorkerVersioningOptions(),
+                    options.getWorkerVersioningOptions().getCoreOptions(),
                     taskQueueActivitiesPerSecond,
                     this.slotSupplier,
                     workerMetricsScope,
@@ -268,7 +268,7 @@ final class ActivityWorker implements SuspendableWorker {
         result == null
             // completed synchronously or manual completion hasn't been requested
             || !result.isManualCompletion()) {
-          task.getCompletionCallback().apply();
+          task.getCompletionCallback().run();
         }
       }
 

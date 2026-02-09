@@ -2,17 +2,17 @@ package io.temporal.internal.worker;
 
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse;
 import io.temporal.worker.tuning.SlotReleaseReason;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class WorkflowTask implements ScalingTask {
   @Nonnull private final PollWorkflowTaskQueueResponse response;
-  @Nonnull private final Functions.Proc1<SlotReleaseReason> completionCallback;
+  @Nonnull private final Consumer<SlotReleaseReason> completionCallback;
 
   public WorkflowTask(
       @Nonnull PollWorkflowTaskQueueResponse response,
-      @Nonnull Functions.Proc1<SlotReleaseReason> completionCallback) {
+      @Nonnull Consumer<SlotReleaseReason> completionCallback) {
     this.response = response;
     this.completionCallback = completionCallback;
   }
@@ -27,7 +27,7 @@ public class WorkflowTask implements ScalingTask {
    * completed.
    */
   @Nonnull
-  public Functions.Proc1<SlotReleaseReason> getCompletionCallback() {
+  public Consumer<SlotReleaseReason> getCompletionCallback() {
     return completionCallback;
   }
 

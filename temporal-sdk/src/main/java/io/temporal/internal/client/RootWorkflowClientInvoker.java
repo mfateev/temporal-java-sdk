@@ -75,7 +75,7 @@ public class RootWorkflowClientInvoker implements WorkflowClientCallsInterceptor
       if (requestEagerExecution && eagerDispatchHandle.getDeploymentOptions() != null) {
         startRequest.setEagerWorkerDeploymentOptions(
             WorkerVersioningProtoUtils.deploymentOptionsToProto(
-                eagerDispatchHandle.getDeploymentOptions()));
+                eagerDispatchHandle.getDeploymentOptions().toCoreOptions()));
       }
       StartWorkflowExecutionResponse response = genericClient.start(startRequest.build());
       WorkflowExecution execution =

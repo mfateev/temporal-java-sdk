@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import io.temporal.common.Experimental;
 import io.temporal.common.VersioningBehavior;
 import io.temporal.common.WorkerDeploymentVersion;
+import io.temporal.internal.worker.CoreWorkerDeploymentOptions;
 import java.util.Objects;
 
 /** Options for configuring the Worker Versioning feature. */
@@ -90,6 +91,15 @@ public class WorkerDeploymentOptions {
 
   public VersioningBehavior getDefaultVersioningBehavior() {
     return defaultVersioningBehavior;
+  }
+
+  /** Convert to the core-level options used by temporal-core. */
+  public CoreWorkerDeploymentOptions toCoreOptions() {
+    return CoreWorkerDeploymentOptions.newBuilder()
+        .setUseVersioning(useVersioning)
+        .setVersion(version)
+        .setDefaultVersioningBehavior(defaultVersioningBehavior)
+        .build();
   }
 
   @Override

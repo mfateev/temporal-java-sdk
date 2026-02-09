@@ -9,7 +9,6 @@ import io.temporal.common.RetryOptions;
 import io.temporal.internal.common.ProtoConverters;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.RetryOptionsUtils;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Objects;
@@ -21,14 +20,14 @@ final class ActivityInfoImpl implements ActivityInfoInternal {
   private final String activityTaskQueue;
   private final PollActivityTaskQueueResponseOrBuilder response;
   private final boolean local;
-  private final Functions.Proc completionHandle;
+  private final Runnable completionHandle;
 
   ActivityInfoImpl(
       PollActivityTaskQueueResponseOrBuilder response,
       @Nonnull String namespace,
       @Nonnull String activityTaskQueue,
       boolean local,
-      Functions.Proc completionHandle) {
+      Runnable completionHandle) {
     this.response = Objects.requireNonNull(response);
     this.namespace = Objects.requireNonNull(namespace);
     this.activityTaskQueue = Objects.requireNonNull(activityTaskQueue);
@@ -150,7 +149,7 @@ final class ActivityInfoImpl implements ActivityInfoInternal {
   }
 
   @Override
-  public Functions.Proc getCompletionHandle() {
+  public Runnable getCompletionHandle() {
     return completionHandle;
   }
 

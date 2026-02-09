@@ -2,15 +2,14 @@ package io.temporal.internal.activity;
 
 import io.temporal.activity.ManualActivityCompletionClient;
 import io.temporal.failure.CanceledFailure;
-import io.temporal.workflow.Functions;
 import javax.annotation.Nonnull;
 
 final class CompletionAwareManualCompletionClient implements ManualActivityCompletionClient {
   private final ManualActivityCompletionClient client;
-  private final Functions.Proc completionHandle;
+  private final Runnable completionHandle;
 
   CompletionAwareManualCompletionClient(
-      ManualActivityCompletionClient client, Functions.Proc completionHandle) {
+      ManualActivityCompletionClient client, Runnable completionHandle) {
     this.client = client;
     this.completionHandle = completionHandle;
   }
@@ -20,7 +19,7 @@ final class CompletionAwareManualCompletionClient implements ManualActivityCompl
     try {
       client.complete(result);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -29,7 +28,7 @@ final class CompletionAwareManualCompletionClient implements ManualActivityCompl
     try {
       client.fail(failure);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -43,7 +42,7 @@ final class CompletionAwareManualCompletionClient implements ManualActivityCompl
     try {
       client.reportCancellation(details);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 }

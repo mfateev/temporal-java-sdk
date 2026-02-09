@@ -9,7 +9,6 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.common.converter.DataConverter;
 import io.temporal.internal.client.external.ManualActivityCompletionClientFactory;
 import io.temporal.payload.context.ActivitySerializationContext;
-import io.temporal.workflow.Functions;
 import java.lang.reflect.Type;
 import java.time.Duration;
 import java.util.Optional;
@@ -30,7 +29,7 @@ class ActivityExecutionContextImpl implements InternalActivityExecutionContext {
   private final WorkflowClient client;
   private final Object activity;
   private final ManualActivityCompletionClientFactory manualCompletionClientFactory;
-  private final Functions.Proc completionHandle;
+  private final Runnable completionHandle;
   private final HeartbeatContext heartbeatContext;
 
   private final Scope metricsScope;
@@ -47,7 +46,7 @@ class ActivityExecutionContextImpl implements InternalActivityExecutionContext {
       DataConverter dataConverter,
       ScheduledExecutorService heartbeatExecutor,
       ManualActivityCompletionClientFactory manualCompletionClientFactory,
-      Functions.Proc completionHandle,
+      Runnable completionHandle,
       Scope metricsScope,
       String identity,
       Duration maxHeartbeatThrottleInterval,

@@ -2,12 +2,11 @@ package io.temporal.internal.worker;
 
 import io.temporal.api.enums.v1.WorkerVersioningMode;
 import io.temporal.common.VersioningBehavior;
-import io.temporal.worker.WorkerDeploymentOptions;
 import javax.annotation.Nonnull;
 
 public class WorkerVersioningProtoUtils {
   public static io.temporal.api.deployment.v1.WorkerDeploymentOptions deploymentOptionsToProto(
-      @Nonnull WorkerDeploymentOptions options) {
+      @Nonnull CoreWorkerDeploymentOptions options) {
     return io.temporal.api.deployment.v1.WorkerDeploymentOptions.newBuilder()
         .setBuildId(options.getVersion().getBuildId())
         .setDeploymentName(options.getVersion().getDeploymentName())

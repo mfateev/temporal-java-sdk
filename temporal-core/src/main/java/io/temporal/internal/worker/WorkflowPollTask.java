@@ -48,7 +48,7 @@ final class WorkflowPollTask implements MultiThreadedPoller.PollTask<WorkflowTas
       @Nonnull String taskQueue,
       @Nullable String stickyTaskQueue,
       @Nonnull String identity,
-      @Nonnull WorkerVersioningOptions versioningOptions,
+      @Nonnull CoreWorkerVersioningOptions versioningOptions,
       @Nonnull TrackingSlotSupplier<WorkflowSlotInfo> slotSupplier,
       @Nonnull StickyQueueBalancer stickyQueueBalancer,
       @Nonnull Scope workerMetricsScope,

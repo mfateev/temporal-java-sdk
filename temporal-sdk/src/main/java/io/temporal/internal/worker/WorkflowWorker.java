@@ -116,7 +116,7 @@ final class WorkflowWorker implements SuspendableWorker {
                   taskQueue,
                   null,
                   options.getIdentity(),
-                  options.getWorkerVersioningOptions(),
+                  options.getWorkerVersioningOptions().getCoreOptions(),
                   slotSupplier,
                   workerMetricsScope,
                   service.getServerCapabilities());
@@ -128,7 +128,7 @@ final class WorkflowWorker implements SuspendableWorker {
                       taskQueue,
                       stickyTaskQueueName,
                       options.getIdentity(),
-                      options.getWorkerVersioningOptions(),
+                      options.getWorkerVersioningOptions().getCoreOptions(),
                       slotSupplier,
                       workerMetricsScope,
                       service.getServerCapabilities()),
@@ -143,7 +143,7 @@ final class WorkflowWorker implements SuspendableWorker {
                       taskQueue,
                       null,
                       options.getIdentity(),
-                      options.getWorkerVersioningOptions(),
+                      options.getWorkerVersioningOptions().getCoreOptions(),
                       slotSupplier,
                       workerMetricsScope,
                       service.getServerCapabilities()));
@@ -172,7 +172,7 @@ final class WorkflowWorker implements SuspendableWorker {
                     taskQueue,
                     stickyTaskQueueName,
                     options.getIdentity(),
-                    options.getWorkerVersioningOptions(),
+                    options.getWorkerVersioningOptions().getCoreOptions(),
                     slotSupplier,
                     stickyQueueBalancer,
                     workerMetricsScope,
@@ -538,7 +538,7 @@ final class WorkflowWorker implements SuspendableWorker {
         } while (nextWFTResponse.isPresent());
       } finally {
         swTotal.stop();
-        task.getCompletionCallback().apply(releaseReason);
+        task.getCompletionCallback().accept(releaseReason);
         MDC.remove(LoggerTag.WORKFLOW_ID);
         MDC.remove(LoggerTag.WORKFLOW_TYPE);
         MDC.remove(LoggerTag.RUN_ID);
@@ -607,7 +607,8 @@ final class WorkflowWorker implements SuspendableWorker {
 
       if (options.getDeploymentOptions() != null) {
         taskCompleted.setDeploymentOptions(
-            WorkerVersioningProtoUtils.deploymentOptionsToProto(options.getDeploymentOptions()));
+            WorkerVersioningProtoUtils.deploymentOptionsToProto(
+                options.getDeploymentOptions().toCoreOptions()));
       } else if (service.getServerCapabilities().get().getBuildIdBasedVersioning()) {
         taskCompleted.setWorkerVersionStamp(options.workerVersionStamp());
       } else {
@@ -637,7 +638,8 @@ final class WorkflowWorker implements SuspendableWorker {
 
       if (options.getDeploymentOptions() != null) {
         taskFailed.setDeploymentOptions(
-            WorkerVersioningProtoUtils.deploymentOptionsToProto(options.getDeploymentOptions()));
+            WorkerVersioningProtoUtils.deploymentOptionsToProto(
+                options.getDeploymentOptions().toCoreOptions()));
       } else if (service.getServerCapabilities().get().getBuildIdBasedVersioning()) {
         taskFailed.setWorkerVersion(options.workerVersionStamp());
       }

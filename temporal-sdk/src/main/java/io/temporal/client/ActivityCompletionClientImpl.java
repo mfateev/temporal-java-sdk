@@ -4,7 +4,6 @@ import com.uber.m3.tally.Scope;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.internal.client.external.ManualActivityCompletionClientFactory;
 import io.temporal.payload.context.ActivitySerializationContext;
-import io.temporal.workflow.Functions;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -12,13 +11,13 @@ import javax.annotation.Nullable;
 class ActivityCompletionClientImpl implements ActivityCompletionClient {
 
   private final ManualActivityCompletionClientFactory factory;
-  private final Functions.Proc completionHandle;
+  private final Runnable completionHandle;
   private final Scope metricsScope;
   private final @Nullable ActivitySerializationContext serializationContext;
 
   ActivityCompletionClientImpl(
       ManualActivityCompletionClientFactory manualActivityCompletionClientFactory,
-      Functions.Proc completionHandle,
+      Runnable completionHandle,
       Scope metricsScope,
       @Nullable ActivitySerializationContext serializationContext) {
     this.factory = manualActivityCompletionClientFactory;
@@ -32,7 +31,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
     try {
       factory.getClient(taskToken, metricsScope, serializationContext).complete(result);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -43,7 +42,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
           .getClient(toExecution(workflowId, runId), activityId, metricsScope, serializationContext)
           .complete(result);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -52,7 +51,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
     try {
       factory.getClient(taskToken, metricsScope, serializationContext).fail(result);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -64,7 +63,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
           .getClient(toExecution(workflowId, runId), activityId, metricsScope, serializationContext)
           .fail(result);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -73,7 +72,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
     try {
       factory.getClient(taskToken, metricsScope, serializationContext).reportCancellation(details);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
@@ -85,7 +84,7 @@ class ActivityCompletionClientImpl implements ActivityCompletionClient {
           .getClient(toExecution(workflowId, runId), activityId, metricsScope, serializationContext)
           .reportCancellation(details);
     } finally {
-      completionHandle.apply();
+      completionHandle.run();
     }
   }
 
