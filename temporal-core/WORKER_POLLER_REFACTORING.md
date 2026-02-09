@@ -256,26 +256,37 @@ Kotlin SDK should also add support for `WorkerDeploymentOptions` to match Java S
 
 ## Migration Strategy
 
-1. **Phase 1: Create Core Options**
-   - Create `CorePollerOptions`, `CoreWorkerVersioningOptions`, `CoreWorkerDeploymentOptions`, `CoreSingleWorkerOptions` in temporal-core
-   - Update Java SDK options to wrap/use core options
-   - Update Kotlin SDK options to follow Java structure and use core options
+All phases are complete.
 
-2. **Phase 2: Move Lifecycle Interfaces**
-   - Move `Shutdownable`, `Suspendable`, `SuspendableWorker`, `Startable`, `WorkerLifecycleState` to temporal-core
-   - Move `ShutdownManager` to temporal-core
+1. **Phase 1: Create Core Options** _(COMPLETE)_
+   - Created `CorePollerOptions`, `CoreWorkerVersioningOptions`, `CoreWorkerDeploymentOptions`, `CoreSingleWorkerOptions` in temporal-core
+   - Updated Java SDK options to wrap/use core options with `getCoreOptions()`
+   - Updated Kotlin SDK `KWorkerOptions` with deployment and poller behavior properties
+   - Moved `PollerBehavior` types, `VersioningBehavior`, `WorkerDeploymentVersion` to temporal-core
 
-3. **Phase 3: Move Concurrency Infrastructure**
-   - Move slot suppliers, semaphores, throttlers
-   - Move `StickyQueueBalancer`, `WorkflowExecutorCache`, `WorkflowRunLockManager`
+2. **Phase 2: Move Lifecycle Interfaces** _(COMPLETE)_
+   - Moved `Shutdownable`, `Suspendable`, `SuspendableWorker`, `Startable`, `WorkerLifecycleState`, `WorkerWithLifecycle` to temporal-core
+   - Moved `ShutdownManager` to temporal-core (refactored `waitForSupplierPermitsReleasedUnlimited` to use `IntSupplier`)
+   - Moved `ExecutorThreadFactory`, `WorkerThreadsNameHelper`, `DisableNormalPolling`, `GrpcUtils`
 
-4. **Phase 4: Move Pollers**
-   - Move `BasePoller`, `MultiThreadedPoller`, `AsyncPoller`
-   - Move `PollTaskExecutor`
+3. **Phase 3: Move Concurrency Infrastructure** _(COMPLETE)_
+   - Moved slot suppliers (`TrackingSlotSupplier`, `SlotInfo` hierarchy, `FixedSizeSlotSupplier`), semaphores (`AdjustableSemaphore`), throttlers (`Throttler`, `CircularLongBuffer`)
+   - Moved `StickyQueueBalancer`, `WorkflowRunLockManager`, `MetricsType`, `ScalingTask`, `SlotReservationData`
+   - Moved `WorkflowExecutorCache` (genericized to `<T extends Closeable>`)
+   - Moved `PollScaleReportHandle` (refactored `Functions.Proc1` to `Consumer`)
 
-5. **Phase 5: Move Poll Tasks**
-   - Move all poll task implementations
-   - Move task data types (`WorkflowTask`, `ActivityTask`, `NexusTask`)
+4. **Phase 4: Move Pollers** _(COMPLETE)_
+   - Moved `BasePoller`, `MultiThreadedPoller`, `AsyncPoller`, `PollTaskExecutor`
+   - Moved prerequisites: `TaskExecutor`, `ShutdownableTaskExecutor`, `BlockCallerPolicy`, `LoggerTag`, `ThreadConfigurator`, `VirtualThreadDelegate`
+   - Changed pollers from `PollerOptions` to `CorePollerOptions`
+   - Added multi-release JAR support to temporal-core for Java 21 virtual threads
+
+5. **Phase 5: Move Poll Tasks** _(COMPLETE)_
+   - Moved all poll task implementations (sync and async variants for workflow, activity, nexus)
+   - Moved task data types (`WorkflowTask`, `ActivityTask`, `NexusTask`) with `Functions.Proc`/`Proc1` replaced by `Runnable`/`Consumer`
+   - Moved `PollerTypeMetricsTag`, `WorkflowSlotInfo`, `NexusSlotInfo`, `WorkerVersioningProtoUtils`
+   - Changed poll tasks from `WorkerVersioningOptions` to `CoreWorkerVersioningOptions`
+   - Added `toCoreOptions()` to `WorkerDeploymentOptions` for SDK-to-core conversion
 
 ## Benefits
 
