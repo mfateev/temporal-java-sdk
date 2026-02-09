@@ -100,7 +100,7 @@ final class WorkflowWorker implements SuspendableWorker {
               taskQueue,
               options.getIdentity(),
               new TaskHandlerImpl(handler),
-              pollerOptions,
+              pollerOptions.getCoreOptions(),
               this.slotSupplier.maximumSlots().orElse(Integer.MAX_VALUE),
               options.isUsingVirtualThreads());
 
@@ -154,7 +154,7 @@ final class WorkflowWorker implements SuspendableWorker {
                 new SlotReservationData(taskQueue, options.getIdentity(), options.getBuildId()),
                 pollers,
                 this.pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
       } else {
         PollerBehaviorSimpleMaximum pollerBehavior =
@@ -178,7 +178,7 @@ final class WorkflowWorker implements SuspendableWorker {
                     workerMetricsScope,
                     service.getServerCapabilities()),
                 pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
       }
       poller.start();

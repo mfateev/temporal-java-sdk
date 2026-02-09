@@ -666,7 +666,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
               taskQueue,
               options.getIdentity(),
               new AttemptTaskHandlerImpl(handler),
-              pollerOptions,
+              pollerOptions.getCoreOptions(),
               slotSupplier.maximumSlots().orElse(Integer.MAX_VALUE),
               options.isUsingVirtualThreads());
 

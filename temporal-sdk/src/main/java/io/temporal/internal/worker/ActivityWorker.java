@@ -83,7 +83,7 @@ final class ActivityWorker implements SuspendableWorker {
               taskQueue,
               options.getIdentity(),
               new TaskHandlerImpl(handler),
-              pollerOptions,
+              pollerOptions.getCoreOptions(),
               slotSupplier.maximumSlots().orElse(Integer.MAX_VALUE),
               options.isUsingVirtualThreads());
 
@@ -105,7 +105,7 @@ final class ActivityWorker implements SuspendableWorker {
                     workerMetricsScope,
                     service.getServerCapabilities()),
                 this.pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
 
       } else {
@@ -123,7 +123,7 @@ final class ActivityWorker implements SuspendableWorker {
                     workerMetricsScope,
                     service.getServerCapabilities()),
                 this.pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
       }
       poller.start();

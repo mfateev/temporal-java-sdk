@@ -122,8 +122,8 @@ public class AsyncPollerTest {
       AsyncPoller.PollTaskAsync<TestScalingTask> pollTask,
       DummyTaskExecutor taskExecutor,
       PollerBehavior pollerBehavior) {
-    PollerOptions options =
-        PollerOptions.newBuilder()
+    CorePollerOptions options =
+        CorePollerOptions.newBuilder()
             .setPollThreadNamePrefix("test")
             .setPollerBehavior(pollerBehavior)
             .build();

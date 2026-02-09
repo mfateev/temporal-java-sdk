@@ -81,7 +81,7 @@ final class NexusWorker implements SuspendableWorker {
               taskQueue,
               options.getIdentity(),
               new TaskHandlerImpl(handler),
-              pollerOptions,
+              pollerOptions.getCoreOptions(),
               slotSupplier.maximumSlots().orElse(Integer.MAX_VALUE),
               options.isUsingVirtualThreads());
       boolean useAsyncPoller =
@@ -101,7 +101,7 @@ final class NexusWorker implements SuspendableWorker {
                     service.getServerCapabilities(),
                     this.slotSupplier),
                 this.pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
       } else {
         poller =
@@ -117,7 +117,7 @@ final class NexusWorker implements SuspendableWorker {
                     workerMetricsScope,
                     service.getServerCapabilities()),
                 this.pollTaskExecutor,
-                pollerOptions,
+                pollerOptions.getCoreOptions(),
                 workerMetricsScope);
       }
       poller.start();

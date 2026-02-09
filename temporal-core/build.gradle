@@ -1,6 +1,18 @@
 description = '''Temporal Core - Minimal runtime for Temporal SDK'''
 
+// Temporal Core supports Java 8 or later so to support virtual threads
+// we need to compile the code with Java 21 and package it in a multi-release jar.
+sourceSets {
+    java21 {
+        java {
+            srcDirs = ['src/main/java21']
+        }
+    }
+}
+
 dependencies {
+    java21Implementation files(sourceSets.main.output.classesDirs) { builtBy compileJava }
+
     api(platform("io.grpc:grpc-bom:$grpcVersion"))
     api(platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion"))
 
@@ -15,4 +27,22 @@ dependencies {
     testImplementation "junit:junit:${junitVersion}"
     testImplementation "org.mockito:mockito-core:${mockitoVersion}"
     testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logbackVersion}"
+}
+
+tasks.named('compileJava21Java') {
+    if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+        javaCompiler = javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+    options.release = 21
+}
+
+jar {
+    into('META-INF/versions/21') {
+        from sourceSets.java21.output
+    }
+    manifest.attributes(
+            'Multi-Release': 'true'
+    )
 }

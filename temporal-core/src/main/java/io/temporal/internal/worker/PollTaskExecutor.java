@@ -21,7 +21,7 @@ final class PollTaskExecutor<T> implements ShutdownableTaskExecutor<T> {
   private final String taskQueue;
   private final String identity;
   private final TaskHandler<T> handler;
-  private final PollerOptions pollerOptions;
+  private final CorePollerOptions pollerOptions;
 
   private final ExecutorService taskExecutor;
   private final String pollThreadNamePrefix;
@@ -31,7 +31,7 @@ final class PollTaskExecutor<T> implements ShutdownableTaskExecutor<T> {
       @Nonnull String taskQueue,
       @Nonnull String identity,
       @Nonnull TaskHandler<T> handler,
-      @Nonnull PollerOptions pollerOptions,
+      @Nonnull CorePollerOptions pollerOptions,
       int threadPoolMax,
       boolean useVirtualThreads) {
     this.namespace = Objects.requireNonNull(namespace);

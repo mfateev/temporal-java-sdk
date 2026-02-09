@@ -39,7 +39,7 @@ final class MultiThreadedPoller<T> extends BasePoller<T> {
   private static final Logger log = LoggerFactory.getLogger(MultiThreadedPoller.class);
   private final String identity;
   private final PollTask<T> pollTask;
-  private final PollerOptions pollerOptions;
+  private final CorePollerOptions pollerOptions;
   private final Scope workerMetricsScope;
 
   private Throttler pollRateThrottler;
@@ -51,7 +51,7 @@ final class MultiThreadedPoller<T> extends BasePoller<T> {
       String identity,
       PollTask<T> pollTask,
       ShutdownableTaskExecutor<T> taskExecutor,
-      PollerOptions pollerOptions,
+      CorePollerOptions pollerOptions,
       Scope workerMetricsScope) {
     super(taskExecutor);
     Objects.requireNonNull(identity, "identity cannot be null");

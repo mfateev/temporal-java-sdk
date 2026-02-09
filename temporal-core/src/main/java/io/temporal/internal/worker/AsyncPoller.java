@@ -27,7 +27,7 @@ final class AsyncPoller<T extends ScalingTask> extends BasePoller<T> {
   private final TrackingSlotSupplier<?> slotSupplier;
   private final SlotReservationData slotReservationData;
   private final List<PollTaskAsync<T>> asyncTaskPollers;
-  private final PollerOptions pollerOptions;
+  private final CorePollerOptions pollerOptions;
   private final PollerBehaviorAutoscaling pollerBehavior;
   private final Scope workerMetricsScope;
   private Throttler pollRateThrottler;
@@ -41,7 +41,7 @@ final class AsyncPoller<T extends ScalingTask> extends BasePoller<T> {
       SlotReservationData slotReservationData,
       PollTaskAsync<T> asyncTaskPoller,
       ShutdownableTaskExecutor<T> taskExecutor,
-      PollerOptions pollerOptions,
+      CorePollerOptions pollerOptions,
       Scope workerMetricsScope) {
     this(
         slotSupplier,
@@ -57,7 +57,7 @@ final class AsyncPoller<T extends ScalingTask> extends BasePoller<T> {
       SlotReservationData slotReservationData,
       List<PollTaskAsync<T>> asyncTaskPollers,
       ShutdownableTaskExecutor<T> taskExecutor,
-      PollerOptions pollerOptions,
+      CorePollerOptions pollerOptions,
       Scope workerMetricsScope) {
     super(taskExecutor);
     Objects.requireNonNull(slotSupplier, "slotSupplier cannot be null");
