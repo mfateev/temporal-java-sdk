@@ -100,28 +100,24 @@ public class ReplayWorkflowTaskHandlerFailureCauseTest {
             "test-namespace",
             null, // workflowFactory - can be null for this test
             cache,
-            options,
+            options.getCoreOptions(),
             null, // stickyTaskQueue - can be null
             null, // stickyTaskQueueScheduleToStartTimeout - can be null
             mockService, // service - must be non-null
-            null // localActivityDispatcher - can be null
-            );
+            null, // localActivityDispatcher - can be null
+            new ReplayWorkflowRunTaskHandlerFactory(options)::create,
+            (t, wfId) -> io.temporal.api.failure.v1.Failure.getDefaultInstance());
 
     // Use reflection to access the private failureToWFTResult method
     Method method =
         ReplayWorkflowTaskHandler.class.getDeclaredMethod(
             "failureToWFTResult",
             io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder.class,
-            Throwable.class,
-            io.temporal.common.converter.DataConverter.class);
+            Throwable.class);
     method.setAccessible(true);
     io.temporal.internal.worker.WorkflowTaskHandler.Result result =
         (io.temporal.internal.worker.WorkflowTaskHandler.Result)
-            method.invoke(
-                handler,
-                workflowTask,
-                failure,
-                io.temporal.common.converter.DefaultDataConverter.newDefaultInstance());
+            method.invoke(handler, workflowTask, failure);
 
     // Extract the RespondWorkflowTaskFailedRequest from the Result
     return result.getTaskFailed();

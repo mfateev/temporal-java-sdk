@@ -27,11 +27,11 @@ import io.temporal.serviceclient.MetricsTag;
 import io.temporal.worker.MetricsType;
 import io.temporal.worker.WorkerMetricsTag;
 import io.temporal.worker.tuning.*;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -190,7 +190,7 @@ final class LocalActivityWorker implements Startable, Shutdownable {
     @Override
     public boolean dispatch(
         @Nonnull ExecuteLocalActivityParameters params,
-        @Nonnull Functions.Proc1<LocalActivityResult> resultCallback,
+        @Nonnull Consumer<LocalActivityResult> resultCallback,
         @Nullable Deadline acceptanceDeadline) {
       WorkerLifecycleState lifecycleState = getLifecycleState();
       switch (lifecycleState) {

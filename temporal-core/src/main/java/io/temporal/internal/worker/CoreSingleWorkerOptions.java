@@ -21,6 +21,7 @@ public final class CoreSingleWorkerOptions {
   public static final class Builder {
 
     private String identity;
+    private String buildId;
     private CorePollerOptions pollerOptions;
     private Scope metricsScope;
     private Duration stickyQueueScheduleToStartTimeout;
@@ -38,6 +39,7 @@ public final class CoreSingleWorkerOptions {
         return;
       }
       this.identity = options.identity;
+      this.buildId = options.buildId;
       this.pollerOptions = options.pollerOptions;
       this.metricsScope = options.metricsScope;
       this.stickyQueueScheduleToStartTimeout = options.stickyQueueScheduleToStartTimeout;
@@ -51,6 +53,11 @@ public final class CoreSingleWorkerOptions {
 
     public Builder setIdentity(String identity) {
       this.identity = identity;
+      return this;
+    }
+
+    public Builder setBuildId(String buildId) {
+      this.buildId = buildId;
       return this;
     }
 
@@ -118,6 +125,7 @@ public final class CoreSingleWorkerOptions {
 
       return new CoreSingleWorkerOptions(
           this.identity,
+          this.buildId,
           pollerOptions,
           metricsScope,
           this.stickyQueueScheduleToStartTimeout,
@@ -131,6 +139,7 @@ public final class CoreSingleWorkerOptions {
   }
 
   private final String identity;
+  private final String buildId;
   private final CorePollerOptions pollerOptions;
   private final Scope metricsScope;
   private final Duration stickyQueueScheduleToStartTimeout;
@@ -143,6 +152,7 @@ public final class CoreSingleWorkerOptions {
 
   private CoreSingleWorkerOptions(
       String identity,
+      String buildId,
       CorePollerOptions pollerOptions,
       Scope metricsScope,
       Duration stickyQueueScheduleToStartTimeout,
@@ -153,6 +163,7 @@ public final class CoreSingleWorkerOptions {
       boolean usingVirtualThreads,
       CoreWorkerVersioningOptions versioningOptions) {
     this.identity = identity;
+    this.buildId = buildId;
     this.pollerOptions = pollerOptions;
     this.metricsScope = metricsScope;
     this.stickyQueueScheduleToStartTimeout = stickyQueueScheduleToStartTimeout;
@@ -166,6 +177,11 @@ public final class CoreSingleWorkerOptions {
 
   public String getIdentity() {
     return identity;
+  }
+
+  @Nullable
+  public String getBuildId() {
+    return buildId;
   }
 
   public CorePollerOptions getPollerOptions() {

@@ -5,7 +5,7 @@ import io.temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest;
 import io.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest;
 import io.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest;
 import io.temporal.serviceclient.RpcRetryOptions;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 
 /**
  * Interface of workflow task handlers.
@@ -21,7 +21,7 @@ public interface WorkflowTaskHandler {
     private final RespondQueryTaskCompletedRequest queryCompleted;
     private final RpcRetryOptions requestRetryOptions;
     private final boolean completionCommand;
-    private final Functions.Proc1<Long> resetEventIdHandle;
+    private final Consumer<Long> resetEventIdHandle;
     private final Runnable applyPostCompletionMetrics;
 
     public Result(
@@ -31,7 +31,7 @@ public interface WorkflowTaskHandler {
         RespondQueryTaskCompletedRequest queryCompleted,
         RpcRetryOptions requestRetryOptions,
         boolean completionCommand,
-        Functions.Proc1<Long> resetEventIdHandle,
+        Consumer<Long> resetEventIdHandle,
         Runnable applyPostCompletionMetrics) {
       this.workflowType = workflowType;
       this.taskCompleted = taskCompleted;
@@ -63,7 +63,7 @@ public interface WorkflowTaskHandler {
       return completionCommand;
     }
 
-    public Functions.Proc1<Long> getResetEventIdHandle() {
+    public Consumer<Long> getResetEventIdHandle() {
       if (resetEventIdHandle != null) {
         return resetEventIdHandle;
       }

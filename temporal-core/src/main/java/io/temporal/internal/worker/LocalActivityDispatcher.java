@@ -2,7 +2,7 @@ package io.temporal.internal.worker;
 
 import io.grpc.Deadline;
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters;
-import io.temporal.workflow.Functions;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -16,6 +16,6 @@ public interface LocalActivityDispatcher {
    */
   boolean dispatch(
       @Nonnull ExecuteLocalActivityParameters params,
-      @Nonnull Functions.Proc1<LocalActivityResult> resultCallback,
+      @Nonnull Consumer<LocalActivityResult> resultCallback,
       @Nullable Deadline acceptanceDeadline);
 }

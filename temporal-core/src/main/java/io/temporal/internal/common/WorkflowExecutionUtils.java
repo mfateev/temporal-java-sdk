@@ -20,6 +20,8 @@
 
 package io.temporal.internal.common;
 
+import com.google.protobuf.TextFormat;
+import io.temporal.api.command.v1.Command;
 import io.temporal.api.enums.v1.CommandType;
 import io.temporal.api.enums.v1.EventType;
 import io.temporal.api.history.v1.HistoryEvent;
@@ -134,6 +136,14 @@ public final class WorkflowExecutionUtils {
         return EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED;
     }
     throw new IllegalArgumentException("Unknown commandType");
+  }
+
+  public static String prettyPrintCommands(Iterable<Command> commands) {
+    StringBuilder result = new StringBuilder();
+    for (Command command : commands) {
+      result.append(TextFormat.printer().printToString(command));
+    }
+    return result.toString();
   }
 
   public static boolean isFullHistory(PollWorkflowTaskQueueResponseOrBuilder workflowTask) {

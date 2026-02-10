@@ -34,7 +34,6 @@ import io.temporal.internal.sync.WorkflowThread;
 import io.temporal.internal.worker.*;
 import io.temporal.worker.MetricsType;
 import io.temporal.worker.WorkflowImplementationOptions;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
@@ -43,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 /**
  * Implements workflow executor that relies on replay of a workflow code. An instance of this class
@@ -55,7 +55,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
 
   private final Lock lock = new ReentrantLock();
 
-  private final Functions.Proc1<LocalActivityResult> localActivityCompletionSink;
+  private final Consumer<LocalActivityResult> localActivityCompletionSink;
 
   private final BlockingQueue<LocalActivityResult> localActivityCompletionQueue =
       new LinkedBlockingDeque<>();

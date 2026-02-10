@@ -20,21 +20,20 @@ import io.temporal.api.sdk.v1.WorkflowTaskCompletedMetadata;
 import io.temporal.api.taskqueue.v1.StickyExecutionAttributes;
 import io.temporal.api.taskqueue.v1.TaskQueue;
 import io.temporal.api.workflowservice.v1.*;
-import io.temporal.common.converter.DataConverter;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.WorkflowExecutionUtils;
 import io.temporal.internal.worker.*;
-import io.temporal.payload.context.WorkflowSerializationContext;
 import io.temporal.serviceclient.MetricsTag;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.worker.NonDeterministicException;
-import io.temporal.workflow.Functions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,29 +45,35 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
   private final ReplayWorkflowFactory workflowFactory;
   private final String namespace;
   private final WorkflowExecutorCache<WorkflowRunTaskHandler> cache;
-  private final SingleWorkerOptions options;
+  private final CoreSingleWorkerOptions coreOptions;
   private final Duration stickyTaskQueueScheduleToStartTimeout;
   private final WorkflowServiceStubs service;
   private final TaskQueue stickyTaskQueue;
   private final LocalActivityDispatcher localActivityDispatcher;
+  private final WorkflowRunTaskHandlerFactory runTaskHandlerFactory;
+  private final BiFunction<Throwable, String, Failure> exceptionToFailure;
 
   public ReplayWorkflowTaskHandler(
       String namespace,
       ReplayWorkflowFactory asyncWorkflowFactory,
       WorkflowExecutorCache<WorkflowRunTaskHandler> cache,
-      SingleWorkerOptions options,
+      CoreSingleWorkerOptions coreOptions,
       TaskQueue stickyTaskQueue,
       Duration stickyTaskQueueScheduleToStartTimeout,
       WorkflowServiceStubs service,
-      LocalActivityDispatcher localActivityDispatcher) {
+      LocalActivityDispatcher localActivityDispatcher,
+      WorkflowRunTaskHandlerFactory runTaskHandlerFactory,
+      BiFunction<Throwable, String, Failure> exceptionToFailure) {
     this.namespace = namespace;
     this.workflowFactory = asyncWorkflowFactory;
     this.cache = cache;
-    this.options = options;
+    this.coreOptions = coreOptions;
     this.stickyTaskQueue = stickyTaskQueue;
     this.stickyTaskQueueScheduleToStartTimeout = stickyTaskQueueScheduleToStartTimeout;
     this.service = Objects.requireNonNull(service);
     this.localActivityDispatcher = localActivityDispatcher;
+    this.runTaskHandlerFactory = runTaskHandlerFactory;
+    this.exceptionToFailure = exceptionToFailure;
   }
 
   @Override
@@ -76,7 +81,9 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       throws Exception {
     String workflowType = workflowTask.getWorkflowType().getName();
     Scope metricsScope =
-        options.getMetricsScope().tagged(ImmutableMap.of(MetricsTag.WORKFLOW_TYPE, workflowType));
+        coreOptions
+            .getMetricsScope()
+            .tagged(ImmutableMap.of(MetricsTag.WORKFLOW_TYPE, workflowType));
     return handleWorkflowTaskWithQuery(workflowTask.toBuilder(), metricsScope);
   }
 
@@ -155,12 +162,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
         return createDirectQueryResult(workflowTask, null, e);
       } else {
         // this call rethrows an exception in some scenarios
-        DataConverter dataConverterWithWorkflowContext =
-            options
-                .getDataConverter()
-                .withContext(
-                    new WorkflowSerializationContext(namespace, execution.getWorkflowId()));
-        return failureToWFTResult(workflowTask, e, dataConverterWithWorkflowContext);
+        return failureToWFTResult(workflowTask, e);
       }
     } finally {
       if (!useCache && workflowRunTaskHandler != null) {
@@ -174,7 +176,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       String workflowType,
       PollWorkflowTaskQueueResponseOrBuilder workflowTask,
       WorkflowTaskResult result,
-      Functions.Proc1<Long> eventIdSetHandle) {
+      Consumer<Long> eventIdSetHandle) {
     WorkflowExecution execution = workflowTask.getWorkflowExecution();
     if (log.isTraceEnabled()) {
       log.trace(
@@ -257,17 +259,17 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
   }
 
   private Result failureToWFTResult(
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask, Throwable e, DataConverter dc)
-      throws Exception {
+      PollWorkflowTaskQueueResponseOrBuilder workflowTask, Throwable e) throws Exception {
     String workflowType = workflowTask.getWorkflowType().getName();
+    WorkflowExecution execution = workflowTask.getWorkflowExecution();
     if (e instanceof WorkflowExecutionException) {
       @SuppressWarnings("deprecation")
       RespondWorkflowTaskCompletedRequest response =
           RespondWorkflowTaskCompletedRequest.newBuilder()
               .setTaskToken(workflowTask.getTaskToken())
-              .setIdentity(options.getIdentity())
+              .setIdentity(coreOptions.getIdentity())
               .setNamespace(namespace)
-              .setBinaryChecksum(options.getBuildId())
+              .setBinaryChecksum(coreOptions.getBuildId())
               .addCommands(
                   Command.newBuilder()
                       .setCommandType(CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION)
@@ -280,7 +282,6 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           workflowType, response, null, null, null, false, null, null);
     }
 
-    WorkflowExecution execution = workflowTask.getWorkflowExecution();
     log.warn(
         "Workflow task processing failure. startedEventId={}, WorkflowId={}, RunId={}. If seen continuously the workflow might be stuck.",
         workflowTask.getStartedEventId(),
@@ -304,7 +305,7 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
       throw (Exception) e;
     }
 
-    Failure failure = dc.exceptionToFailure(e);
+    Failure failure = exceptionToFailure.apply(e, execution.getWorkflowId());
     RespondWorkflowTaskFailedRequest.Builder failedRequest =
         RespondWorkflowTaskFailedRequest.newBuilder()
             .setTaskToken(workflowTask.getTaskToken())
@@ -400,11 +401,10 @@ public final class ReplayWorkflowTaskHandler implements WorkflowTaskHandler {
           .setNextPageToken(getHistoryResponse.getNextPageToken());
     }
     ReplayWorkflow workflow = workflowFactory.getWorkflow(workflowType, workflowExecution);
-    return new ReplayWorkflowRunTaskHandler(
+    return runTaskHandlerFactory.create(
         namespace,
         workflow,
         workflowTask,
-        options,
         metricsScope,
         localActivityDispatcher,
         service.getServerCapabilities().get());

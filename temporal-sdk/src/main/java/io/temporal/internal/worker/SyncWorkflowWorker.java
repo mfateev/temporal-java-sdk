@@ -11,10 +11,12 @@ import io.temporal.internal.activity.ActivityExecutionContextFactory;
 import io.temporal.internal.activity.ActivityTaskHandlerImpl;
 import io.temporal.internal.activity.LocalActivityExecutionContextFactoryImpl;
 import io.temporal.internal.replay.ReplayWorkflowFactory;
+import io.temporal.internal.replay.ReplayWorkflowRunTaskHandlerFactory;
 import io.temporal.internal.replay.ReplayWorkflowTaskHandler;
 import io.temporal.internal.replay.WorkflowRunTaskHandler;
 import io.temporal.internal.sync.POJOWorkflowImplementationFactory;
 import io.temporal.internal.sync.WorkflowThreadExecutor;
+import io.temporal.payload.context.WorkflowSerializationContext;
 import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.worker.WorkflowTaskDispatchHandle;
 import io.temporal.worker.tuning.LocalActivitySlotInfo;
@@ -113,11 +115,17 @@ public class SyncWorkflowWorker implements SuspendableWorker {
             namespace,
             compositeFactory,
             cache,
-            singleWorkerOptions,
+            singleWorkerOptions.getCoreOptions(),
             stickyTaskQueue,
             singleWorkerOptions.getStickyQueueScheduleToStartTimeout(),
             client.getWorkflowServiceStubs(),
-            laWorker.getLocalActivityScheduler());
+            laWorker.getLocalActivityScheduler(),
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions)::create,
+            (throwable, workflowId) ->
+                singleWorkerOptions
+                    .getDataConverter()
+                    .withContext(new WorkflowSerializationContext(namespace, workflowId))
+                    .exceptionToFailure(throwable));
 
     workflowWorker =
         new WorkflowWorker(
@@ -139,11 +147,17 @@ public class SyncWorkflowWorker implements SuspendableWorker {
             namespace,
             compositeFactory,
             null,
-            singleWorkerOptions,
+            singleWorkerOptions.getCoreOptions(),
             null,
             Duration.ZERO,
             client.getWorkflowServiceStubs(),
-            laWorker.getLocalActivityScheduler());
+            laWorker.getLocalActivityScheduler(),
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions)::create,
+            (throwable, workflowId) ->
+                singleWorkerOptions
+                    .getDataConverter()
+                    .withContext(new WorkflowSerializationContext(namespace, workflowId))
+                    .exceptionToFailure(throwable));
 
     queryReplayHelper = new QueryReplayHelper(nonStickyReplayTaskHandler);
   }

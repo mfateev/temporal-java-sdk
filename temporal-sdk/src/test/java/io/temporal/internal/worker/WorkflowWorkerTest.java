@@ -14,11 +14,13 @@ import com.uber.m3.tally.Scope;
 import com.uber.m3.util.ImmutableMap;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.common.v1.WorkflowType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.workflowservice.v1.*;
 import io.temporal.common.reporter.TestStatsReporter;
 import io.temporal.internal.common.InternalUtils;
 import io.temporal.internal.replay.ReplayWorkflow;
 import io.temporal.internal.replay.ReplayWorkflowFactory;
+import io.temporal.internal.replay.ReplayWorkflowRunTaskHandlerFactory;
 import io.temporal.internal.replay.ReplayWorkflowTaskHandler;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.testUtils.Eventually;
@@ -335,16 +337,19 @@ public class WorkflowWorkerTest {
 
     SlotSupplier<WorkflowSlotInfo> slotSupplier = new FixedSizeSlotSupplier<>(1);
 
+    SingleWorkerOptions singleWorkerOptions = SingleWorkerOptions.newBuilder().build();
     WorkflowTaskHandler rootTaskHandler =
         new ReplayWorkflowTaskHandler(
             "namespace",
             setUpMockWorkflowFactory(),
             cache,
-            SingleWorkerOptions.newBuilder().build(),
+            singleWorkerOptions.getCoreOptions(),
             InternalUtils.createStickyTaskQueue("sticky", "taskQueue"),
             Duration.ofSeconds(5),
             client,
-            null);
+            null,
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions)::create,
+            (t, wfId) -> Failure.getDefaultInstance());
     // Queue to pass the reset event id from WorkflowTaskHandler to the test
     BlockingQueue<Long> resetEventIdQueue = new ArrayBlockingQueue<>(1);
     // Wrap the root task handler to capture the reset event id
@@ -363,7 +368,7 @@ public class WorkflowWorkerTest {
                 result.isCompletionCommand(),
                 (id) -> {
                   resetEventIdQueue.add(id);
-                  result.getResetEventIdHandle().apply(id);
+                  result.getResetEventIdHandle().accept(id);
                 },
                 null);
           }

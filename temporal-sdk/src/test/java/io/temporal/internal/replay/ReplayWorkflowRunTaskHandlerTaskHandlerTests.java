@@ -13,6 +13,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Durations;
 import com.uber.m3.tally.NoopScope;
 import io.temporal.api.enums.v1.EventType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.History;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.taskqueue.v1.StickyExecutionAttributes;
@@ -45,16 +46,19 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
     // Arrange
     WorkflowExecutorCache cache =
         new WorkflowExecutorCache(10, new WorkflowRunLockManager(), new NoopScope());
+    SingleWorkerOptions singleWorkerOptions = SingleWorkerOptions.newBuilder().build();
     WorkflowTaskHandler taskHandler =
         new ReplayWorkflowTaskHandler(
             "namespace",
             setUpMockWorkflowFactory(),
             cache,
-            SingleWorkerOptions.newBuilder().build(),
+            singleWorkerOptions.getCoreOptions(),
             null,
             Duration.ofSeconds(5),
             testWorkflowRule.getWorkflowServiceStubs(),
-            null);
+            null,
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions)::create,
+            (t, wfId) -> Failure.getDefaultInstance());
 
     // Act
     WorkflowTaskHandler.Result result =
@@ -92,16 +96,19 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
                 .setHistory(History.newBuilder().addAllEvents(history).build())
                 .build());
 
+    SingleWorkerOptions singleWorkerOptions2 = SingleWorkerOptions.newBuilder().build();
     WorkflowTaskHandler taskHandler =
         new ReplayWorkflowTaskHandler(
             "namespace",
             setUpMockWorkflowFactory(),
             cache,
-            SingleWorkerOptions.newBuilder().build(),
+            singleWorkerOptions2.getCoreOptions(),
             null,
             Duration.ofSeconds(5),
             client,
-            null);
+            null,
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions2)::create,
+            (t, wfId) -> singleWorkerOptions2.getDataConverter().exceptionToFailure(t));
 
     // Send a poll with a partial history and no cached execution so the SDK will request a full
     // history
@@ -165,16 +172,19 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
     // Arrange
     WorkflowExecutorCache cache =
         new WorkflowExecutorCache(10, new WorkflowRunLockManager(), new NoopScope());
+    SingleWorkerOptions singleWorkerOptions3 = SingleWorkerOptions.newBuilder().build();
     WorkflowTaskHandler taskHandler =
         new ReplayWorkflowTaskHandler(
             "namespace",
             setUpMockWorkflowFactory(),
             cache,
-            SingleWorkerOptions.newBuilder().build(),
+            singleWorkerOptions3.getCoreOptions(),
             InternalUtils.createStickyTaskQueue("sticky", "taskQueue"),
             Duration.ofSeconds(5),
             testWorkflowRule.getWorkflowServiceStubs(),
-            null);
+            null,
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions3)::create,
+            (t, wfId) -> Failure.getDefaultInstance());
 
     PollWorkflowTaskQueueResponse workflowTask =
         HistoryUtils.generateWorkflowTaskWithInitialHistory();
@@ -195,16 +205,19 @@ public class ReplayWorkflowRunTaskHandlerTaskHandlerTests {
 
     WorkflowExecutorCache cache =
         new WorkflowExecutorCache(10, new WorkflowRunLockManager(), new NoopScope());
+    SingleWorkerOptions singleWorkerOptions4 = SingleWorkerOptions.newBuilder().build();
     WorkflowTaskHandler taskHandler =
         new ReplayWorkflowTaskHandler(
             "namespace",
             setUpMockWorkflowFactory(),
             cache,
-            SingleWorkerOptions.newBuilder().build(),
+            singleWorkerOptions4.getCoreOptions(),
             InternalUtils.createStickyTaskQueue("sticky", "taskQueue"),
             Duration.ofSeconds(5),
             testWorkflowRule.getWorkflowServiceStubs(),
-            null);
+            null,
+            new ReplayWorkflowRunTaskHandlerFactory(singleWorkerOptions4)::create,
+            (t, wfId) -> Failure.getDefaultInstance());
 
     PollWorkflowTaskQueueResponse workflowTask =
         HistoryUtils.generateWorkflowTaskWithInitialHistory();

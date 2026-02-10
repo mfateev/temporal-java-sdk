@@ -7,13 +7,13 @@ import io.temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest;
 import io.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse;
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters;
 import io.temporal.worker.tuning.SlotPermit;
-import io.temporal.workflow.Functions;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -29,11 +29,10 @@ class LocalActivityExecutionContext {
 
   public LocalActivityExecutionContext(
       @Nonnull ExecuteLocalActivityParameters executionParams,
-      @Nonnull Functions.Proc1<LocalActivityResult> resultCallback,
+      @Nonnull Consumer<LocalActivityResult> resultCallback,
       @Nullable Deadline scheduleToCloseDeadline) {
     this.executionParams = Objects.requireNonNull(executionParams, "executionParams");
-    this.executionResult.thenAccept(
-        Objects.requireNonNull(resultCallback, "resultCallback")::apply);
+    this.executionResult.thenAccept(Objects.requireNonNull(resultCallback, "resultCallback"));
     this.scheduleToCloseDeadline = scheduleToCloseDeadline;
     this.currentAttempt = new AtomicInteger(executionParams.getInitialAttempt());
     Failure previousExecutionFailure = executionParams.getPreviousLocalExecutionFailure();

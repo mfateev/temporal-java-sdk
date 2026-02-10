@@ -197,6 +197,7 @@ public final class SingleWorkerOptions {
       CoreSingleWorkerOptions coreOptions =
           CoreSingleWorkerOptions.newBuilder()
               .setIdentity(this.identity)
+              .setBuildId(this.buildId)
               .setPollerOptions(pollerOptions.getCoreOptions())
               .setMetricsScope(metricsScope)
               .setStickyQueueScheduleToStartTimeout(this.stickyQueueScheduleToStartTimeout)
