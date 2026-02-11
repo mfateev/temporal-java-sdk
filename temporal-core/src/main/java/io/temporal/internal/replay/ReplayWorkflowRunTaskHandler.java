@@ -7,33 +7,26 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.protobuf.util.Durations;
-import com.google.protobuf.util.Timestamps;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.Stopwatch;
 import io.grpc.Deadline;
 import io.temporal.api.command.v1.Command;
 import io.temporal.api.common.v1.Payloads;
 import io.temporal.api.enums.v1.QueryResultType;
+import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.protocol.v1.Message;
 import io.temporal.api.query.v1.WorkflowQuery;
 import io.temporal.api.query.v1.WorkflowQueryResult;
-import io.temporal.api.workflowservice.v1.GetSystemInfoResponse;
 import io.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponseOrBuilder;
+import io.temporal.common.VersioningBehavior;
 import io.temporal.internal.Config;
-import io.temporal.internal.common.FailureUtils;
 import io.temporal.internal.common.SdkFlag;
-import io.temporal.internal.common.UpdateMessage;
 import io.temporal.internal.statemachines.ExecuteLocalActivityParameters;
-import io.temporal.internal.statemachines.StatesMachinesCallback;
 import io.temporal.internal.statemachines.WorkflowStateMachines;
-import io.temporal.internal.statemachines.WorkflowStateMachinesConfig;
-import io.temporal.internal.statemachines.WorkflowStateMachinesSdkCallbacksImpl;
-import io.temporal.internal.sync.WorkflowThread;
 import io.temporal.internal.worker.*;
 import io.temporal.worker.MetricsType;
-import io.temporal.worker.WorkflowImplementationOptions;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
@@ -43,10 +36,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 /**
  * Implements workflow executor that relies on replay of a workflow code. An instance of this class
- * is created per cached workflow run.
+ * is created per cached workflow run. All components (state machines, context, executor) are
+ * pre-created and wired by the SDK factory before being passed to this handler.
  */
 class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
   private final Scope metricsScope;
@@ -64,78 +60,39 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
 
   private final LocalActivityMeteringHelper localActivityMeteringHelper;
 
-  private final ReplayWorkflow workflow;
-
   private final WorkflowStateMachines workflowStateMachines;
 
   /** Number of non completed local activity tasks */
   // TODO move and maintain this counter inside workflowStateMachines
   private int localActivityTaskCount;
 
-  private final ReplayWorkflowContextImpl context;
+  private final ReplayWorkflowContext context;
 
-  private final ReplayWorkflowExecutor replayWorkflowExecutor;
+  private final ReplayWorkflowExecutorListener executorListener;
 
-  private final GetSystemInfoResponse.Capabilities capabilities;
+  private final WorkflowExceptionHandler exceptionHandler;
+
+  private final @Nullable Supplier<VersioningBehavior> versioningBehavior;
 
   ReplayWorkflowRunTaskHandler(
-      String namespace,
-      ReplayWorkflow workflow,
-      PollWorkflowTaskQueueResponseOrBuilder workflowTask,
-      SingleWorkerOptions workerOptions,
+      WorkflowStateMachines workflowStateMachines,
+      ReplayWorkflowContext context,
+      ReplayWorkflowExecutorListener executorListener,
+      WorkflowExecutionStartedEventAttributes startedEvent,
       Scope metricsScope,
       LocalActivityDispatcher localActivityDispatcher,
-      GetSystemInfoResponse.Capabilities capabilities) {
-    HistoryEvent startedEvent = workflowTask.getHistory().getEvents(0);
-    if (!startedEvent.hasWorkflowExecutionStartedEventAttributes()) {
-      throw new IllegalArgumentException(
-          "First event in the history is not WorkflowExecutionStarted");
-    }
-    this.startedEvent = startedEvent.getWorkflowExecutionStartedEventAttributes();
+      WorkflowExceptionHandler exceptionHandler,
+      @Nullable Supplier<VersioningBehavior> versioningBehavior) {
+    this.workflowStateMachines = workflowStateMachines;
+    this.context = context;
+    this.executorListener = executorListener;
+    this.startedEvent = startedEvent;
     this.metricsScope = metricsScope;
     this.localActivityDispatcher = localActivityDispatcher;
-    this.workflow = workflow;
-
-    WorkflowImplementationOptions implOptions = null;
-    if (workflow.getWorkflowContext() != null) {
-      implOptions =
-          ((WorkflowContext) workflow.getWorkflowContext()).getWorkflowImplementationOptions();
-    }
-    if (implOptions == null) {
-      implOptions = WorkflowImplementationOptions.newBuilder().build();
-    }
-    // Adapt WorkflowImplementationOptions to WorkflowStateMachinesConfig
-    final WorkflowImplementationOptions finalImplOptions = implOptions;
-    WorkflowStateMachinesConfig config = finalImplOptions::isEnableUpsertVersionSearchAttributes;
-    // The destroyCheckCallback uses WorkflowThread.await to check if the workflow thread should be
-    // destroyed
-    Runnable destroyCheckCallback =
-        () -> WorkflowThread.await("kill workflow thread if destroy requested", () -> true);
-    this.workflowStateMachines =
-        new WorkflowStateMachines(
-            new StatesMachinesCallbackImpl(),
-            capabilities,
-            config,
-            destroyCheckCallback,
-            WorkflowStateMachinesSdkCallbacksImpl.INSTANCE);
-    String fullReplayDirectQueryType =
-        workflowTask.hasQuery() ? workflowTask.getQuery().getQueryType() : null;
-    this.context =
-        new ReplayWorkflowContextImpl(
-            workflowStateMachines,
-            namespace,
-            this.startedEvent,
-            workflowTask.getWorkflowExecution(),
-            Timestamps.toMillis(startedEvent.getEventTime()),
-            fullReplayDirectQueryType,
-            workerOptions,
-            metricsScope);
-
-    this.replayWorkflowExecutor =
-        new ReplayWorkflowExecutor(workflow, workflowStateMachines, context);
+    this.exceptionHandler = exceptionHandler;
+    this.versioningBehavior = versioningBehavior;
     this.localActivityCompletionSink = localActivityCompletionQueue::add;
     this.localActivityMeteringHelper = new LocalActivityMeteringHelper();
-    this.capabilities = capabilities;
   }
 
   @Override
@@ -200,9 +157,8 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
       if (workflowStateMachines.sdkVersionToWrite() != null) {
         result.setWriteSdkVersion(workflowStateMachines.sdkVersionToWrite());
       }
-      if (workflow.getWorkflowContext() != null) {
-        result.setVersioningBehavior(
-            ((WorkflowContext) workflow.getWorkflowContext()).getVersioningBehavior());
+      if (versioningBehavior != null) {
+        result.setVersioningBehavior(versioningBehavior.get());
       }
       // Setup post-completion metrics to be applied after task response accepted
       String postCompleteCounter = workflowStateMachines.getPostCompletionMetricCounter();
@@ -241,7 +197,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
       if (context.getWorkflowTaskFailure() != null) {
         throw context.getWorkflowTaskFailure();
       }
-      Optional<Payloads> resultPayloads = replayWorkflowExecutor.query(query);
+      Optional<Payloads> resultPayloads = executorListener.query(query);
       return new QueryResult(resultPayloads, context.isWorkflowMethodCompleted());
     } finally {
       lock.unlock();
@@ -279,23 +235,15 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
         try {
           workflowStateMachines.handleEvent(event, hasNext);
         } catch (Throwable e) {
-          // Fail workflow if exception is of the specified type
-          WorkflowImplementationOptions implementationOptions =
-              ((WorkflowContext) workflow.getWorkflowContext()).getWorkflowImplementationOptions();
-          Class<? extends Throwable>[] failTypes =
-              implementationOptions.getFailWorkflowExceptionTypes();
-          for (Class<? extends Throwable> failType : failTypes) {
-            if (failType.isAssignableFrom(e.getClass())) {
-              if (!FailureUtils.isBenignApplicationFailure(e)) {
-                metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
-              }
-              throw new WorkflowExecutionException(
-                  ((WorkflowContext) workflow.getWorkflowContext())
-                      .mapWorkflowExceptionToFailure(e));
+          // Delegate to the exception handler to check if this exception should fail the workflow
+          Failure failure = exceptionHandler.handleException(e);
+          if (failure != null) {
+            if (!exceptionHandler.isBenignFailure(e)) {
+              metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
             }
+            throw new WorkflowExecutionException(failure);
           }
-          if (e instanceof WorkflowExecutionException
-              && !FailureUtils.isBenignApplicationFailure(e)) {
+          if (e instanceof WorkflowExecutionException && !exceptionHandler.isBenignFailure(e)) {
             metricsScope.counter(MetricsType.WORKFLOW_FAILED_COUNTER).inc(1);
           }
           throw wrap(e);
@@ -331,7 +279,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
     for (Map.Entry<String, WorkflowQuery> entry : queries.entrySet()) {
       WorkflowQuery query = entry.getValue();
       try {
-        Optional<Payloads> queryResult = replayWorkflowExecutor.query(query);
+        Optional<Payloads> queryResult = executorListener.query(query);
         WorkflowQueryResult.Builder result =
             WorkflowQueryResult.newBuilder()
                 .setResultType(QueryResultType.QUERY_RESULT_TYPE_ANSWERED);
@@ -356,7 +304,7 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
   public void close() {
     lock.lock();
     try {
-      replayWorkflowExecutor.close();
+      executorListener.close();
     } finally {
       lock.unlock();
     }
@@ -431,34 +379,6 @@ class ReplayWorkflowRunTaskHandler implements WorkflowRunTaskHandler {
   @VisibleForTesting
   WorkflowStateMachines getWorkflowStateMachines() {
     return workflowStateMachines;
-  }
-
-  private class StatesMachinesCallbackImpl implements StatesMachinesCallback {
-
-    @Override
-    public void start(HistoryEvent startWorkflowEvent) {
-      replayWorkflowExecutor.start(startWorkflowEvent);
-    }
-
-    @Override
-    public void eventLoop() {
-      replayWorkflowExecutor.eventLoop();
-    }
-
-    @Override
-    public void signal(HistoryEvent signalEvent) {
-      replayWorkflowExecutor.handleWorkflowExecutionSignaled(signalEvent);
-    }
-
-    @Override
-    public void update(UpdateMessage message) {
-      replayWorkflowExecutor.handleWorkflowExecutionUpdated(message);
-    }
-
-    @Override
-    public void cancel(HistoryEvent cancelEvent) {
-      replayWorkflowExecutor.handleWorkflowExecutionCancelRequested(cancelEvent);
-    }
   }
 
   @VisibleForTesting

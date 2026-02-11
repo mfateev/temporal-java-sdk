@@ -1,7 +1,5 @@
 package io.temporal.internal.replay;
 
-import static io.temporal.internal.history.VersionMarkerUtils.TEMPORAL_CHANGE_VERSION;
-
 import com.uber.m3.tally.Scope;
 import io.temporal.api.command.v1.*;
 import io.temporal.api.common.v1.*;
@@ -9,11 +7,11 @@ import io.temporal.api.failure.v1.Failure;
 import io.temporal.api.history.v1.HistoryEvent;
 import io.temporal.api.history.v1.WorkflowExecutionStartedEventAttributes;
 import io.temporal.api.sdk.v1.UserMetadata;
-import io.temporal.failure.CanceledFailure;
 import io.temporal.internal.common.ProtobufTimeUtils;
 import io.temporal.internal.common.SdkFlag;
+import io.temporal.internal.history.VersionMarkerUtils;
 import io.temporal.internal.statemachines.*;
-import io.temporal.internal.worker.SingleWorkerOptions;
+import io.temporal.internal.worker.CoreSingleWorkerOptions;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -36,11 +34,14 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
   private final WorkflowMutableState mutableState;
   private final @Nullable String fullReplayDirectQueryName;
   private final Scope replayAwareWorkflowMetricsScope;
-  private final SingleWorkerOptions workerOptions;
+  private final CoreSingleWorkerOptions coreOptions;
+  private final Supplier<RuntimeException> canceledExceptionFactory;
 
   /**
    * @param fullReplayDirectQueryName query name if an execution is a full replay caused by a direct
    *     query, null otherwise
+   * @param canceledExceptionFactory factory for creating cancellation exceptions (SDK provides
+   *     {@code () -> new CanceledFailure("Canceled by request")})
    */
   ReplayWorkflowContextImpl(
       WorkflowStateMachines workflowStateMachines,
@@ -49,8 +50,9 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
       WorkflowExecution workflowExecution,
       long runStartedTimestampMillis,
       @Nullable String fullReplayDirectQueryName,
-      SingleWorkerOptions workerOptions,
-      Scope workflowMetricsScope) {
+      CoreSingleWorkerOptions coreOptions,
+      Scope workflowMetricsScope,
+      Supplier<RuntimeException> canceledExceptionFactory) {
     this.workflowStateMachines = workflowStateMachines;
     this.basicWorkflowContext =
         new BasicWorkflowContext(
@@ -59,12 +61,13 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     this.fullReplayDirectQueryName = fullReplayDirectQueryName;
     this.replayAwareWorkflowMetricsScope =
         new ReplayAwareScope(workflowMetricsScope, this, workflowStateMachines::currentTimeMillis);
-    this.workerOptions = workerOptions;
+    this.coreOptions = coreOptions;
+    this.canceledExceptionFactory = canceledExceptionFactory;
   }
 
   @Override
   public boolean getEnableLoggingInReplay() {
-    return workerOptions.getEnableLoggingInReplay();
+    return coreOptions.getEnableLoggingInReplay();
   }
 
   @Override
@@ -264,7 +267,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
     // servicing a query, in which case we do want to use the ID from history.
     if (!workflowStateMachines.isReplaying()
         && workflowStateMachines.getCurrentWFTStartedEventId() != 0) {
-      curTaskBID = workerOptions.getBuildId();
+      curTaskBID = coreOptions.getBuildId();
     }
     return Optional.ofNullable(curTaskBID);
   }
@@ -301,7 +304,7 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
         }
       case EVENT_TYPE_TIMER_CANCELED:
         {
-          CanceledFailure exception = new CanceledFailure("Canceled by request");
+          RuntimeException exception = canceledExceptionFactory.get();
           callback.accept(exception);
           return;
         }
@@ -348,12 +351,13 @@ final class ReplayWorkflowContextImpl implements ReplayWorkflowContext {
      * It is set by the SDK when getVersion is called. We know that users have been setting
      * this field in the past, and we want to avoid breaking their workflows.
      * */
-    if (searchAttributes.containsIndexedFields(TEMPORAL_CHANGE_VERSION.getName())) {
+    if (searchAttributes.containsIndexedFields(
+        VersionMarkerUtils.TEMPORAL_CHANGE_VERSION_SEARCH_ATTRIBUTE_NAME)) {
       // When we enabled upserting of the search attribute by default, we should consider raising a
       // warning here.
       log.debug(
           "{} is a reserved field. This can be set automatically by the SDK by calling `setEnableUpsertVersionSearchAttributes` on your `WorkflowImplementationOptions`",
-          TEMPORAL_CHANGE_VERSION.getName());
+          VersionMarkerUtils.TEMPORAL_CHANGE_VERSION_SEARCH_ATTRIBUTE_NAME);
     }
     workflowStateMachines.upsertSearchAttributes(searchAttributes);
     mutableState.upsertSearchAttributes(searchAttributes);

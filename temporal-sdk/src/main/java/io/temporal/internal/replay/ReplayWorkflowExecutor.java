@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-final class ReplayWorkflowExecutor {
+final class ReplayWorkflowExecutor implements ReplayWorkflowExecutorListener {
   @VisibleForTesting
   public static final String unfinishedUpdateHandlesWarnMessage =
       "[TMPRL1102] Workflow finished while update handlers are still running. This may "
@@ -58,12 +58,12 @@ final class ReplayWorkflowExecutor {
 
   private final WorkflowStateMachines workflowStateMachines;
 
-  private final ReplayWorkflowContextImpl context;
+  private final ReplayWorkflowContext context;
 
   public ReplayWorkflowExecutor(
       ReplayWorkflow workflow,
       WorkflowStateMachines workflowStateMachines,
-      ReplayWorkflowContextImpl context) {
+      ReplayWorkflowContext context) {
     this.workflow = workflow;
     this.workflowStateMachines = workflowStateMachines;
     this.context = context;
@@ -197,10 +197,12 @@ final class ReplayWorkflowExecutor {
     }
   }
 
+  @Override
   public Optional<Payloads> query(WorkflowQuery query) {
     return workflow.query(query);
   }
 
+  @Override
   public void close() {
     workflow.close();
   }

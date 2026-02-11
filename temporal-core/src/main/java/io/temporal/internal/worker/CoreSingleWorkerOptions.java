@@ -29,6 +29,7 @@ public final class CoreSingleWorkerOptions {
     private Duration maxHeartbeatThrottleInterval;
     private Duration defaultHeartbeatThrottleInterval;
     private long defaultDeadlockDetectionTimeout;
+    private boolean enableLoggingInReplay;
     private boolean usingVirtualThreads;
     private CoreWorkerVersioningOptions versioningOptions;
 
@@ -47,6 +48,7 @@ public final class CoreSingleWorkerOptions {
       this.maxHeartbeatThrottleInterval = options.maxHeartbeatThrottleInterval;
       this.defaultHeartbeatThrottleInterval = options.defaultHeartbeatThrottleInterval;
       this.defaultDeadlockDetectionTimeout = options.defaultDeadlockDetectionTimeout;
+      this.enableLoggingInReplay = options.enableLoggingInReplay;
       this.usingVirtualThreads = options.usingVirtualThreads;
       this.versioningOptions = options.versioningOptions;
     }
@@ -97,6 +99,11 @@ public final class CoreSingleWorkerOptions {
       return this;
     }
 
+    public Builder setEnableLoggingInReplay(boolean enableLoggingInReplay) {
+      this.enableLoggingInReplay = enableLoggingInReplay;
+      return this;
+    }
+
     public Builder setUsingVirtualThreads(boolean usingVirtualThreads) {
       this.usingVirtualThreads = usingVirtualThreads;
       return this;
@@ -133,6 +140,7 @@ public final class CoreSingleWorkerOptions {
           this.maxHeartbeatThrottleInterval,
           this.defaultHeartbeatThrottleInterval,
           this.defaultDeadlockDetectionTimeout,
+          this.enableLoggingInReplay,
           this.usingVirtualThreads,
           this.versioningOptions);
     }
@@ -147,6 +155,7 @@ public final class CoreSingleWorkerOptions {
   private final Duration maxHeartbeatThrottleInterval;
   private final Duration defaultHeartbeatThrottleInterval;
   private final long defaultDeadlockDetectionTimeout;
+  private final boolean enableLoggingInReplay;
   private final boolean usingVirtualThreads;
   private final CoreWorkerVersioningOptions versioningOptions;
 
@@ -160,6 +169,7 @@ public final class CoreSingleWorkerOptions {
       Duration maxHeartbeatThrottleInterval,
       Duration defaultHeartbeatThrottleInterval,
       long defaultDeadlockDetectionTimeout,
+      boolean enableLoggingInReplay,
       boolean usingVirtualThreads,
       CoreWorkerVersioningOptions versioningOptions) {
     this.identity = identity;
@@ -171,6 +181,7 @@ public final class CoreSingleWorkerOptions {
     this.maxHeartbeatThrottleInterval = maxHeartbeatThrottleInterval;
     this.defaultHeartbeatThrottleInterval = defaultHeartbeatThrottleInterval;
     this.defaultDeadlockDetectionTimeout = defaultDeadlockDetectionTimeout;
+    this.enableLoggingInReplay = enableLoggingInReplay;
     this.usingVirtualThreads = usingVirtualThreads;
     this.versioningOptions = versioningOptions;
   }
@@ -210,6 +221,10 @@ public final class CoreSingleWorkerOptions {
 
   public long getDefaultDeadlockDetectionTimeout() {
     return defaultDeadlockDetectionTimeout;
+  }
+
+  public boolean getEnableLoggingInReplay() {
+    return enableLoggingInReplay;
   }
 
   public boolean isUsingVirtualThreads() {

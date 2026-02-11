@@ -266,8 +266,11 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
     return null;
   }
 
-  private ReplayWorkflowRunTaskHandler createFakeExecutor(PollWorkflowTaskQueueResponse response) {
-    return new ReplayWorkflowRunTaskHandler(
+  private WorkflowRunTaskHandler createFakeExecutor(PollWorkflowTaskQueueResponse response)
+      throws Exception {
+    SingleWorkerOptions options = SingleWorkerOptions.newBuilder().build();
+    ReplayWorkflowRunTaskHandlerFactory factory = new ReplayWorkflowRunTaskHandlerFactory(options);
+    return factory.create(
         "namespace",
         new ReplayWorkflow() {
           @Override
@@ -313,7 +316,6 @@ public class ReplayWorkflowRunTaskHandlerCacheTests {
           }
         },
         response,
-        SingleWorkerOptions.newBuilder().build(),
         metricsScope,
         (a, b, c) -> true,
         GetSystemInfoResponse.Capabilities.newBuilder().build());

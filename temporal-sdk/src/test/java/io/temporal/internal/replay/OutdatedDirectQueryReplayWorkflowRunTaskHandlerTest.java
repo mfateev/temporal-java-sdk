@@ -76,17 +76,18 @@ public class OutdatedDirectQueryReplayWorkflowRunTaskHandlerTest {
             .setHistory(workflowExecutionHistory.getHistory())
             .setQuery(WorkflowQuery.newBuilder().setQueryType("some-query").build());
 
-    ReplayWorkflowRunTaskHandler handler =
-        new ReplayWorkflowRunTaskHandler(
+    SingleWorkerOptions options = SingleWorkerOptions.newBuilder().build();
+    ReplayWorkflowRunTaskHandlerFactory factory = new ReplayWorkflowRunTaskHandlerFactory(options);
+    WorkflowRunTaskHandler handler =
+        factory.create(
             "UnitTest",
             createReplayWorkflow(workflowExecutionHistory),
             wft,
-            SingleWorkerOptions.newBuilder().build(),
             new NoopScope(),
             mock(LocalActivityDispatcher.class),
             GetSystemInfoResponse.Capabilities.newBuilder().build());
 
-    stateMachines = handler.getWorkflowStateMachines();
+    stateMachines = ((ReplayWorkflowRunTaskHandler) handler).getWorkflowStateMachines();
     QueryResult queryResult =
         handler.handleDirectQueryWorkflowTask(
             wft, new FullHistoryIterator(workflowExecutionHistory.getEvents()));

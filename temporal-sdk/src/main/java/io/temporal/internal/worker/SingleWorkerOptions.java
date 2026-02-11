@@ -205,6 +205,7 @@ public final class SingleWorkerOptions {
               .setMaxHeartbeatThrottleInterval(this.maxHeartbeatThrottleInterval)
               .setDefaultHeartbeatThrottleInterval(this.defaultHeartbeatThrottleInterval)
               .setDefaultDeadlockDetectionTimeout(this.defaultDeadlockDetectionTimeout)
+              .setEnableLoggingInReplay(this.enableLoggingInReplay)
               .setUsingVirtualThreads(this.usingVirtualThreads)
               .setVersioningOptions(coreVersioningOptions)
               .build();
@@ -216,7 +217,6 @@ public final class SingleWorkerOptions {
           this.useBuildIdForVersioning,
           dataConverter,
           pollerOptions,
-          this.enableLoggingInReplay,
           this.contextPropagators,
           this.workerInterceptors,
           this.deploymentOptions);
@@ -229,7 +229,6 @@ public final class SingleWorkerOptions {
   private final boolean useBuildIdForVersioning;
   private final DataConverter dataConverter;
   private final PollerOptions pollerOptions;
-  private final boolean enableLoggingInReplay;
   private final List<ContextPropagator> contextPropagators;
   private final WorkerInterceptor[] workerInterceptors;
   private final WorkerDeploymentOptions deploymentOptions;
@@ -241,7 +240,6 @@ public final class SingleWorkerOptions {
       boolean useBuildIdForVersioning,
       DataConverter dataConverter,
       PollerOptions pollerOptions,
-      boolean enableLoggingInReplay,
       List<ContextPropagator> contextPropagators,
       WorkerInterceptor[] workerInterceptors,
       WorkerDeploymentOptions deploymentOptions) {
@@ -251,7 +249,6 @@ public final class SingleWorkerOptions {
     this.useBuildIdForVersioning = useBuildIdForVersioning;
     this.dataConverter = dataConverter;
     this.pollerOptions = pollerOptions;
-    this.enableLoggingInReplay = enableLoggingInReplay;
     this.contextPropagators = contextPropagators;
     this.workerInterceptors = workerInterceptors;
     this.deploymentOptions = deploymentOptions;
@@ -318,7 +315,7 @@ public final class SingleWorkerOptions {
   }
 
   public boolean getEnableLoggingInReplay() {
-    return enableLoggingInReplay;
+    return coreOptions.getEnableLoggingInReplay();
   }
 
   public List<ContextPropagator> getContextPropagators() {
