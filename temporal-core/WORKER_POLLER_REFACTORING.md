@@ -13,18 +13,27 @@ This document describes the plan to move worker and poller infrastructure from `
 ### temporal-core contains:
 - State machine infrastructure (`WorkflowStateMachines`, individual state machines)
 - Replay abstractions (`ReplayWorkflow`, `ReplayWorkflowContext`)
-- Core utilities (`CorePayloadConverter`, marker utilities, SDK flags)
+- Replay execution (`ReplayWorkflowTaskHandler`, `ReplayWorkflowRunTaskHandler`, `ReplayWorkflowContextImpl`, `BasicWorkflowContext`)
+- Core interfaces (`ReplayWorkflowExecutorListener`, `WorkflowExceptionHandler`, `WorkflowRunTaskHandlerFactory`)
+- Core utilities (`CorePayloadConverter`, marker utilities, SDK flags, `Config`)
 - Factory interfaces (`WorkflowImplementationFactory`, `LocalActivityResult`)
 - Generic client (`GenericWorkflowClient`)
-
-### temporal-sdk contains (worker/poller related):
+- Core options (`CoreSingleWorkerOptions`, `CorePollerOptions`, `CoreWorkerVersioningOptions`)
 - Pollers: `BasePoller`, `MultiThreadedPoller`, `AsyncPoller`
-- Workers: `ActivityWorker`, `WorkflowWorker`, `NexusWorker`, `LocalActivityWorker`
 - Poll tasks: `WorkflowPollTask`, `ActivityPollTask`, `NexusPollTask` (sync and async variants)
 - Task execution: `PollTaskExecutor`
-- Concurrency: `TrackingSlotSupplier`, `AdjustableSemaphore`, `StickyQueueBalancer`
+- Task data types: `WorkflowTask`, `ActivityTask`, `NexusTask`
+- Concurrency: `TrackingSlotSupplier`, `AdjustableSemaphore`, `StickyQueueBalancer`, `WorkflowExecutorCache`, `WorkflowRunLockManager`
 - Lifecycle: `SuspendableWorker`, `Shutdownable`, `ShutdownManager`
-- Configuration: `SingleWorkerOptions`, `PollerOptions`, `WorkerVersioningOptions`
+
+### temporal-sdk contains:
+- Workers: `ActivityWorker`, `WorkflowWorker`, `NexusWorker`, `LocalActivityWorker`
+- Task handlers: `WorkflowTaskHandler`, `ActivityTaskHandler`, `NexusTaskHandler` (SDK-specific implementations)
+- Workflow executor: `ReplayWorkflowExecutor` (implements `ReplayWorkflowExecutorListener`)
+- Factory: `ReplayWorkflowRunTaskHandlerFactory` (wires SDK-specific components into core handler)
+- SDK options: `SingleWorkerOptions`, `PollerOptions` (wrap core options)
+- Registration: `SyncWorkflowWorker`, `SyncActivityWorker`, `SyncNexusWorker`
+- User-facing API: `Worker`, `WorkerFactory`, `WorkerOptions`
 
 ## Proposed Core Options Classes
 
@@ -287,6 +296,21 @@ All phases are complete.
    - Moved `PollerTypeMetricsTag`, `WorkflowSlotInfo`, `NexusSlotInfo`, `WorkerVersioningProtoUtils`
    - Changed poll tasks from `WorkerVersioningOptions` to `CoreWorkerVersioningOptions`
    - Added `toCoreOptions()` to `WorkerDeploymentOptions` for SDK-to-core conversion
+
+6. **Phase 6: Move ReplayWorkflowTaskHandler** _(COMPLETE)_
+   - Moved `ReplayWorkflowTaskHandler` to temporal-core
+   - Introduced `WorkflowRunTaskHandlerFactory` interface to decouple handler creation from SDK types
+   - SDK provides `ReplayWorkflowRunTaskHandlerFactory` implementing the factory interface
+
+7. **Phase 7: Move ReplayWorkflowRunTaskHandler Dependencies** _(COMPLETE)_
+   - Moved `ReplayWorkflowRunTaskHandler`, `ReplayWorkflowContextImpl`, `BasicWorkflowContext`, `Config` to temporal-core
+   - Deleted `WorkflowMutableState` from temporal-sdk (inlined into temporal-core)
+   - Introduced `ReplayWorkflowExecutorListener` interface for core handler to call executor without SDK dependency
+   - Introduced `WorkflowExceptionHandler` interface for SDK-specific exception-to-failure mapping
+   - Moved component creation (state machines, context, executor wiring) into SDK's `ReplayWorkflowRunTaskHandlerFactory`
+   - Added `enableLoggingInReplay` to `CoreSingleWorkerOptions`
+   - Replaced SDK-specific `CanceledFailure` with `canceledExceptionFactory` supplier
+   - Replaced `TEMPORAL_CHANGE_VERSION` static import with `VersionMarkerUtils.TEMPORAL_CHANGE_VERSION_SEARCH_ATTRIBUTE_NAME`
 
 ## Benefits
 
